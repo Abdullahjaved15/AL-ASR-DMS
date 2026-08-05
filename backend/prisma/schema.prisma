@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String        @id @default(uuid())
+  name            String
+  email           String        @unique
+  phone           String?
+  password        String
+  role            String        @default("SALESMAN") // ADMIN, SALESMAN
+  status          String        @default("PENDING")  // ACTIVE, PENDING, SUSPENDED
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  createdSellers  Seller[]      @relation("CreatedSellers")
+  assignedSellers Seller[]      @relation("AssignedSellers")
+  createdBuyers   Buyer[]       @relation("CreatedBuyers")
+  assignedBuyers  Buyer[]       @relation("AssignedBuyers")
+  deals           Deal[]        @relation("UserDeals")
+  activities      ActivityLog[]
+}
+
+model Seller {
+  id               String        @id @default(uuid())
+  createdBy        String
+  createdByUser    User          @relation("CreatedSellers", fields: [createdBy], references: [id])
+  registrationDate DateTime      @default(now())
+
+  vehicle          String
+  model            String
+  year             Int
+  color            String
+  mileage          Int
+
+  demandPrice      Float
+
+  sellerName       String
+  sellerPhone      String
+  sellerCity       String
+
+  leadSource       String
+  leadReference    String?
+
+  assignedTo       String?
+  assignedUser     User?         @relation("AssignedSellers", fields: [assignedTo], references: [id])
+
+  leadStatus       String        @default("New Lead") // New Lead, Contacted, Follow Up, Interested, Negotiation, Deal Closed, Lost, Cancelled, Incomplete
+  comments         String?
+
+  images           SellerImage[]
+  deals            Deal[]
+
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
+model SellerImage {
+  id                 String   @id @default(uuid())
+  sellerId           String
+  seller             Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  category           String   @default("Other") // Front, Back, Interior, Engine, Dashboard, Documents, Other
+  imageUrl           String
+  cloudinaryPublicId String?
+  uploadedAt         DateTime @default(now())
+}
+
+model Buyer {
+  id               String   @id @default(uuid())
+  createdBy        String
+  createdByUser    User     @relation("CreatedBuyers", fields: [createdBy], references: [id])
+  registrationDate DateTime @default(now())
+
+  vehicle          String
+  model            String
+  year             Int
+  color            String
+  mileage          Int
+
+  budget           Float
+
+  buyerName        String
+  buyerPhone       String
+  buyerCity        String
+
+  leadSource       String
+  leadReference    String?
+
+  assignedTo       String?
+  assignedUser     User?    @relation("AssignedBuyers", fields: [assignedTo], references: [id])
+
+  leadStatus       String   @default("New Lead")
+  comments         String?
+
+  deals            Deal[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Deal {
+  id          String   @id @default(uuid())
+  buyerId     String
+  buyer       Buyer    @relation(fields: [buyerId], references: [id])
+  sellerId    String
+  seller      Seller   @relation(fields: [sellerId], references: [id])
+  salesmanId  String
+  salesman    User     @relation("UserDeals", fields: [salesmanId], references: [id])
+
+  dealPrice   Float
+  profit      Float
+  closingDate DateTime @default(now())
+  remarks     String?
+
+  createdAt   DateTime @default(now())
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  details   String
+  timestamp DateTime @default(now())
+}

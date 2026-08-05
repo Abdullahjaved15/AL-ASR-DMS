@@ -1,0 +1,17 @@
+# Environment variables (DO NOT COMMIT)
+.env
+.env.local
+*.env
+
+# Dependencies
+node_modules/
+
+# Local databases & uploads
+*.db
+*.db-journal
+prisma/dev.db
+public/uploads/*
+!public/uploads/.gitkeep
+
+# Logs
+*.log

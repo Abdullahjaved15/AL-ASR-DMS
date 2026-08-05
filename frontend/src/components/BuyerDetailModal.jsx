@@ -1,0 +1,126 @@
+import React from 'react';
+import { X, Users, Phone, MapPin, Calendar, Tag, UserCheck, Edit, DollarSign, FileText } from 'lucide-react';
+import StatusBadge from './StatusBadge';
+
+export default function BuyerDetailModal({ buyer, onClose, onEdit }) {
+  if (!buyer) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/85 backdrop-blur-lg flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="glass-modal rounded-3xl p-6 w-full max-w-2xl border border-white/10 shadow-2xl my-8 relative flex flex-col">
+        {/* Modal Header */}
+        <div className="flex flex-wrap items-center justify-between pb-4 border-b border-white/10 gap-3">
+          <div className="flex items-center space-x-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-black font-extrabold text-lg">
+              {buyer.buyerName?.charAt(0).toUpperCase() || 'B'}
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h3 className="text-xl font-extrabold text-white">{buyer.buyerName}</h3>
+                <StatusBadge status={buyer.leadStatus} />
+              </div>
+              <p className="text-xs text-slate-400 font-mono mt-0.5">
+                Buyer Lead ID: {buyer.id?.substring(0, 8)} • Registered: {new Date(buyer.createdAt).toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => onEdit(buyer)}
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 rounded-xl text-xs font-mono flex items-center space-x-1.5 transition-colors"
+            >
+              <Edit className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Edit Inquiry</span>
+            </button>
+
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Content Body */}
+        <div className="py-5 space-y-5">
+          {/* Overview Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Buyer Contact Information */}
+            <div className="glass-card rounded-2xl p-5 border border-white/10 space-y-3">
+              <h4 className="text-xs uppercase font-mono text-cyan-400 tracking-wider font-bold border-b border-white/5 pb-2">
+                Buyer Contact Details
+              </h4>
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-mono">Full Name:</span>
+                  <span className="font-bold text-white text-sm">{buyer.buyerName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-mono">Phone Number:</span>
+                  <span className="font-mono text-cyan-400 font-bold">{buyer.buyerPhone}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-mono">City / Location:</span>
+                  <span className="text-white font-medium">{buyer.buyerCity}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-mono">Lead Source:</span>
+                  <span className="text-slate-300 font-mono">{buyer.leadSource}</span>
+                </div>
+                {buyer.leadReference && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-400 font-mono">Reference:</span>
+                    <span className="text-slate-300 font-mono">{buyer.leadReference}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Vehicle Requirement & Budget */}
+            <div className="glass-card rounded-2xl p-5 border border-white/10 space-y-3">
+              <h4 className="text-xs uppercase font-mono text-cyan-400 tracking-wider font-bold border-b border-white/5 pb-2">
+                Inquiry Requirements & Budget
+              </h4>
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-mono">Target Budget:</span>
+                  <span className="font-mono font-extrabold text-emerald-400 text-base">
+                    Rs. {buyer.budget?.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-mono">Desired Vehicle:</span>
+                  <span className="font-bold text-white">{buyer.vehicle} {buyer.model}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-mono">Model Year Target:</span>
+                  <span className="font-mono text-white font-semibold">{buyer.year}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-mono">Color Preference:</span>
+                  <span className="text-white font-medium">{buyer.color}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-mono">Assigned Agent:</span>
+                  <span className="font-mono text-emerald-400 font-semibold">
+                    {buyer.assignedUser?.name || 'Unassigned'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Comments & Inquiry Notes */}
+          {buyer.comments && (
+            <div className="glass-card rounded-2xl p-4 border border-white/10">
+              <h4 className="text-xs uppercase font-mono text-slate-400 tracking-wider mb-1">Inquiry Comments & Requirements Notes</h4>
+              <p className="text-xs text-slate-200 leading-relaxed font-sans">{buyer.comments}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
