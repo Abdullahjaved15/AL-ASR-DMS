@@ -3,7 +3,7 @@ import { Search, Plus, Car, UserPlus, Handshake, Menu, LogOut } from 'lucide-rea
 import { useAuth } from '../context/AuthContext';
 
 export default function Header({ currentTab, search, setSearch, onOpenModal, onToggleMobileMenu }) {
-  const { user, logout } = useAuth();
+const { user, isAdmin, logout } = useAuth();
   const [localSearch, setLocalSearch] = useState(search);
 
   useEffect(() => {
@@ -77,35 +77,39 @@ export default function Header({ currentTab, search, setSearch, onOpenModal, onT
           />
         </div>
 
-        {/* Quick Action Buttons */}
-        {(currentTab === 'all_sellers' || currentTab === 'my_sellers' || currentTab === 'sellers' || currentTab === 'dashboard') && (
-          <button
-            onClick={() => onOpenModal('seller')}
-            className="px-3 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold rounded-xl text-xs shadow-lg shadow-cyan-500/20 transition-all flex items-center space-x-1.5"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Seller</span>
-          </button>
-        )}
+        {/* Quick Action Buttons (Admin Only) */}
+        {isAdmin && (
+          <>
+            {(currentTab === 'all_sellers' || currentTab === 'my_sellers' || currentTab === 'sellers' || currentTab === 'dashboard') && (
+              <button
+                onClick={() => onOpenModal('seller')}
+                className="px-3 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold rounded-xl text-xs shadow-lg shadow-cyan-500/20 transition-all flex items-center space-x-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Seller</span>
+              </button>
+            )}
 
-        {(currentTab === 'all_buyers' || currentTab === 'my_buyers' || currentTab === 'buyers' || currentTab === 'dashboard') && (
-          <button
-            onClick={() => onOpenModal('buyer')}
-            className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold border border-white/10 rounded-xl text-xs transition-all flex items-center space-x-1.5"
-          >
-            <UserPlus className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Add Buyer</span>
-          </button>
-        )}
+            {(currentTab === 'all_buyers' || currentTab === 'my_buyers' || currentTab === 'buyers' || currentTab === 'dashboard') && (
+              <button
+                onClick={() => onOpenModal('buyer')}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold border border-white/10 rounded-xl text-xs transition-all flex items-center space-x-1.5"
+              >
+                <UserPlus className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Add Buyer</span>
+              </button>
+            )}
 
-        {(currentTab === 'deals' || currentTab === 'dashboard') && (
-          <button
-            onClick={() => onOpenModal('deal')}
-            className="px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 font-semibold rounded-xl text-xs transition-all flex items-center space-x-1.5"
-          >
-            <Handshake className="w-3.5 h-3.5" />
-            <span>Close Deal</span>
-          </button>
+            {(currentTab === 'deals' || currentTab === 'dashboard') && (
+              <button
+                onClick={() => onOpenModal('deal')}
+                className="px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 font-semibold rounded-xl text-xs transition-all flex items-center space-x-1.5"
+              >
+                <Handshake className="w-3.5 h-3.5" />
+                <span>Close Deal</span>
+              </button>
+            )}
+          </>
         )}
 
         <button

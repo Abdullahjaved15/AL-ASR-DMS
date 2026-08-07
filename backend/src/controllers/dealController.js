@@ -56,6 +56,10 @@ const getDeals = async (req, res) => {
 
 const createDeal = async (req, res) => {
   try {
+    if (req.user.role === 'SALESMAN') {
+      return res.status(403).json({ message: 'Access denied: Only Administrators can register closed deals.' });
+    }
+
     const { buyerId, sellerId, dealPrice, closingDate, remarks } = req.body;
 
     if (!buyerId || !sellerId || !dealPrice) {
@@ -70,13 +74,6 @@ const createDeal = async (req, res) => {
     const seller = await prisma.seller.findUnique({ where: { id: sellerId } });
     if (!seller) {
       return res.status(404).json({ message: 'Seller vehicle not found' });
-    }
-
-    // RBAC check
-    if (req.user.role !== 'ADMIN') {
-      if (seller.assignedTo !== req.user.id && seller.createdBy !== req.user.id) {
-        return res.status(403).json({ message: 'You can only close deals for your assigned seller leads' });
-      }
     }
 
     const numericDealPrice = parseFloat(dealPrice);

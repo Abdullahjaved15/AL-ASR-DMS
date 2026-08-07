@@ -122,13 +122,15 @@ export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
       {/* Action Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold text-white">Closed Transactions Ledger (PKR)</h3>
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black font-bold rounded-xl text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center space-x-1.5"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Finalize New Deal</span>
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black font-bold rounded-xl text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center space-x-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Finalize New Deal</span>
+          </button>
+        )}
       </div>
 
       {/* Deals Data Table */}

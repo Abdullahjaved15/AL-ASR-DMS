@@ -72,22 +72,24 @@ export default function Dashboard({ onNavigate, onOpenModal }) {
                 : 'Here is your personal sales pipeline summary. Manage your assigned seller leads, buyer inquiries, and closed transactions.'}
             </p>
           </div>
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={() => onOpenModal('seller')}
-              className="px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-extrabold rounded-xl text-xs shadow-lg shadow-cyan-500/20 transition-all flex items-center space-x-2"
-            >
-              <Car className="w-4 h-4" />
-              <span>+ Add Seller Vehicle</span>
-            </button>
-            <button
-              onClick={() => onOpenModal('deal')}
-              className="px-4 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 font-semibold rounded-xl text-xs transition-all flex items-center space-x-2"
-            >
-              <Handshake className="w-4 h-4" />
-              <span>Register Deal</span>
-            </button>
-          </div>
+          {isAdmin && (
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => onOpenModal('seller')}
+                className="px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-extrabold rounded-xl text-xs shadow-lg shadow-cyan-500/20 transition-all flex items-center space-x-2"
+              >
+                <Car className="w-4 h-4" />
+                <span>+ Add Seller Vehicle</span>
+              </button>
+              <button
+                onClick={() => onOpenModal('deal')}
+                className="px-4 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 font-semibold rounded-xl text-xs transition-all flex items-center space-x-2"
+              >
+                <Handshake className="w-4 h-4" />
+                <span>Register Deal</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
