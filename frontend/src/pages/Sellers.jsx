@@ -272,7 +272,8 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                 <th>Seller Name & Contact</th>
                 <th>City</th>
                 <th>Demand Price (PKR)</th>
-                <th>Salesman</th>
+                <th>Lead Shared By / Ref</th>
+                <th>Assigned Salesman</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -280,12 +281,13 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
               ${sellers.map((s, idx) => `
                 <tr>
                   <td>${idx + 1}</td>
-                  <td><strong>${s.vehicle} ${s.model}</strong> (${s.year})<br/><span style="color:#64748b; font-size:10px;">Color: ${s.color}</span></td>
+                  <td><strong>${s.vehicle} ${s.model}</strong> (${s.year})<br/><span style="color:#64748b; font-size:10px;">Color: ${s.color || 'N/A'}</span></td>
                   <td>${s.numberPlate ? `<span class="plate-tag">${s.numberPlate}</span>` : '<span style="color:#94a3b8;">Unregistered</span>'}</td>
                   <td><strong>${s.carCondition || 'Used'}</strong> ${s.carCondition === 'Zero Meter' ? `(${s.zeroMeterType || 'Cash'})` : ''}</td>
                   <td><strong>${s.sellerName}</strong><br/><span style="color:#64748b; font-size:10px;">${s.sellerPhone}</span></td>
                   <td>${s.sellerCity}</td>
                   <td><strong>Rs. ${s.demandPrice?.toLocaleString()}</strong></td>
+                  <td><strong>${s.leadReference || s.leadSource || 'Direct'}</strong></td>
                   <td>${s.assignedUser?.name || 'Unassigned'}</td>
                   <td>${s.leadStatus}</td>
                 </tr>

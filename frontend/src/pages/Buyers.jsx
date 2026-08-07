@@ -292,9 +292,11 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                 <th>Buyer Name & Contact</th>
                 <th>City</th>
                 <th>Desired Vehicle Specs</th>
-                <th>Target Budget (PKR)</th>
-                <th>Payment / Financing</th>
-                <th>Salesman</th>
+                <th>Condition</th>
+                <th>Target Budget / Total Amount</th>
+                <th>Bank Financing Breakdown</th>
+                <th>Lead Shared By / Ref</th>
+                <th>Assigned Salesman</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -305,13 +307,20 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                   <td><strong>${b.buyerName}</strong><br/><span style="color:#64748b; font-size:10px;">${b.buyerPhone}</span></td>
                   <td>${b.buyerCity}</td>
                   <td><strong>${b.vehicle} ${b.model}</strong> (${b.year})</td>
+                  <td><strong>${b.carCondition || 'Used'}</strong> ${b.carCondition === 'Zero Meter' ? `(${b.zeroMeterType || 'Cash'})` : ''}</td>
                   <td><strong>Rs. ${b.budget?.toLocaleString()}</strong></td>
                   <td>
                     ${b.isBankCase 
-                      ? `<span class="badge bank-badge">BANK CASE (${b.bankName || 'Standard Bank'})</span>` 
+                      ? `<div style="font-size:10px; line-height:1.4;">
+                          <span class="badge bank-badge">BANK CASE (${b.bankName || 'Standard Bank'})</span><br/>
+                          <strong>Downpayment (${b.downpaymentPercent || 0}%):</strong> Rs. ${(b.downpaymentAmount || 0).toLocaleString()}<br/>
+                          <strong>Processing Fees:</strong> Rs. ${(b.processingFees || 0).toLocaleString()}<br/>
+                          <strong style="color:#0284c7;">Bank Due Loan:</strong> Rs. ${(b.dueAmount || 0).toLocaleString()}
+                         </div>` 
                       : `<span class="badge cash-badge">CASH SALE</span>`
                     }
                   </td>
+                  <td><strong>${b.leadReference || b.leadSource || 'Direct'}</strong></td>
                   <td>${b.assignedUser?.name || 'Unassigned'}</td>
                   <td>${b.leadStatus}</td>
                 </tr>
