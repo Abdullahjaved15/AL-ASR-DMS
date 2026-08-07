@@ -369,9 +369,13 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
             </thead>
             <tbody className="divide-y divide-white/5 text-xs">
               {sellers.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((seller) => (
-                <tr key={seller.id} className="hover:bg-white/5 transition-colors">
-                  <td className="py-4 px-4 cursor-pointer" onClick={() => openDetailModal(seller)}>
-                    <div className="flex items-center space-x-3 group">
+                <tr 
+                  key={seller.id} 
+                  onClick={() => openDetailModal(seller)}
+                  className="hover:bg-cyan-500/5 cursor-pointer transition-colors group"
+                >
+                  <td className="py-4 px-4">
+                    <div className="flex items-center space-x-3">
                       <div className="w-10 h-10 rounded-xl bg-slate-900 border border-white/10 group-hover:border-cyan-500/50 flex items-center justify-center text-cyan-400 font-mono font-bold transition-all">
                         {seller.vehicle?.substring(0, 2).toUpperCase()}
                       </div>
@@ -397,8 +401,8 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                     </div>
                   </td>
 
-                  <td className="py-4 px-4 cursor-pointer" onClick={() => openDetailModal(seller)}>
-                    <p className="font-semibold text-white hover:text-cyan-400 transition-colors">{seller.sellerName}</p>
+                  <td className="py-4 px-4">
+                    <p className="font-semibold text-white group-hover:text-cyan-400 transition-colors">{seller.sellerName}</p>
                     <p className="text-[11px] text-slate-400 font-mono flex items-center space-x-1 mt-0.5">
                       <Phone className="w-3 h-3 text-cyan-400" />
                       <span>{seller.sellerPhone}</span>
@@ -424,7 +428,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                     <StatusBadge status={seller.leadStatus} />
                   </td>
 
-                  <td className="py-4 px-4">
+                  <td className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => openImagesModal(seller)}
                       className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 border border-white/10 text-cyan-400 rounded-lg font-mono text-[11px] flex items-center space-x-1.5 transition-colors"
@@ -434,9 +438,18 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                     </button>
                   </td>
 
-                  <td className="py-4 px-4 text-right">
+                  <td className="py-4 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end space-x-2">
-                      {(isAdmin || seller.assignedTo === user?.id || seller.createdBy === user?.id) ? (
+                      <button
+                        onClick={() => openDetailModal(seller)}
+                        className="px-2 py-1.5 rounded-lg bg-slate-800/80 hover:bg-cyan-500/20 border border-white/10 text-slate-300 hover:text-cyan-400 font-mono text-[10px] flex items-center space-x-1 transition-all"
+                        title="View full vehicle seller details"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>View</span>
+                      </button>
+
+                      {(isAdmin || seller.assignedTo === user?.id || seller.createdBy === user?.id) && (
                         <>
                           <button
                             onClick={() => openEditModal(seller)}
@@ -456,14 +469,6 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                             </button>
                           )}
                         </>
-                      ) : (
-                        <button
-                          onClick={() => openDetailModal(seller)}
-                          className="px-2 py-1 rounded-lg bg-slate-800/80 border border-white/10 text-slate-400 font-mono text-[10px] hover:text-cyan-400 flex items-center space-x-1"
-                        >
-                          <Eye className="w-3 h-3" />
-                          <span>View Only</span>
-                        </button>
                       )}
                     </div>
                   </td>

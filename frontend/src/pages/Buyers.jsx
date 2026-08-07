@@ -422,9 +422,13 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                 </tr>
               ) : (
                 buyers.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((buyer) => (
-                  <tr key={buyer.id} className="hover:bg-white/[0.02] transition-colors">
+                  <tr 
+                    key={buyer.id} 
+                    onClick={() => openDetailModal(buyer)}
+                    className="hover:bg-cyan-500/5 cursor-pointer transition-colors group"
+                  >
                     <td className="py-4 px-4">
-                      <div className="font-bold text-white text-sm">{buyer.buyerName}</div>
+                      <div className="font-bold text-white text-sm group-hover:text-cyan-400 transition-colors">{buyer.buyerName}</div>
                       <div className="text-slate-400 font-mono text-[11px] flex items-center space-x-1 mt-0.5">
                         <span>{buyer.buyerPhone}</span>
                         <span>•</span>
@@ -478,8 +482,17 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                       <StatusBadge status={buyer.leadStatus} />
                     </td>
 
-                    <td className="py-4 px-4 text-right">
+                    <td className="py-4 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end space-x-1.5">
+                        <button
+                          onClick={() => openDetailModal(buyer)}
+                          className="px-2 py-1.5 rounded-lg bg-slate-800/80 hover:bg-cyan-500/20 border border-white/10 text-slate-300 hover:text-cyan-400 font-mono text-[10px] flex items-center space-x-1 transition-all"
+                          title="View full buyer inquiry details"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>View</span>
+                        </button>
+
                         {buyer.isBankCase && (
                           <button
                             onClick={() => { setSelectedBuyer(buyer); setIsChecklistModalOpen(true); }}
@@ -491,7 +504,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                           </button>
                         )}
 
-                        {(isAdmin || buyer.assignedTo === user?.id || buyer.createdBy === user?.id) ? (
+                        {(isAdmin || buyer.assignedTo === user?.id || buyer.createdBy === user?.id) && (
                           <>
                             <button
                               onClick={() => openEditModal(buyer)}
@@ -511,14 +524,6 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                               </button>
                             )}
                           </>
-                        ) : (
-                          <button
-                            onClick={() => openDetailModal(buyer)}
-                            className="px-2 py-1 rounded-lg bg-slate-800/80 border border-white/10 text-slate-400 font-mono text-[10px] hover:text-cyan-400 flex items-center space-x-1"
-                          >
-                            <Eye className="w-3 h-3" />
-                            <span>View</span>
-                          </button>
                         )}
                       </div>
                     </td>
