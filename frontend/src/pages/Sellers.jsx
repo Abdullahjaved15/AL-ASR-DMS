@@ -88,16 +88,18 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
     setLoading(true);
     try {
       const activeFilters = { ...filters };
-      if (scope === 'mine' && user?.id) {
+      if (scope === 'mine' && user?.id && !isAdmin) {
         activeFilters.assignedTo = user.id;
       }
       const data = await api.getSellers({
         search,
         ...activeFilters
       });
-      const filteredData = (scope === 'mine' && user?.id)
-        ? data.filter(s => s.assignedTo === user.id || s.createdBy === user.id)
-        : data;
+      let filteredData = data;
+      if (scope === 'mine' && user?.id) {
+        const mine = data.filter(s => s.assignedTo === user.id || s.createdBy === user.id);
+        filteredData = (isAdmin && mine.length === 0) ? data : mine;
+      }
       setSellers(filteredData);
     } catch (err) {
       console.error('Failed to fetch sellers:', err);
