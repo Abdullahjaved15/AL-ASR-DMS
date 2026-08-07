@@ -375,7 +375,9 @@ export default function CurrentStock() {
                       </div>
                       <div>
                         <p className="font-extrabold text-white text-sm">{item.vehicle} {item.model}</p>
-                        <p className="text-[11px] text-slate-400 font-mono">{item.notes || 'Main Showroom Floor'}</p>
+                        <p className="text-[11px] text-slate-400 font-mono">
+                          {item.notes && !item.notes.includes('Imported from') ? item.notes : 'Showroom Floor Inventory'}
+                        </p>
                       </div>
                     </div>
                   </td>

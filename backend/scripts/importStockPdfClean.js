@@ -160,7 +160,7 @@ async function importStockPdf() {
         location: 'Main Showroom Floor',
         careOf: careOf,
         regNumber: regNumber,
-        notes: `Imported from Stock.pdf floor inventory (${line})`
+        notes: null
       }
     });
 
