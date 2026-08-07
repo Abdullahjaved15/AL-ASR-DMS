@@ -737,26 +737,22 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                     {Boolean(formData.budget) && (
                       <div className="bg-slate-950/80 p-3.5 rounded-xl border border-sky-500/20 text-xs space-y-1.5 font-mono">
                         <div className="flex justify-between text-slate-300">
-                          <span>Vehicle Price:</span>
+                          <span>Vehicle Target Budget / Price:</span>
                           <span className="font-bold text-white">Rs. {parseFloat(formData.budget || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-amber-300">
+                          <span>Downpayment ({formData.downpaymentPercent || 0}% of Vehicle Price):</span>
+                          <span className="font-bold">- Rs. {(parseFloat(formData.budget || 0) * ((parseFloat(formData.downpaymentPercent) || 0) / 100)).toLocaleString()}</span>
                         </div>
                         {Boolean(parseFloat(formData.processingFees)) && (
                           <div className="flex justify-between text-purple-300">
-                            <span>Processing Fees:</span>
+                            <span>Processing Fees (Added After Downpayment):</span>
                             <span>+ Rs. {parseFloat(formData.processingFees || 0).toLocaleString()}</span>
                           </div>
                         )}
-                        <div className="flex justify-between text-sky-400 font-bold border-t border-white/10 pt-1">
-                          <span>Total Amount (Vehicle + Fees):</span>
-                          <span>Rs. {(parseFloat(formData.budget || 0) + (parseFloat(formData.processingFees) || 0)).toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between text-amber-300">
-                          <span>Downpayment ({formData.downpaymentPercent || 0}% of Total):</span>
-                          <span className="font-bold">- Rs. {((parseFloat(formData.budget || 0) + (parseFloat(formData.processingFees) || 0)) * ((parseFloat(formData.downpaymentPercent) || 0) / 100)).toLocaleString()}</span>
-                        </div>
                         <div className="flex justify-between text-cyan-300 font-bold text-sm pt-1.5 border-t border-white/10">
-                          <span>Calculated Due Amount (Bank Loan Balance):</span>
-                          <span>Rs. {((parseFloat(formData.budget || 0) + (parseFloat(formData.processingFees) || 0)) - ((parseFloat(formData.budget || 0) + (parseFloat(formData.processingFees) || 0)) * ((parseFloat(formData.downpaymentPercent) || 0) / 100))).toLocaleString()}</span>
+                          <span>Calculated Due Amount (Bank Loan Balance + Fees):</span>
+                          <span>Rs. {((parseFloat(formData.budget || 0) - (parseFloat(formData.budget || 0) * ((parseFloat(formData.downpaymentPercent) || 0) / 100))) + (parseFloat(formData.processingFees) || 0)).toLocaleString()}</span>
                         </div>
                       </div>
                     )}

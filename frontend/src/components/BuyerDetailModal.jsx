@@ -99,26 +99,20 @@ export default function BuyerDetailModal({ buyer, onClose, onEdit }) {
                 {buyer.isBankCase && (
                   <>
                     <div className="flex justify-between">
-                      <span className="text-slate-400 font-mono">Processing Fees:</span>
+                      <span className="text-slate-400 font-mono">Downpayment ({buyer.downpaymentPercent || 0}% of Vehicle Price):</span>
+                      <span className="font-mono text-amber-300 font-bold">
+                        - Rs. {(buyer.downpaymentAmount || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 font-mono">Processing Fees (Added After Downpayment):</span>
                       <span className="font-mono text-purple-300 font-bold">
                         + Rs. {(buyer.processingFees || 0).toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between pt-1 border-t border-white/10">
-                      <span className="text-slate-300 font-mono font-bold">Total Amount:</span>
-                      <span className="font-mono font-extrabold text-sky-400 text-sm">
-                        Rs. {((buyer.budget || 0) + (buyer.processingFees || 0)).toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400 font-mono">Downpayment ({buyer.downpaymentPercent || 0}%):</span>
-                      <span className="font-mono text-amber-300 font-bold">
-                        Rs. {(buyer.downpaymentAmount || 0).toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400 font-mono">Bank Due Loan Balance:</span>
-                      <span className="font-mono text-cyan-300 font-bold">
+                      <span className="text-slate-300 font-mono font-bold">Calculated Due Loan Balance:</span>
+                      <span className="font-mono font-extrabold text-cyan-300 text-sm">
                         Rs. {(buyer.dueAmount || 0).toLocaleString()}
                       </span>
                     </div>
