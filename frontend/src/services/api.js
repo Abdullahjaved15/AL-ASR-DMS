@@ -1,5 +1,6 @@
 const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
 const API_BASE = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
+console.log('🔗 AL ASR DMS connecting to Backend API at:', API_BASE);
 
 const getHeaders = (isMultipart = false) => {
   const token = localStorage.getItem('dms_token');
