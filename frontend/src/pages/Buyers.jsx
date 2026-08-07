@@ -10,6 +10,16 @@ import { logoBase64 } from '../utils/logoBase64';
 
 const leadStatuses = ['New Lead', 'Contacted', 'Follow Up', 'Interested', 'Negotiation', 'Deal Closed', 'Lost', 'Cancelled', 'Incomplete'];
 
+const formatDateStr = (dateVal) => {
+  if (!dateVal) return '-';
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return '-';
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const year = d.getUTCFullYear();
+  return `${day}-${month}-${year}`;
+};
+
 export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scope = 'all' }) {
   const { user, isAdmin } = useAuth();
   const [buyers, setBuyers] = useState([]);
@@ -236,16 +246,6 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
     const printWindow = window.open('', '_blank');
     const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const totalValuation = buyers.reduce((acc, b) => acc + (b.budget || 0), 0);
-
-    const formatDateStr = (dateVal) => {
-      if (!dateVal) return '-';
-      const d = new Date(dateVal);
-      if (isNaN(d.getTime())) return '-';
-      const day = String(d.getUTCDate()).padStart(2, '0');
-      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-      const year = d.getUTCFullYear();
-      return `${day}-${month}-${year}`;
-    };
 
     const htmlContent = `
       <!DOCTYPE html>
