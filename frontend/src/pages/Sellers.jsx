@@ -274,7 +274,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
             <thead>
               <tr>
                 <th>#</th>
-                <th>Lead Date</th>
+                <th>Lead Assign Date</th>
                 <th>Vehicle & Specs</th>
                 <th>Reg / Plate #</th>
                 <th>Condition</th>
@@ -372,7 +372,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-900/80 border-b border-white/10 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
-                <th className="py-3.5 px-4">Lead Date</th>
+                <th className="py-3.5 px-4">Lead Assign Date</th>
                 <th className="py-3.5 px-4">Vehicle & Specs</th>
                 <th className="py-3.5 px-4">Seller Contact</th>
                 <th className="py-3.5 px-4">Demand Price</th>

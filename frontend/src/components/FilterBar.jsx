@@ -250,11 +250,11 @@ export default function FilterBar({
             </div>
           )}
 
-          {/* From Lead Date Filter */}
+          {/* From Lead Assign Date Filter */}
           <div className="space-y-1.5">
             <label className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider flex items-center space-x-1">
               <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-              <span>From Lead Date</span>
+              <span>From Assign Date</span>
             </label>
             <input
               type="date"
@@ -264,11 +264,11 @@ export default function FilterBar({
             />
           </div>
 
-          {/* To Lead Date Filter */}
+          {/* To Lead Assign Date Filter */}
           <div className="space-y-1.5">
             <label className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider flex items-center space-x-1">
               <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-              <span>To Lead Date</span>
+              <span>To Assign Date</span>
             </label>
             <input
               type="date"
@@ -332,7 +332,7 @@ export default function FilterBar({
 
           {(filters.fromDate || filters.toDate) && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-xs font-mono">
-              <span>Date Range: <strong>{filters.fromDate || 'Start'} to {filters.toDate || 'End'}</strong></span>
+              <span>Assign Date Range: <strong>{filters.fromDate || 'Start'} to {filters.toDate || 'End'}</strong></span>
               <button onClick={() => { removeFilter('fromDate'); removeFilter('toDate'); }} className="hover:text-white transition-colors">
                 <X className="w-3 h-3" />
               </button>

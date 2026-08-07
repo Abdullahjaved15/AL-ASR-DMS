@@ -297,7 +297,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
             <thead>
               <tr>
                 <th>#</th>
-                <th>Lead Date</th>
+                <th>Lead Assign Date</th>
                 <th>Buyer Name & Contact</th>
                 <th>City</th>
                 <th>Desired Vehicle Specs</th>
@@ -406,7 +406,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-900/80 border-b border-white/10 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
-                <th className="py-3.5 px-4">Lead Date</th>
+                <th className="py-3.5 px-4">Lead Assign Date</th>
                 <th className="py-3.5 px-4">Buyer & Contact</th>
                 <th className="py-3.5 px-4">Desired Vehicle</th>
                 <th className="py-3.5 px-4">Condition</th>
