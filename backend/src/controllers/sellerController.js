@@ -15,9 +15,9 @@ const invalidateSellersCache = () => {
 
 const getSellers = async (req, res) => {
   try {
-    const { search, leadStatus, assignedTo, city, vehicle, model, minYear, maxYear, year, minPrice, maxPrice } = req.query;
+    const { search, leadStatus, assignedTo, city, vehicle, model, minYear, maxYear, year, minPrice, maxPrice, fromDate, toDate } = req.query;
 
-    const hasFilters = Boolean(search || leadStatus || assignedTo || city || vehicle || model || minYear || maxYear || year || minPrice || maxPrice);
+    const hasFilters = Boolean(search || leadStatus || assignedTo || city || vehicle || model || minYear || maxYear || year || minPrice || maxPrice || fromDate || toDate);
 
     // Return cached response for default un-filtered ADMIN requests within 15s TTL
     if (!hasFilters && (req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN') && sellersCache && (Date.now() - sellersCacheTime < CACHE_TTL_MS)) {
@@ -62,6 +62,19 @@ const getSellers = async (req, res) => {
       where.year = {};
       if (minYear) where.year.gte = parseInt(minYear);
       if (maxYear) where.year.lte = parseInt(maxYear);
+    }
+
+    // Lead Registration Date Range Filter
+    if (fromDate || toDate) {
+      where.createdAt = {};
+      if (fromDate) {
+        where.createdAt.gte = new Date(fromDate);
+      }
+      if (toDate) {
+        const toEnd = new Date(toDate);
+        toEnd.setHours(23, 59, 59, 999);
+        where.createdAt.lte = toEnd;
+      }
     }
 
     // Price Filter

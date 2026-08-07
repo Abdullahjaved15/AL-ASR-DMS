@@ -297,6 +297,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
             <thead>
               <tr>
                 <th>#</th>
+                <th>Lead Date</th>
                 <th>Buyer Name & Contact</th>
                 <th>City</th>
                 <th>Desired Vehicle Specs</th>
@@ -312,6 +313,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
               ${buyers.map((b, idx) => `
                 <tr>
                   <td>${idx + 1}</td>
+                  <td><strong style="color:#0284c7; font-family:monospace;">${new Date(b.createdAt).toLocaleDateString()}</strong></td>
                   <td><strong>${b.buyerName}</strong><br/><span style="color:#64748b; font-size:10px;">${b.buyerPhone}</span></td>
                   <td>${b.buyerCity}</td>
                   <td><strong>${b.vehicle} ${b.model}</strong> (${b.year})</td>
@@ -404,6 +406,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-900/80 border-b border-white/10 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
+                <th className="py-3.5 px-4">Lead Date</th>
                 <th className="py-3.5 px-4">Buyer & Contact</th>
                 <th className="py-3.5 px-4">Desired Vehicle</th>
                 <th className="py-3.5 px-4">Condition</th>
@@ -417,14 +420,14 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
             <tbody className="divide-y divide-white/5 text-xs text-slate-200">
               {loading ? (
                 <tr>
-                  <td colSpan="8" className="py-12 text-center text-slate-400">
+                  <td colSpan="9" className="py-12 text-center text-slate-400">
                     <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-sky-500 border-t-transparent mb-2"></div>
                     <p className="font-mono">Loading buyer leads...</p>
                   </td>
                 </tr>
               ) : buyers.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="py-12 text-center text-slate-400 font-mono">
+                  <td colSpan="9" className="py-12 text-center text-slate-400 font-mono">
                     No buyer inquiries found matching your filters.
                   </td>
                 </tr>
@@ -435,6 +438,9 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                     onClick={() => openDetailModal(buyer)}
                     className="hover:bg-cyan-500/5 cursor-pointer transition-colors group"
                   >
+                    <td className="py-4 px-4 font-mono font-bold text-cyan-400 text-xs whitespace-nowrap">
+                      {new Date(buyer.createdAt).toLocaleDateString()}
+                    </td>
                     <td className="py-4 px-4" onClick={() => openDetailModal(buyer)}>
                       <div className="font-bold text-white text-sm group-hover:text-cyan-400 transition-colors">{buyer.buyerName}</div>
                       <div className="text-slate-400 font-mono text-[11px] flex items-center space-x-1 mt-0.5">

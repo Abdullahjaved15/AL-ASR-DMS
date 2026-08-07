@@ -274,6 +274,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
             <thead>
               <tr>
                 <th>#</th>
+                <th>Lead Date</th>
                 <th>Vehicle & Specs</th>
                 <th>Reg / Plate #</th>
                 <th>Condition</th>
@@ -289,6 +290,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
               ${sellers.map((s, idx) => `
                 <tr>
                   <td>${idx + 1}</td>
+                  <td><strong style="color:#0284c7; font-family:monospace;">${new Date(s.createdAt).toLocaleDateString()}</strong></td>
                   <td><strong>${s.vehicle} ${s.model}</strong> (${s.year})<br/><span style="color:#64748b; font-size:10px;">Color: ${s.color || 'N/A'}</span></td>
                   <td>${s.numberPlate ? `<span class="plate-tag">${s.numberPlate}</span>` : '<span style="color:#94a3b8;">Unregistered</span>'}</td>
                   <td><strong>${s.carCondition || 'Used'}</strong> ${s.carCondition === 'Zero Meter' ? `(${s.zeroMeterType || 'Cash'})` : ''}</td>
@@ -325,9 +327,13 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
       {/* Top Header Bar with Count and Action */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-extrabold text-white tracking-tight">Showroom Seller Inventory</h2>
+          <div className="flex items-center space-x-2">
+            <h2 className="text-xl font-extrabold text-white tracking-tight">
+              {scope === 'mine' ? 'My Sellers Leads' : 'All Sellers Inventory'}
+            </h2>
+          </div>
           <p className="text-xs font-mono text-slate-400 mt-0.5">
-            Showing <strong className="text-cyan-400">{sellers.length}</strong> matching seller vehicle(s)
+            Showing <strong className="text-cyan-400">{sellers.length}</strong> matching seller lead vehicle(s)
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -344,7 +350,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
               className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold rounded-xl text-xs shadow-lg shadow-cyan-500/20 transition-all flex items-center space-x-1.5"
             >
               <Plus className="w-4 h-4" />
-              <span>New Seller Entry</span>
+              <span>New Seller Registration</span>
             </button>
           )}
         </div>
@@ -366,6 +372,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-900/80 border-b border-white/10 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
+                <th className="py-3.5 px-4">Lead Date</th>
                 <th className="py-3.5 px-4">Vehicle & Specs</th>
                 <th className="py-3.5 px-4">Seller Contact</th>
                 <th className="py-3.5 px-4">Demand Price</th>
@@ -382,6 +389,9 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                   onClick={() => openDetailModal(seller)}
                   className="hover:bg-cyan-500/5 cursor-pointer transition-colors group"
                 >
+                  <td className="py-4 px-4 font-mono font-bold text-cyan-400 text-xs whitespace-nowrap">
+                    {new Date(seller.createdAt).toLocaleDateString()}
+                  </td>
                   <td className="py-4 px-4">
                     <div className="flex items-center space-x-3">
                       <div className="w-10 h-10 rounded-xl bg-slate-900 border border-white/10 group-hover:border-cyan-500/50 flex items-center justify-center text-cyan-400 font-mono font-bold transition-all">

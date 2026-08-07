@@ -3,9 +3,21 @@ const { formatPakistaniPhone } = require('../utils/phoneFormatter');
 
 const getBuyers = async (req, res) => {
   try {
-    const { search, leadStatus, assignedTo, city, vehicle, model, minYear, maxYear, year, minPrice, maxPrice, isBankCase } = req.query;
+    const { search, leadStatus, assignedTo, city, vehicle, model, minYear, maxYear, year, minPrice, maxPrice, isBankCase, fromDate, toDate } = req.query;
 
     const where = {};
+
+    if (fromDate || toDate) {
+      where.createdAt = {};
+      if (fromDate) {
+        where.createdAt.gte = new Date(fromDate);
+      }
+      if (toDate) {
+        const toEnd = new Date(toDate);
+        toEnd.setHours(23, 59, 59, 999);
+        where.createdAt.lte = toEnd;
+      }
+    }
 
     if (assignedTo) {
       const targetUser = await prisma.user.findUnique({ where: { id: assignedTo }, select: { name: true } });

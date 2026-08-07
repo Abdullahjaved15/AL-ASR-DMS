@@ -249,6 +249,34 @@ export default function FilterBar({
               </select>
             </div>
           )}
+
+          {/* From Lead Date Filter */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider flex items-center space-x-1">
+              <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+              <span>From Lead Date</span>
+            </label>
+            <input
+              type="date"
+              value={filters.fromDate || ''}
+              onChange={(e) => handleInputChange('fromDate', e.target.value)}
+              className="w-full bg-slate-900/90 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+            />
+          </div>
+
+          {/* To Lead Date Filter */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider flex items-center space-x-1">
+              <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+              <span>To Lead Date</span>
+            </label>
+            <input
+              type="date"
+              value={filters.toDate || ''}
+              onChange={(e) => handleInputChange('toDate', e.target.value)}
+              className="w-full bg-slate-900/90 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+            />
+          </div>
         </div>
       )}
 
@@ -297,6 +325,15 @@ export default function FilterBar({
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-300 border border-rose-500/30 text-xs font-mono">
               <span>City: <strong>{filters.city}</strong></span>
               <button onClick={() => removeFilter('city')} className="hover:text-white transition-colors">
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+
+          {(filters.fromDate || filters.toDate) && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-xs font-mono">
+              <span>Date Range: <strong>{filters.fromDate || 'Start'} to {filters.toDate || 'End'}</strong></span>
+              <button onClick={() => { removeFilter('fromDate'); removeFilter('toDate'); }} className="hover:text-white transition-colors">
                 <X className="w-3 h-3" />
               </button>
             </span>
