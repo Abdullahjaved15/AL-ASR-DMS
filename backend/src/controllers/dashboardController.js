@@ -1,9 +1,17 @@
 const prisma = require('../config/db');
 
+let dashboardCache = {};
+const DASHBOARD_CACHE_TTL = 10000; // 10 seconds
+
 const getDashboardStats = async (req, res) => {
   try {
     const isSalesman = req.user.role !== 'ADMIN';
     const userId = req.user.id;
+    const cacheKey = `${req.user.role}_${userId}`;
+
+    if (dashboardCache[cacheKey] && (Date.now() - dashboardCache[cacheKey].timestamp < DASHBOARD_CACHE_TTL)) {
+      return res.json(dashboardCache[cacheKey].data);
+    }
 
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -43,7 +51,10 @@ const getDashboardStats = async (req, res) => {
         }),
         prisma.deal.findMany({
           where: { salesmanId: userId },
-          include: { seller: true, buyer: true },
+          include: {
+            seller: { select: { id: true, vehicle: true, model: true, demandPrice: true } },
+            buyer: { select: { id: true, buyerName: true, buyerPhone: true } }
+          },
           orderBy: { closingDate: 'desc' }
         }),
         prisma.seller.count({
@@ -70,7 +81,7 @@ const getDashboardStats = async (req, res) => {
         take: 8
       });
 
-      return res.json({
+      const responsePayload = {
         role: 'SALESMAN',
         metrics: {
           mySellers,
@@ -85,10 +96,13 @@ const getDashboardStats = async (req, res) => {
         },
         recentDeals: myDeals.slice(0, 5),
         recentActivity
-      });
+      };
+
+      dashboardCache[cacheKey] = { data: responsePayload, timestamp: Date.now() };
+      return res.json(responsePayload);
 
     } else {
-      // Admin Dashboard Metrics
+      // Admin Dashboard Metrics - Query Optimization with single groupBy pass
       const [
         totalSellers,
         totalBuyers,
@@ -100,7 +114,8 @@ const getDashboardStats = async (req, res) => {
         activeLeadsCount,
         lostLeadsCount,
         pendingSalesmenCount,
-        allSalesmen
+        groupedStatus,
+        recentActivity
       ] = await Promise.all([
         prisma.seller.count(),
         prisma.buyer.count(),
@@ -111,15 +126,23 @@ const getDashboardStats = async (req, res) => {
         prisma.deal.findMany({
           include: {
             salesman: { select: { id: true, name: true, email: true } },
-            seller: true,
-            buyer: true
+            seller: { select: { id: true, vehicle: true, model: true } },
+            buyer: { select: { id: true, buyerName: true } }
           },
           orderBy: { closingDate: 'desc' }
         }),
         prisma.seller.count({ where: { leadStatus: { in: ['New Lead', 'Contacted', 'Follow Up', 'Interested', 'Negotiation'] } } }),
         prisma.seller.count({ where: { leadStatus: { in: ['Lost', 'Cancelled'] } } }),
         prisma.user.count({ where: { status: 'PENDING', role: 'SALESMAN' } }),
-        prisma.user.findMany({ where: { role: 'SALESMAN', status: 'ACTIVE' } })
+        prisma.seller.groupBy({
+          by: ['leadStatus'],
+          _count: { _all: true }
+        }),
+        prisma.activityLog.findMany({
+          include: { user: { select: { name: true, email: true, role: true } } },
+          orderBy: { timestamp: 'desc' },
+          take: 10
+        })
       ]);
 
       const totalRevenue = allDeals.reduce((sum, d) => sum + d.dealPrice, 0);
@@ -140,20 +163,17 @@ const getDashboardStats = async (req, res) => {
       const topSalesmen = Object.values(salesmanSalesMap).sort((a, b) => b.revenue - a.revenue);
       const topSalesman = topSalesmen[0] || { name: 'N/A', revenue: 0, dealsCount: 0 };
 
-      // Pipeline breakdown calculation
+      // Pipeline breakdown calculation from single groupBy query
       const statuses = ['New Lead', 'Contacted', 'Follow Up', 'Interested', 'Negotiation', 'Deal Closed', 'Lost', 'Cancelled', 'Incomplete'];
       const pipelineBreakdown = {};
-      for (const status of statuses) {
-        pipelineBreakdown[status] = await prisma.seller.count({ where: { leadStatus: status } });
-      }
-
-      const recentActivity = await prisma.activityLog.findMany({
-        include: { user: { select: { name: true, email: true, role: true } } },
-        orderBy: { timestamp: 'desc' },
-        take: 10
+      statuses.forEach(s => { pipelineBreakdown[s] = 0; });
+      groupedStatus.forEach(g => {
+        if (g.leadStatus) {
+          pipelineBreakdown[g.leadStatus] = g._count._all;
+        }
       });
 
-      return res.json({
+      const responsePayload = {
         role: 'ADMIN',
         metrics: {
           totalSellers,
@@ -172,7 +192,10 @@ const getDashboardStats = async (req, res) => {
         topSalesmenList: topSalesmen.slice(0, 5),
         recentDeals: allDeals.slice(0, 6),
         recentActivity
-      });
+      };
+
+      dashboardCache[cacheKey] = { data: responsePayload, timestamp: Date.now() };
+      return res.json(responsePayload);
     }
   } catch (error) {
     return res.status(500).json({ message: 'Failed to generate dashboard metrics', error: error.message });

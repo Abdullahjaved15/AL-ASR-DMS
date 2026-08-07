@@ -20,6 +20,16 @@ const handleResponse = async (res) => {
   return data;
 };
 
+const cleanParams = (params = {}) => {
+  const cleaned = {};
+  Object.keys(params).forEach(key => {
+    if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
+      cleaned[key] = params[key];
+    }
+  });
+  return new URLSearchParams(cleaned).toString();
+};
+
 export const api = {
   // Auth API
   login: async (email, password) => {
@@ -43,6 +53,15 @@ export const api = {
   getMe: async () => {
     const res = await fetch(`${API_BASE}/auth/me`, {
       headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  updateProfile: async (profileData) => {
+    const res = await fetch(`${API_BASE}/auth/profile`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(profileData)
     });
     return handleResponse(res);
   },
@@ -81,7 +100,7 @@ export const api = {
 
   // Sellers & Inventory API
   getSellers: async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = cleanParams(params);
     const res = await fetch(`${API_BASE}/sellers?${query}`, { headers: getHeaders() });
     return handleResponse(res);
   },
@@ -140,7 +159,7 @@ export const api = {
 
   // Buyers API
   getBuyers: async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = cleanParams(params);
     const res = await fetch(`${API_BASE}/buyers?${query}`, { headers: getHeaders() });
     return handleResponse(res);
   },
@@ -173,7 +192,7 @@ export const api = {
 
   // Deals API
   getDeals: async (params = {}) => {
-    const query = new URLSearchParams(params).toString();
+    const query = cleanParams(params);
     const res = await fetch(`${API_BASE}/deals?${query}`, { headers: getHeaders() });
     return handleResponse(res);
   },
@@ -203,5 +222,128 @@ export const api = {
   getExportCSVUrl: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     return `${API_BASE}/reports/export-csv?${query}`;
+  },
+
+  // Collaborations API
+  getCollaborations: async () => {
+    const res = await fetch(`${API_BASE}/collaborations`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  createCollaboration: async (data) => {
+    const res = await fetch(`${API_BASE}/collaborations`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  updateCollaborationStatus: async (id, data) => {
+    const res = await fetch(`${API_BASE}/collaborations/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  deleteCollaboration: async (id) => {
+    const res = await fetch(`${API_BASE}/collaborations/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  // Current Stock API
+  getCurrentStock: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/stock?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  createStockItem: async (data) => {
+    const res = await fetch(`${API_BASE}/stock`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  updateStockItem: async (id, data) => {
+    const res = await fetch(`${API_BASE}/stock/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  deleteStockItem: async (id) => {
+    const res = await fetch(`${API_BASE}/stock/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  // Invoices & Vouchers API (Super Admin)
+  getInvoices: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/invoices?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  getInvoiceById: async (id) => {
+    const res = await fetch(`${API_BASE}/invoices/${id}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  createInvoice: async (data) => {
+    const res = await fetch(`${API_BASE}/invoices`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  deleteInvoice: async (id) => {
+    const res = await fetch(`${API_BASE}/invoices/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  // Receiving Letters API (Accessible by ALL staff)
+  getReceivingLetters: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/receiving-letters?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  getReceivingLetterById: async (id) => {
+    const res = await fetch(`${API_BASE}/receiving-letters/${id}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  createReceivingLetter: async (data) => {
+    const res = await fetch(`${API_BASE}/receiving-letters`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  deleteReceivingLetter: async (id) => {
+    const res = await fetch(`${API_BASE}/receiving-letters/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
   }
 };

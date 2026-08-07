@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { DataCacheProvider } from './context/DataCacheContext';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 
@@ -10,6 +11,11 @@ import Buyers from './pages/Buyers';
 import Deals from './pages/Deals';
 import Users from './pages/Users';
 import Reports from './pages/Reports';
+import CollaborationCenter from './pages/CollaborationCenter';
+import CurrentStock from './pages/CurrentStock';
+import Invoices from './pages/Invoices';
+import ReceivingLetter from './pages/ReceivingLetter';
+import Settings from './pages/Settings';
 
 function MainLayout() {
   const { user, loading } = useAuth();
@@ -39,10 +45,10 @@ function MainLayout() {
 
   const handleOpenModal = (type) => {
     if (type === 'seller') {
-      setCurrentTab('sellers');
+      setCurrentTab('my_sellers');
       setIsSellerModalOpen(true);
     } else if (type === 'buyer') {
-      setCurrentTab('buyers');
+      setCurrentTab('my_buyers');
       setIsBuyerModalOpen(true);
     } else if (type === 'deal') {
       setCurrentTab('deals');
@@ -71,40 +77,93 @@ function MainLayout() {
         />
 
         <main className="flex-1 overflow-y-auto">
-          {currentTab === 'dashboard' && (
+          <div className={currentTab === 'dashboard' ? 'block' : 'hidden'}>
             <Dashboard
               onNavigate={(tab) => setCurrentTab(tab)}
               onOpenModal={handleOpenModal}
             />
-          )}
+          </div>
 
-          {currentTab === 'sellers' && (
+          <div className={(currentTab === 'all_sellers' || currentTab === 'sellers') ? 'block' : 'hidden'}>
             <Sellers
+              scope="all"
               search={search}
               isAddModalOpen={isSellerModalOpen}
               setIsAddModalOpen={setIsSellerModalOpen}
             />
-          )}
+          </div>
 
-          {currentTab === 'buyers' && (
+          <div className={currentTab === 'my_sellers' ? 'block' : 'hidden'}>
+            <Sellers
+              scope="mine"
+              search={search}
+              isAddModalOpen={isSellerModalOpen}
+              setIsAddModalOpen={setIsSellerModalOpen}
+            />
+          </div>
+
+          <div className={(currentTab === 'all_buyers' || currentTab === 'buyers') ? 'block' : 'hidden'}>
             <Buyers
+              scope="all"
               search={search}
               isAddModalOpen={isBuyerModalOpen}
               setIsAddModalOpen={setIsBuyerModalOpen}
             />
-          )}
+          </div>
 
-          {currentTab === 'deals' && (
+          <div className={currentTab === 'my_buyers' ? 'block' : 'hidden'}>
+            <Buyers
+              scope="mine"
+              search={search}
+              isAddModalOpen={isBuyerModalOpen}
+              setIsAddModalOpen={setIsBuyerModalOpen}
+            />
+          </div>
+
+          <div className={currentTab === 'bank_cases' ? 'block' : 'hidden'}>
+            <Buyers
+              scope="bank_cases"
+              search={search}
+              isAddModalOpen={isBuyerModalOpen}
+              setIsAddModalOpen={setIsBuyerModalOpen}
+            />
+          </div>
+
+          <div className={currentTab === 'receiving_letter' ? 'block' : 'hidden'}>
+            <ReceivingLetter />
+          </div>
+
+          <div className={currentTab === 'deals' ? 'block' : 'hidden'}>
             <Deals
               search={search}
               isAddModalOpen={isDealModalOpen}
               setIsAddModalOpen={setIsDealModalOpen}
             />
-          )}
+          </div>
 
-          {currentTab === 'users' && <Users />}
+          <div className={currentTab === 'collaboration' ? 'block' : 'hidden'}>
+            <CollaborationCenter />
+          </div>
 
-          {currentTab === 'reports' && <Reports />}
+          <div className={currentTab === 'stock' ? 'block' : 'hidden'}>
+            <CurrentStock />
+          </div>
+
+          <div className={currentTab === 'invoices' ? 'block' : 'hidden'}>
+            <Invoices />
+          </div>
+
+          <div className={currentTab === 'users' ? 'block' : 'hidden'}>
+            <Users />
+          </div>
+
+          <div className={currentTab === 'reports' ? 'block' : 'hidden'}>
+            <Reports />
+          </div>
+
+          <div className={currentTab === 'settings' ? 'block' : 'hidden'}>
+            <Settings />
+          </div>
         </main>
       </div>
     </div>
@@ -114,7 +173,9 @@ function MainLayout() {
 export default function App() {
   return (
     <AuthProvider>
-      <MainLayout />
+      <DataCacheProvider>
+        <MainLayout />
+      </DataCacheProvider>
     </AuthProvider>
   );
 }

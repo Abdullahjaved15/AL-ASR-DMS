@@ -85,6 +85,12 @@ export default function BuyerDetailModal({ buyer, onClose, onEdit }) {
               </h4>
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between">
+                  <span className="text-slate-400 font-mono">Payment / Financing:</span>
+                  <span className={`font-mono font-bold ${buyer.isBankCase ? 'text-sky-400' : 'text-emerald-400'}`}>
+                    {buyer.isBankCase ? `BANK CASE (${buyer.bankName || 'Standard Bank'})` : 'CASH SALE'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-slate-400 font-mono">Target Budget:</span>
                   <span className="font-mono font-extrabold text-emerald-400 text-base">
                     Rs. {buyer.budget?.toLocaleString()}

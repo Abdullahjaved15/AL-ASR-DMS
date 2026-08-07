@@ -1,17 +1,13 @@
 const prisma = require('../config/db');
+const { formatPakistaniPhone } = require('../utils/phoneFormatter');
 
 const getBuyers = async (req, res) => {
   try {
-    const { search, leadStatus, assignedTo, city, vehicle, model } = req.query;
+    const { search, leadStatus, assignedTo, city, vehicle, model, minYear, maxYear, year, minPrice, maxPrice, isBankCase } = req.query;
 
     const where = {};
 
-    if (req.user.role !== 'ADMIN') {
-      where.OR = [
-        { assignedTo: req.user.id },
-        { createdBy: req.user.id }
-      ];
-    } else if (assignedTo) {
+    if (assignedTo) {
       where.assignedTo = assignedTo;
     }
 
@@ -19,26 +15,47 @@ const getBuyers = async (req, res) => {
       where.leadStatus = leadStatus;
     }
 
+    if (isBankCase !== undefined && isBankCase !== '') {
+      where.isBankCase = isBankCase === 'true' || isBankCase === true;
+    }
+
     if (city) {
-      where.buyerCity = { contains: city };
+      where.buyerCity = { contains: city, mode: 'insensitive' };
     }
 
     if (vehicle) {
-      where.vehicle = { contains: vehicle };
+      where.vehicle = { contains: vehicle, mode: 'insensitive' };
     }
 
     if (model) {
-      where.model = { contains: model };
+      where.model = { contains: model, mode: 'insensitive' };
+    }
+
+    // Year Filter
+    if (year) {
+      where.year = parseInt(year);
+    } else if (minYear || maxYear) {
+      where.year = {};
+      if (minYear) where.year.gte = parseInt(minYear);
+      if (maxYear) where.year.lte = parseInt(maxYear);
+    }
+
+    // Price Filter (budget for buyers)
+    if (minPrice || maxPrice) {
+      where.budget = {};
+      if (minPrice) where.budget.gte = parseFloat(minPrice);
+      if (maxPrice) where.budget.lte = parseFloat(maxPrice);
     }
 
     if (search) {
       const searchFilter = [
-        { buyerName: { contains: search } },
-        { buyerPhone: { contains: search } },
-        { buyerCity: { contains: search } },
-        { vehicle: { contains: search } },
-        { model: { contains: search } },
-        { comments: { contains: search } }
+        { buyerName: { contains: search, mode: 'insensitive' } },
+        { buyerPhone: { contains: search, mode: 'insensitive' } },
+        { buyerCity: { contains: search, mode: 'insensitive' } },
+        { vehicle: { contains: search, mode: 'insensitive' } },
+        { model: { contains: search, mode: 'insensitive' } },
+        { bankName: { contains: search, mode: 'insensitive' } },
+        { comments: { contains: search, mode: 'insensitive' } }
       ];
 
       if (where.OR) {
@@ -56,8 +73,7 @@ const getBuyers = async (req, res) => {
       where,
       include: {
         createdByUser: { select: { id: true, name: true, email: true } },
-        assignedUser: { select: { id: true, name: true, email: true } },
-        deals: true
+        assignedUser: { select: { id: true, name: true, email: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -85,7 +101,8 @@ const getBuyerById = async (req, res) => {
       return res.status(404).json({ message: 'Buyer record not found' });
     }
 
-    if (req.user.role !== 'ADMIN' && buyer.assignedTo !== req.user.id && buyer.createdBy !== req.user.id) {
+    const isAdminUser = req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN';
+    if (!isAdminUser && buyer.assignedTo !== req.user.id && buyer.createdBy !== req.user.id) {
       return res.status(403).json({ message: 'Access denied to this buyer lead' });
     }
 
@@ -99,6 +116,7 @@ const createBuyer = async (req, res) => {
   try {
     const {
       vehicle, model, year, color, mileage, budget,
+      isBankCase, bankName, bankChecklist,
       buyerName, buyerPhone, buyerCity,
       leadSource, leadReference, assignedTo, leadStatus, comments
     } = req.body;
@@ -107,7 +125,8 @@ const createBuyer = async (req, res) => {
       return res.status(400).json({ message: 'Vehicle, model, budget, buyer name, phone, and city are required' });
     }
 
-    const assignedSalesman = (req.user.role === 'ADMIN' && assignedTo) ? assignedTo : req.user.id;
+    const isAdminUser = req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN';
+    const assignedSalesman = (isAdminUser && assignedTo) ? assignedTo : req.user.id;
 
     const newBuyer = await prisma.buyer.create({
       data: {
@@ -118,8 +137,11 @@ const createBuyer = async (req, res) => {
         color: color || 'Any',
         mileage: parseInt(mileage) || 0,
         budget: parseFloat(budget),
+        isBankCase: Boolean(isBankCase),
+        bankName: bankName || null,
+        bankChecklist: bankChecklist || null,
         buyerName,
-        buyerPhone,
+        buyerPhone: formatPakistaniPhone(buyerPhone),
         buyerCity,
         leadSource: leadSource || 'Website',
         leadReference: leadReference || null,
@@ -136,7 +158,7 @@ const createBuyer = async (req, res) => {
       data: {
         userId: req.user.id,
         action: 'CREATE_BUYER',
-        details: `Added buyer inquiry ${buyerName} for ${vehicle} ${model} (Budget: $${budget})`
+        details: `Added buyer inquiry ${buyerName} for ${vehicle} ${model} (Bank Case: ${isBankCase ? 'YES (' + (bankName || 'Unspecified Bank') + ')' : 'NO'})`
       }
     });
 
@@ -155,12 +177,14 @@ const updateBuyer = async (req, res) => {
       return res.status(404).json({ message: 'Buyer not found' });
     }
 
-    if (req.user.role !== 'ADMIN' && existingBuyer.assignedTo !== req.user.id && existingBuyer.createdBy !== req.user.id) {
+    const isAdminUser = req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN';
+    if (!isAdminUser && existingBuyer.assignedTo !== req.user.id && existingBuyer.createdBy !== req.user.id) {
       return res.status(403).json({ message: 'Access denied: You can only edit your own leads' });
     }
 
     const {
       vehicle, model, year, color, mileage, budget,
+      isBankCase, bankName, bankChecklist,
       buyerName, buyerPhone, buyerCity,
       leadSource, leadReference, assignedTo, leadStatus, comments
     } = req.body;
@@ -172,15 +196,18 @@ const updateBuyer = async (req, res) => {
     if (color) updateData.color = color;
     if (mileage !== undefined) updateData.mileage = parseInt(mileage);
     if (budget) updateData.budget = parseFloat(budget);
+    if (isBankCase !== undefined) updateData.isBankCase = Boolean(isBankCase);
+    if (bankName !== undefined) updateData.bankName = bankName || null;
+    if (bankChecklist !== undefined) updateData.bankChecklist = bankChecklist;
     if (buyerName) updateData.buyerName = buyerName;
-    if (buyerPhone) updateData.buyerPhone = buyerPhone;
+    if (buyerPhone) updateData.buyerPhone = formatPakistaniPhone(buyerPhone);
     if (buyerCity) updateData.buyerCity = buyerCity;
     if (leadSource) updateData.leadSource = leadSource;
     if (leadReference !== undefined) updateData.leadReference = leadReference;
     if (leadStatus) updateData.leadStatus = leadStatus;
     if (comments !== undefined) updateData.comments = comments;
 
-    if (req.user.role === 'ADMIN' && assignedTo) {
+    if (isAdminUser && assignedTo) {
       updateData.assignedTo = assignedTo;
     }
 
@@ -215,8 +242,8 @@ const deleteBuyer = async (req, res) => {
       return res.status(404).json({ message: 'Buyer not found' });
     }
 
-    if (req.user.role !== 'ADMIN') {
-      return res.status(403).json({ message: 'Only administrators can delete buyer records' });
+    if (req.user.role !== 'ADMIN' && existingBuyer.assignedTo !== req.user.id && existingBuyer.createdBy !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied: You can only delete your own buyer leads' });
     }
 
     await prisma.buyer.delete({ where: { id } });

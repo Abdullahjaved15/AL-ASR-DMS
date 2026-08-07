@@ -136,7 +136,11 @@ export default function Users() {
                     </td>
 
                     <td className="py-4 px-4 font-mono">
-                      {u.role === 'ADMIN' ? (
+                      {u.role === 'SUPER_ADMIN' ? (
+                        <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/40 rounded text-xs font-bold">
+                          SUPER ADMIN
+                        </span>
+                      ) : u.role === 'ADMIN' ? (
                         <span className="px-2 py-0.5 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded text-xs">
                           ADMIN
                         </span>
@@ -287,6 +291,7 @@ export default function Users() {
                 >
                   <option value="SALESMAN">Salesman</option>
                   <option value="ADMIN">Administrator</option>
+                  <option value="SUPER_ADMIN">Super Administrator</option>
                 </select>
               </div>
 

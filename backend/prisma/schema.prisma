@@ -13,7 +13,7 @@ model User {
   email           String        @unique
   phone           String?
   password        String
-  role            String        @default("SALESMAN") // ADMIN, SALESMAN
+  role            String        @default("SALESMAN") // SUPER_ADMIN, ADMIN, SALESMAN
   status          String        @default("PENDING")  // ACTIVE, PENDING, SUSPENDED
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -24,6 +24,11 @@ model User {
   assignedBuyers  Buyer[]       @relation("AssignedBuyers")
   deals           Deal[]        @relation("UserDeals")
   activities      ActivityLog[]
+  invoices        Invoice[]
+  receivingLetters ReceivingLetter[]
+
+  primaryCollaborations Collaboration[] @relation("PrimaryCollaborations")
+  partnerCollaborations Collaboration[] @relation("PartnerCollaborations")
 }
 
 model Seller {
@@ -38,6 +43,7 @@ model Seller {
   color            String
   mileage          Int
 
+  numberPlate      String?       // Unique Vehicle Registration / License Plate Number
   demandPrice      Float
 
   sellerName       String
@@ -55,9 +61,23 @@ model Seller {
 
   images           SellerImage[]
   deals            Deal[]
+  collaborations   Collaboration[]
 
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
+
+  @@index([createdAt])
+  @@index([leadStatus])
+  @@index([assignedTo])
+  @@index([vehicle])
+  @@index([model])
+  @@index([numberPlate])
+  @@index([demandPrice])
+  @@index([year])
+  @@index([assignedTo, leadStatus])
+  @@index([assignedTo, createdAt])
+  @@index([vehicle, model])
+  @@index([leadStatus, createdAt])
 }
 
 model SellerImage {
@@ -84,6 +104,10 @@ model Buyer {
 
   budget           Float
 
+  isBankCase       Boolean  @default(false)
+  bankName         String?
+  bankChecklist    Json?    // Detailed 12-item Bank Case Requirement Checklist
+
   buyerName        String
   buyerPhone       String
   buyerCity        String
@@ -98,9 +122,50 @@ model Buyer {
   comments         String?
 
   deals            Deal[]
+  collaborations   Collaboration[]
 
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([leadStatus])
+  @@index([assignedTo])
+  @@index([vehicle])
+  @@index([model])
+  @@index([isBankCase])
+  @@index([budget])
+  @@index([year])
+  @@index([assignedTo, leadStatus])
+  @@index([assignedTo, createdAt])
+  @@index([vehicle, model])
+  @@index([leadStatus, createdAt])
+}
+
+model Invoice {
+  id               String   @id @default(uuid())
+  invoiceNumber    String   @unique
+  customerName     String
+  customerPhone    String?
+  customerCity     String?
+  carVehicle       String
+  carModel         String
+  carYear          Int
+  carRegNumber     String?
+  chassisNumber    String?
+  engineNumber     String?
+  saleAmount       Float
+  commissionPercent Float   @default(0)
+  commissionAmount Float    @default(0)
+  totalAmount      Float
+  paymentStatus    String   @default("PAID") // PAID, PENDING, CANCELLED
+  remarks          String?
+  createdBy        String
+  createdByUser    User     @relation(fields: [createdBy], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([invoiceNumber])
+  @@index([createdAt])
 }
 
 model Deal {
@@ -118,6 +183,11 @@ model Deal {
   remarks     String?
 
   createdAt   DateTime @default(now())
+
+  @@index([closingDate])
+  @@index([salesmanId])
+  @@index([salesmanId, closingDate])
+  @@index([closingDate, dealPrice])
 }
 
 model ActivityLog {
@@ -127,4 +197,74 @@ model ActivityLog {
   action    String
   details   String
   timestamp DateTime @default(now())
+}
+
+model Collaboration {
+  id                String   @id @default(uuid())
+  sellerId          String?
+  seller            Seller?  @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  buyerId           String?
+  buyer             Buyer?   @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+
+  primarySalesmanId String
+  primarySalesman   User     @relation("PrimaryCollaborations", fields: [primarySalesmanId], references: [id])
+
+  partnerSalesmanId String
+  partnerSalesman   User     @relation("PartnerCollaborations", fields: [partnerSalesmanId], references: [id])
+
+  splitPercentage   Float    @default(50.0) // 50-50% commission split
+  status            String   @default("ACTIVE") // ACTIVE, COMPLETED, CANCELLED
+  notes             String?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([primarySalesmanId])
+  @@index([partnerSalesmanId])
+  @@index([status])
+}
+
+model CurrentStock {
+  id            String   @id @default(uuid())
+  vehicle       String
+  model         String
+  year          Int
+  color         String   @default("White")
+  mileage       Int      @default(0)
+  askingPrice   Float
+  purchasePrice Float?
+  status        String   @default("AVAILABLE") // AVAILABLE, RESERVED, SOLD
+  location      String   @default("Main Showroom")
+  notes         String?
+  careOf        String?  // Care of / Salesman in charge
+  regNumber     String?  // Vehicle Registration / Plate Number
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ReceivingLetter {
+  id                String   @id @default(uuid())
+  letterNumber      String   @unique
+  date              DateTime @default(now())
+  vehicleName       String
+  chassisNumber     String?
+  regNumber         String?
+  color             String?
+  ownerName         String
+  receiverName      String
+  fileStatus        String?
+  keyStatus         String?
+  smartCardStatus   String?
+  anyOtherAccessory String?
+  notes             String?  // Notes / detail section in the end
+  createdBy         String
+  createdByUser     User     @relation(fields: [createdBy], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([letterNumber])
+  @@index([createdAt])
 }

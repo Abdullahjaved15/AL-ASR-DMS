@@ -2,20 +2,32 @@ const prisma = require('../config/db');
 const fs = require('fs');
 const path = require('path');
 const cloudinary = require('../config/cloudinary');
+const { formatPakistaniPhone } = require('../utils/phoneFormatter');
+
+let sellersCache = null;
+let sellersCacheTime = 0;
+const CACHE_TTL_MS = 15000; // 15s TTL
+
+const invalidateSellersCache = () => {
+  sellersCache = null;
+  sellersCacheTime = 0;
+};
 
 const getSellers = async (req, res) => {
   try {
-    const { search, leadStatus, assignedTo, city, vehicle, model } = req.query;
+    const { search, leadStatus, assignedTo, city, vehicle, model, minYear, maxYear, year, minPrice, maxPrice } = req.query;
+
+    const hasFilters = Boolean(search || leadStatus || assignedTo || city || vehicle || model || minYear || maxYear || year || minPrice || maxPrice);
+
+    // Return cached response for default un-filtered ADMIN requests within 15s TTL
+    if (!hasFilters && req.user.role === 'ADMIN' && sellersCache && (Date.now() - sellersCacheTime < CACHE_TTL_MS)) {
+      return res.json(sellersCache);
+    }
 
     const where = {};
 
-    // Data Isolation for Salesman
-    if (req.user.role !== 'ADMIN') {
-      where.OR = [
-        { assignedTo: req.user.id },
-        { createdBy: req.user.id }
-      ];
-    } else if (assignedTo) {
+    // Allow all authenticated users (Admin and Salesmen) to view full dealership inventory
+    if (assignedTo) {
       where.assignedTo = assignedTo;
     }
 
@@ -24,25 +36,42 @@ const getSellers = async (req, res) => {
     }
 
     if (city) {
-      where.sellerCity = { contains: city };
+      where.sellerCity = { contains: city, mode: 'insensitive' };
     }
 
     if (vehicle) {
-      where.vehicle = { contains: vehicle };
+      where.vehicle = { contains: vehicle, mode: 'insensitive' };
     }
 
     if (model) {
-      where.model = { contains: model };
+      where.model = { contains: model, mode: 'insensitive' };
+    }
+
+    // Year Filter
+    if (year) {
+      where.year = parseInt(year);
+    } else if (minYear || maxYear) {
+      where.year = {};
+      if (minYear) where.year.gte = parseInt(minYear);
+      if (maxYear) where.year.lte = parseInt(maxYear);
+    }
+
+    // Price Filter (demandPrice)
+    if (minPrice || maxPrice) {
+      where.demandPrice = {};
+      if (minPrice) where.demandPrice.gte = parseFloat(minPrice);
+      if (maxPrice) where.demandPrice.lte = parseFloat(maxPrice);
     }
 
     if (search) {
       const searchFilter = [
-        { sellerName: { contains: search } },
-        { sellerPhone: { contains: search } },
-        { sellerCity: { contains: search } },
-        { vehicle: { contains: search } },
-        { model: { contains: search } },
-        { comments: { contains: search } }
+        { sellerName: { contains: search, mode: 'insensitive' } },
+        { sellerPhone: { contains: search, mode: 'insensitive' } },
+        { sellerCity: { contains: search, mode: 'insensitive' } },
+        { vehicle: { contains: search, mode: 'insensitive' } },
+        { model: { contains: search, mode: 'insensitive' } },
+        { numberPlate: { contains: search, mode: 'insensitive' } },
+        { comments: { contains: search, mode: 'insensitive' } }
       ];
 
       if (where.OR) {
@@ -61,11 +90,15 @@ const getSellers = async (req, res) => {
       include: {
         createdByUser: { select: { id: true, name: true, email: true } },
         assignedUser: { select: { id: true, name: true, email: true } },
-        images: true,
-        deals: true
+        images: { select: { id: true, category: true, imageUrl: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
+
+    if (!hasFilters && (req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN')) {
+      sellersCache = sellers;
+      sellersCacheTime = Date.now();
+    }
 
     return res.json(sellers);
   } catch (error) {
@@ -92,7 +125,7 @@ const getSellerById = async (req, res) => {
     }
 
     // RBAC check
-    if (req.user.role !== 'ADMIN' && seller.assignedTo !== req.user.id && seller.createdBy !== req.user.id) {
+    if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN' && seller.assignedTo !== req.user.id && seller.createdBy !== req.user.id) {
       return res.status(403).json({ message: 'Access denied to this seller lead' });
     }
 
@@ -105,7 +138,7 @@ const getSellerById = async (req, res) => {
 const createSeller = async (req, res) => {
   try {
     const {
-      vehicle, model, year, color, mileage, demandPrice,
+      vehicle, model, year, color, mileage, numberPlate, demandPrice,
       sellerName, sellerPhone, sellerCity,
       leadSource, leadReference, assignedTo, leadStatus, comments
     } = req.body;
@@ -114,7 +147,27 @@ const createSeller = async (req, res) => {
       return res.status(400).json({ message: 'Vehicle, model, demand price, seller name, phone, and city are required' });
     }
 
-    const assignedSalesman = (req.user.role === 'ADMIN' && assignedTo) ? assignedTo : req.user.id;
+    // Duplicate Number Plate validation (if plate provided)
+    if (numberPlate && numberPlate.trim()) {
+      const cleanPlate = numberPlate.trim().toUpperCase().replace(/[\s-]/g, '');
+      const existingSellers = await prisma.seller.findMany({
+        where: { numberPlate: { not: null } },
+        select: { id: true, numberPlate: true, sellerName: true, vehicle: true, model: true }
+      });
+
+      const duplicate = existingSellers.find(s => 
+        s.numberPlate && s.numberPlate.trim().toUpperCase().replace(/[\s-]/g, '') === cleanPlate
+      );
+
+      if (duplicate) {
+        return res.status(400).json({
+          message: `Vehicle with Number Plate '${numberPlate}' already exists in inventory (Seller: ${duplicate.sellerName}, ${duplicate.vehicle} ${duplicate.model})!`
+        });
+      }
+    }
+
+    const isAdminUser = req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN';
+    const assignedSalesman = (isAdminUser && assignedTo) ? assignedTo : req.user.id;
 
     const newSeller = await prisma.seller.create({
       data: {
@@ -124,9 +177,10 @@ const createSeller = async (req, res) => {
         year: parseInt(year) || new Date().getFullYear(),
         color: color || 'N/A',
         mileage: parseInt(mileage) || 0,
+        numberPlate: numberPlate ? numberPlate.trim().toUpperCase() : null,
         demandPrice: parseFloat(demandPrice),
         sellerName,
-        sellerPhone,
+        sellerPhone: formatPakistaniPhone(sellerPhone),
         sellerCity,
         leadSource: leadSource || 'Direct Call',
         leadReference: leadReference || null,
@@ -144,10 +198,11 @@ const createSeller = async (req, res) => {
       data: {
         userId: req.user.id,
         action: 'CREATE_SELLER',
-        details: `Added seller ${sellerName} for ${year} ${vehicle} ${model} ($${demandPrice})`
+        details: `Added seller ${sellerName} for ${year} ${vehicle} ${model} (Plate: ${numberPlate || 'N/A'})`
       }
     });
 
+    invalidateSellersCache();
     return res.status(201).json(newSeller);
   } catch (error) {
     return res.status(500).json({ message: 'Failed to create seller', error: error.message });
@@ -163,15 +218,35 @@ const updateSeller = async (req, res) => {
       return res.status(404).json({ message: 'Seller not found' });
     }
 
-    if (req.user.role !== 'ADMIN' && existingSeller.assignedTo !== req.user.id && existingSeller.createdBy !== req.user.id) {
+    const isAdminUser = req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN';
+    if (!isAdminUser && existingSeller.assignedTo !== req.user.id && existingSeller.createdBy !== req.user.id) {
       return res.status(403).json({ message: 'Access denied: You can only edit your own leads' });
     }
 
     const {
-      vehicle, model, year, color, mileage, demandPrice,
+      vehicle, model, year, color, mileage, numberPlate, demandPrice,
       sellerName, sellerPhone, sellerCity,
       leadSource, leadReference, assignedTo, leadStatus, comments
     } = req.body;
+
+    // Check duplicate number plate if changed
+    if (numberPlate && numberPlate.trim()) {
+      const cleanPlate = numberPlate.trim().toUpperCase().replace(/[\s-]/g, '');
+      const existingSellers = await prisma.seller.findMany({
+        where: { numberPlate: { not: null }, id: { not: id } },
+        select: { id: true, numberPlate: true, sellerName: true, vehicle: true, model: true }
+      });
+
+      const duplicate = existingSellers.find(s => 
+        s.numberPlate && s.numberPlate.trim().toUpperCase().replace(/[\s-]/g, '') === cleanPlate
+      );
+
+      if (duplicate) {
+        return res.status(400).json({
+          message: `Vehicle with Number Plate '${numberPlate}' already exists in inventory (Seller: ${duplicate.sellerName}, ${duplicate.vehicle} ${duplicate.model})!`
+        });
+      }
+    }
 
     const updateData = {};
     if (vehicle) updateData.vehicle = vehicle;
@@ -179,16 +254,17 @@ const updateSeller = async (req, res) => {
     if (year) updateData.year = parseInt(year);
     if (color) updateData.color = color;
     if (mileage !== undefined) updateData.mileage = parseInt(mileage);
+    if (numberPlate !== undefined) updateData.numberPlate = numberPlate ? numberPlate.trim().toUpperCase() : null;
     if (demandPrice) updateData.demandPrice = parseFloat(demandPrice);
     if (sellerName) updateData.sellerName = sellerName;
-    if (sellerPhone) updateData.sellerPhone = sellerPhone;
+    if (sellerPhone) updateData.sellerPhone = formatPakistaniPhone(sellerPhone);
     if (sellerCity) updateData.sellerCity = sellerCity;
     if (leadSource) updateData.leadSource = leadSource;
     if (leadReference !== undefined) updateData.leadReference = leadReference;
     if (leadStatus) updateData.leadStatus = leadStatus;
     if (comments !== undefined) updateData.comments = comments;
 
-    if (req.user.role === 'ADMIN' && assignedTo) {
+    if (isAdminUser && assignedTo) {
       updateData.assignedTo = assignedTo;
     }
 
@@ -209,6 +285,7 @@ const updateSeller = async (req, res) => {
       }
     });
 
+    invalidateSellersCache();
     return res.json(updatedSeller);
   } catch (error) {
     return res.status(500).json({ message: 'Failed to update seller', error: error.message });
@@ -224,8 +301,8 @@ const deleteSeller = async (req, res) => {
       return res.status(404).json({ message: 'Seller not found' });
     }
 
-    if (req.user.role !== 'ADMIN') {
-      return res.status(403).json({ message: 'Only administrators can delete seller records' });
+    if (req.user.role !== 'ADMIN' && existingSeller.assignedTo !== req.user.id && existingSeller.createdBy !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied: You can only delete your own seller leads' });
     }
 
     await prisma.seller.delete({ where: { id } });
@@ -238,7 +315,8 @@ const deleteSeller = async (req, res) => {
       }
     });
 
-    return res.json({ message: 'Seller deleted successfully' });
+    invalidateSellersCache();
+    return res.json({ message: 'Seller record deleted successfully' });
   } catch (error) {
     return res.status(500).json({ message: 'Failed to delete seller', error: error.message });
   }

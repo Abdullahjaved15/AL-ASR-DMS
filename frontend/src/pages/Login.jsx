@@ -50,8 +50,8 @@ export default function Login() {
       <div className="w-full max-w-md relative z-10">
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 mx-auto flex items-center justify-center shadow-xl shadow-cyan-500/20 ring-1 ring-white/20 mb-4">
-            <Car className="w-9 h-9 text-black font-extrabold" />
+          <div className="w-28 h-28 mx-auto flex items-center justify-center overflow-hidden mb-3 filter drop-shadow-2xl">
+            <img src="/logo.png" alt="AL ASR MOTORS" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white font-sans">
             AL ASR <span className="text-cyan-400 font-mono">MOTORS</span>

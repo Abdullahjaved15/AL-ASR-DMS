@@ -141,6 +141,12 @@ export default function SellerDetailModal({ seller, onClose, onEdit, onImagesUpd
                 </h4>
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
+                    <span className="text-slate-400 font-mono">Number Plate (Reg #):</span>
+                    <span className="font-mono font-bold text-amber-300">
+                      {seller.numberPlate || 'UNREGISTERED'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-slate-400 font-mono">Demand Price:</span>
                     <span className="font-mono font-extrabold text-cyan-400 text-base">
                       Rs. {seller.demandPrice?.toLocaleString()}

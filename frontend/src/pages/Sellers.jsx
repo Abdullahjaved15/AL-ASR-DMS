@@ -1,23 +1,56 @@
 import React, { useState, useEffect } from 'react';
-import { Car, Plus, Search, Filter, Image as ImageIcon, Edit, Trash2, Eye, UserCheck, Phone, MapPin, Tag } from 'lucide-react';
+import { Car, Plus, Search, Filter, Image as ImageIcon, Edit, Trash2, Eye, UserCheck, Phone, MapPin, Tag, Printer, ShieldAlert } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import ImageDropzone from '../components/ImageDropzone';
 import ImageViewerModal from '../components/ImageViewerModal';
 import SellerDetailModal from '../components/SellerDetailModal';
+import FilterBar from '../components/FilterBar';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { logoBase64 } from '../utils/logoBase64';
 
 const leadStatuses = ['New Lead', 'Contacted', 'Follow Up', 'Interested', 'Negotiation', 'Deal Closed', 'Lost', 'Cancelled', 'Incomplete'];
 
-export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen }) {
+export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, scope = 'all' }) {
   const { user, isAdmin } = useAuth();
   const [sellers, setSellers] = useState([]);
   const [salesmenList, setSalesmenList] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Filters
-  const [statusFilter, setStatusFilter] = useState('');
-  const [salesmanFilter, setSalesmanFilter] = useState('');
+  // Multi-Filters state
+  const [filters, setFilters] = useState({
+    vehicle: '',
+    model: '',
+    minYear: '',
+    maxYear: '',
+    minPrice: '',
+    maxPrice: '',
+    city: '',
+    leadStatus: '',
+    assignedTo: ''
+  });
+
+  // UI Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 25;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filters, scope]);
+
+  const resetFilters = () => {
+    setFilters({
+      vehicle: '',
+      model: '',
+      minYear: '',
+      maxYear: '',
+      minPrice: '',
+      maxPrice: '',
+      city: '',
+      leadStatus: '',
+      assignedTo: ''
+    });
+  };
 
   // Modals state
   const [selectedSeller, setSelectedSeller] = useState(null);
@@ -32,6 +65,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen }) {
     year: new Date().getFullYear(),
     color: '',
     mileage: 0,
+    numberPlate: '',
     demandPrice: '',
     sellerName: '',
     sellerPhone: '',
@@ -48,17 +82,23 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen }) {
     if (isAdmin) {
       fetchSalesmen();
     }
-  }, [search, statusFilter, salesmanFilter]);
+  }, [search, filters, scope]);
 
   const fetchSellers = async () => {
     setLoading(true);
     try {
+      const activeFilters = { ...filters };
+      if (scope === 'mine' && user?.id) {
+        activeFilters.assignedTo = user.id;
+      }
       const data = await api.getSellers({
         search,
-        leadStatus: statusFilter,
-        assignedTo: salesmanFilter
+        ...activeFilters
       });
-      setSellers(data);
+      const filteredData = (scope === 'mine' && user?.id)
+        ? data.filter(s => s.assignedTo === user.id || s.createdBy === user.id)
+        : data;
+      setSellers(filteredData);
     } catch (err) {
       console.error('Failed to fetch sellers:', err);
     } finally {
@@ -82,6 +122,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen }) {
       year: new Date().getFullYear(),
       color: '',
       mileage: 0,
+      numberPlate: '',
       demandPrice: '',
       sellerName: '',
       sellerPhone: '',
@@ -136,6 +177,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen }) {
       year: seller.year,
       color: seller.color,
       mileage: seller.mileage,
+      numberPlate: seller.numberPlate || '',
       demandPrice: seller.demandPrice,
       sellerName: seller.sellerName,
       sellerPhone: seller.sellerPhone,
@@ -159,40 +201,129 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen }) {
     setIsDetailModalOpen(true);
   };
 
+  const exportSellersPDF = () => {
+    const printWindow = window.open('', '_blank');
+    const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const totalValuation = sellers.reduce((acc, s) => acc + (s.demandPrice || 0), 0);
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>AL ASR MOTORS - Filtered Vehicle Inventory Report (${todayStr})</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 25px; color: #1e293b; background: #ffffff; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0284c7; padding-bottom: 15px; margin-bottom: 20px; }
+            .logo-box { display: flex; align-items: center; gap: 15px; }
+            .title { font-size: 22px; font-weight: bold; color: #0f172a; }
+            .subtitle { font-size: 12px; color: #64748b; font-family: monospace; }
+            .stats { display: flex; gap: 15px; margin-bottom: 20px; }
+            .stat-box { flex: 1; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; }
+            .stat-label { font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: bold; }
+            .stat-val { font-size: 18px; font-weight: bold; color: #0284c7; margin-top: 4px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th { background: #0f172a; color: #ffffff; text-align: left; padding: 9px; font-size: 10px; text-transform: uppercase; }
+            td { padding: 9px; border-bottom: 1px solid #e2e8f0; font-size: 11px; }
+            tr:nth-child(even) { background: #f8fafc; }
+            .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; font-family: monospace; }
+            .plate-badge { background: #fef08a; color: #854d0e; border: 1px solid #ca8a04; }
+            .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="logo-box">
+              <img src="${logoBase64}" alt="AL ASR MOTORS Logo" style="height: 90px; width: auto; object-fit: contain;" />
+              <div>
+                <div class="title">AL ASR MOTORS - Sellers & Inventory Report</div>
+                <div class="subtitle">Filtered Vehicles Export • Generated: ${todayStr}</div>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 14px; font-weight: bold; color: #0284c7;">Main Showroom Floor</div>
+              <div style="font-size: 10px; color: #64748b;">Sahiwal, Pakistan</div>
+            </div>
+          </div>
+
+          <div class="stats">
+            <div class="stat-box">
+              <div class="stat-label">Total Filtered Vehicles</div>
+              <div class="stat-val">${sellers.length} Units</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Total Inventory Valuation</div>
+              <div class="stat-val">Rs. ${totalValuation.toLocaleString()}</div>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Vehicle & Model</th>
+                <th>Reg / Plate #</th>
+                <th>Year</th>
+                <th>Color</th>
+                <th>Mileage</th>
+                <th>Demand Price (PKR)</th>
+                <th>Seller Contact & City</th>
+                <th>Salesman</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sellers.map((s, idx) => `
+                <tr>
+                  <td>${idx + 1}</td>
+                  <td><strong>${s.vehicle} ${s.model}</strong></td>
+                  <td><span class="badge plate-badge">${s.numberPlate || 'UNREGISTERED'}</span></td>
+                  <td>${s.year}</td>
+                  <td>${s.color || '-'}</td>
+                  <td>${s.mileage ? s.mileage.toLocaleString() + ' km' : '0 km'}</td>
+                  <td><strong>Rs. ${s.demandPrice?.toLocaleString()}</strong></td>
+                  <td>${s.sellerName} (${s.sellerPhone}) - ${s.sellerCity}</td>
+                  <td>${s.assignedUser?.name || 'Unassigned'}</td>
+                  <td>${s.leadStatus}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div class="footer">
+            Confidential Document • AL ASR MOTORS Dealership Management System • ${todayStr}
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   return (
     <div className="p-4 sm:p-8 space-y-6 max-w-7xl mx-auto">
-      {/* Top Filter Bar */}
-      <div className="glass-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center space-x-2 text-xs font-mono text-slate-400">
-            <Filter className="w-4 h-4 text-cyan-400" />
-            <span>Filter Status:</span>
-          </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-slate-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
-          >
-            <option value="">All Lead Statuses</option>
-            {leadStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-
-          {isAdmin && (
-            <select
-              value={salesmanFilter}
-              onChange={(e) => setSalesmanFilter(e.target.value)}
-              className="bg-slate-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
-            >
-              <option value="">All Salesmen</option>
-              {salesmenList.map(sm => <option key={sm.id} value={sm.id}>{sm.name}</option>)}
-            </select>
-          )}
+      {/* Top Header Bar with Count and Action */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-extrabold text-white tracking-tight">Vehicle Inventory & Sellers</h2>
+          <p className="text-xs font-mono text-slate-400 mt-0.5">
+            Showing <strong className="text-cyan-400">{sellers.length}</strong> matching seller lead(s)
+          </p>
         </div>
-
-        <div className="flex items-center space-x-3">
-          <span className="text-xs font-mono text-slate-400">
-            Showing <strong className="text-cyan-400">{sellers.length}</strong> vehicle(s)
-          </span>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={exportSellersPDF}
+            className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 font-bold rounded-xl text-xs shadow-lg transition-all flex items-center space-x-1.5"
+          >
+            <Printer className="w-4 h-4 text-cyan-400" />
+            <span>Export PDF</span>
+          </button>
           <button
             onClick={() => { resetForm(); setIsAddModalOpen(true); }}
             className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold rounded-xl text-xs shadow-lg shadow-cyan-500/20 transition-all flex items-center space-x-1.5"
@@ -202,6 +333,16 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen }) {
           </button>
         </div>
       </div>
+
+      {/* Simultaneous Multi-Field Filter Bar */}
+      <FilterBar
+        filters={filters}
+        setFilters={setFilters}
+        resetFilters={resetFilters}
+        salesmenList={salesmenList}
+        isAdmin={isAdmin}
+        priceLabel="Demand Price Range"
+      />
 
       {/* Sellers Data Table */}
       <div className="glass-card rounded-2xl overflow-hidden border border-white/10">
@@ -219,7 +360,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-xs">
-              {sellers.map((seller) => (
+              {sellers.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((seller) => (
                 <tr key={seller.id} className="hover:bg-white/5 transition-colors">
                   <td className="py-4 px-4 cursor-pointer" onClick={() => openDetailModal(seller)}>
                     <div className="flex items-center space-x-3 group">
@@ -227,9 +368,20 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen }) {
                         {seller.vehicle?.substring(0, 2).toUpperCase()}
                       </div>
                       <div>
-                        <p className="font-extrabold text-white text-sm group-hover:text-cyan-400 transition-colors">
-                          {seller.vehicle} {seller.model}
-                        </p>
+                        <div className="flex items-center space-x-2">
+                          <p className="font-extrabold text-white text-sm group-hover:text-cyan-400 transition-colors">
+                            {seller.vehicle} {seller.model}
+                          </p>
+                          {seller.numberPlate ? (
+                            <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono text-[10px] font-bold">
+                              {seller.numberPlate}
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-500 font-mono text-[9px]">
+                              UNREG
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[11px] text-slate-400 font-mono">
                           {seller.year} • {seller.color} • {seller.mileage?.toLocaleString()} km
                         </p>
@@ -276,21 +428,33 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen }) {
 
                   <td className="py-4 px-4 text-right">
                     <div className="flex items-center justify-end space-x-2">
-                      <button
-                        onClick={() => openEditModal(seller)}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
-                        title="Edit seller details"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
+                      {(isAdmin || seller.assignedTo === user?.id || seller.createdBy === user?.id) ? (
+                        <>
+                          <button
+                            onClick={() => openEditModal(seller)}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                            title="Edit seller details"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
 
-                      {isAdmin && (
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleDeleteSeller(seller.id)}
+                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-colors"
+                              title="Delete record"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </>
+                      ) : (
                         <button
-                          onClick={() => handleDeleteSeller(seller.id)}
-                          className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-colors"
-                          title="Delete record"
+                          onClick={() => openDetailModal(seller)}
+                          className="px-2 py-1 rounded-lg bg-slate-800/80 border border-white/10 text-slate-400 font-mono text-[10px] hover:text-cyan-400 flex items-center space-x-1"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Eye className="w-3 h-3" />
+                          <span>View Only</span>
                         </button>
                       )}
                     </div>
@@ -308,6 +472,39 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen }) {
             </tbody>
           </table>
         </div>
+
+        {/* Table Pagination Footer */}
+        {sellers.length > 0 && (
+          <div className="p-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-4 font-mono text-xs text-slate-400 bg-slate-900/40">
+            <div>
+              Showing <strong className="text-cyan-400">{(currentPage - 1) * pageSize + 1}</strong> to{' '}
+              <strong className="text-cyan-400">{Math.min(currentPage * pageSize, sellers.length)}</strong> of{' '}
+              <strong className="text-white">{sellers.length}</strong> seller entries
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 border border-white/10 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition-all"
+              >
+                Previous
+              </button>
+
+              <span className="px-3 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-cyan-400 font-bold">
+                Page {currentPage} of {Math.ceil(sellers.length / pageSize) || 1}
+              </span>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(sellers.length / pageSize) || 1))}
+                disabled={currentPage === (Math.ceil(sellers.length / pageSize) || 1)}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 border border-white/10 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition-all"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* CREATE / EDIT SELLER MODAL */}
@@ -348,7 +545,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">Model Year</label>
                   <input
@@ -356,6 +553,17 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen }) {
                     value={formData.year}
                     onChange={(e) => setFormData({ ...formData, year: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Number Plate (Reg #)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. LEC-1234"
+                    value={formData.numberPlate}
+                    onChange={(e) => setFormData({ ...formData, numberPlate: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-500 uppercase"
                   />
                 </div>
 
@@ -371,7 +579,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Mileage (km / miles)</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Mileage (km)</label>
                   <input
                     type="number"
                     value={formData.mileage}

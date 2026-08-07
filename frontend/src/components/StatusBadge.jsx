@@ -16,7 +16,7 @@ export default function StatusBadge({ status }) {
   const style = statusStyles[status] || 'bg-slate-500/10 text-slate-300 border-slate-500/30';
 
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-medium border ${style}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-sans font-semibold border ${style}`}>
       <span className="w-1.5 h-1.5 rounded-full bg-current mr-1.5 animate-pulse"></span>
       {status || 'Unknown'}
     </span>

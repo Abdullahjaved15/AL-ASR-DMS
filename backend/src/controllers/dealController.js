@@ -2,7 +2,7 @@ const prisma = require('../config/db');
 
 const getDeals = async (req, res) => {
   try {
-    const { salesmanId, search } = req.query;
+    const { salesmanId, search, vehicle, model, minPrice, maxPrice } = req.query;
 
     const where = {};
 
@@ -12,13 +12,27 @@ const getDeals = async (req, res) => {
       where.salesmanId = salesmanId;
     }
 
+    if (vehicle) {
+      where.seller = { ...where.seller, vehicle: { contains: vehicle, mode: 'insensitive' } };
+    }
+
+    if (model) {
+      where.seller = { ...where.seller, model: { contains: model, mode: 'insensitive' } };
+    }
+
+    if (minPrice || maxPrice) {
+      where.dealPrice = {};
+      if (minPrice) where.dealPrice.gte = parseFloat(minPrice);
+      if (maxPrice) where.dealPrice.lte = parseFloat(maxPrice);
+    }
+
     if (search) {
       where.OR = [
-        { buyer: { buyerName: { contains: search } } },
-        { seller: { sellerName: { contains: search } } },
-        { seller: { vehicle: { contains: search } } },
-        { seller: { model: { contains: search } } },
-        { remarks: { contains: search } }
+        { buyer: { buyerName: { contains: search, mode: 'insensitive' } } },
+        { seller: { sellerName: { contains: search, mode: 'insensitive' } } },
+        { seller: { vehicle: { contains: search, mode: 'insensitive' } } },
+        { seller: { model: { contains: search, mode: 'insensitive' } } },
+        { remarks: { contains: search, mode: 'insensitive' } }
       ];
     }
 

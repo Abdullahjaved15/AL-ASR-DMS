@@ -82,19 +82,67 @@ const deleteUser = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    await prisma.user.delete({ where: { id } });
+    const adminId = req.user.id;
 
-    await prisma.activityLog.create({
-      data: {
-        userId: req.user.id,
-        action: 'DELETE_USER',
-        details: `Deleted user ${userToDelete.name} (${userToDelete.email})`
-      }
+    // Safely unassign/reassign references and delete user in a single transaction
+    await prisma.$transaction(async (tx) => {
+      // 1. Unassign assigned sellers & buyers
+      await tx.seller.updateMany({
+        where: { assignedTo: id },
+        data: { assignedTo: null }
+      });
+      await tx.buyer.updateMany({
+        where: { assignedTo: id },
+        data: { assignedTo: null }
+      });
+
+      // 2. Reassign created sellers & buyers to admin
+      await tx.seller.updateMany({
+        where: { createdBy: id },
+        data: { createdBy: adminId }
+      });
+      await tx.buyer.updateMany({
+        where: { createdBy: id },
+        data: { createdBy: adminId }
+      });
+
+      // 3. Delete user activity logs
+      await tx.activityLog.deleteMany({
+        where: { userId: id }
+      });
+
+      // 4. Delete collaborations involving user
+      await tx.collaboration.deleteMany({
+        where: {
+          OR: [
+            { primarySalesmanId: id },
+            { partnerSalesmanId: id }
+          ]
+        }
+      });
+
+      // 5. Delete deals associated with user
+      await tx.deal.deleteMany({
+        where: { salesmanId: id }
+      });
+
+      // 6. Delete the user
+      await tx.user.delete({ where: { id } });
+
+      // 7. Log admin activity
+      await tx.activityLog.create({
+        data: {
+          userId: adminId,
+          action: 'DELETE_USER',
+          details: `Deleted user ${userToDelete.name} (${userToDelete.email})`
+        }
+      });
     });
 
     return res.json({ message: 'User deleted successfully' });
   } catch (error) {
-    return res.status(500).json({ message: 'Failed to delete user', error: error.message });
+    console.error('Delete user error:', error);
+    return res.status(500).json({ message: error.message || 'Failed to delete user' });
   }
 };
 

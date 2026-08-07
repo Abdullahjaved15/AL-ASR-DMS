@@ -10,6 +10,10 @@ const buyerRoutes = require('./routes/buyerRoutes');
 const dealRoutes = require('./routes/dealRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const collaborationRoutes = require('./routes/collaborationRoutes');
+const stockRoutes = require('./routes/stockRoutes');
+const invoiceRoutes = require('./routes/invoiceRoutes');
+const receivingLetterRoutes = require('./routes/receivingLetterRoutes');
 
 const app = express();
 
@@ -34,6 +38,10 @@ app.use('/api/buyers', buyerRoutes);
 app.use('/api/deals', dealRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/collaborations', collaborationRoutes);
+app.use('/api/stock', stockRoutes);
+app.use('/api/invoices', invoiceRoutes);
+app.use('/api/receiving-letters', receivingLetterRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {

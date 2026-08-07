@@ -41,122 +41,151 @@ const getSalesmenReports = async (req, res) => {
     const { range = 'This Month', startDate, endDate } = req.query;
     const { start, end } = getDateRange(range, startDate, endDate);
 
-    // Fetch active salesmen
-    const salesmen = await prisma.user.findMany({
-      where: { role: 'SALESMAN' },
-      select: { id: true, name: true, email: true, phone: true, createdAt: true }
+    // Optimized single-pass system queries using Prisma groupBy
+    const [
+      salesmen,
+      groupedTotalLeads,
+      groupedActiveLeads,
+      groupedPendingLeads,
+      groupedIncompleteLeads,
+      groupedFinishedSellers,
+      allDeals
+    ] = await Promise.all([
+      prisma.user.findMany({
+        where: { role: 'SALESMAN' },
+        select: { id: true, name: true, email: true, phone: true }
+      }),
+      prisma.seller.groupBy({
+        by: ['assignedTo'],
+        where: { createdAt: { gte: start, lte: end } },
+        _count: { _all: true }
+      }),
+      prisma.seller.groupBy({
+        by: ['assignedTo'],
+        where: {
+          leadStatus: { in: ['New Lead', 'Contacted', 'Follow Up', 'Interested', 'Negotiation'] },
+          createdAt: { gte: start, lte: end }
+        },
+        _count: { _all: true }
+      }),
+      prisma.seller.groupBy({
+        by: ['assignedTo'],
+        where: {
+          leadStatus: 'Follow Up',
+          createdAt: { gte: start, lte: end }
+        },
+        _count: { _all: true }
+      }),
+      prisma.seller.groupBy({
+        by: ['assignedTo'],
+        where: {
+          leadStatus: 'Incomplete',
+          createdAt: { gte: start, lte: end }
+        },
+        _count: { _all: true }
+      }),
+      prisma.seller.groupBy({
+        by: ['assignedTo'],
+        where: {
+          leadStatus: 'Deal Closed',
+          updatedAt: { gte: start, lte: end }
+        },
+        _count: { _all: true }
+      }),
+      prisma.deal.findMany({
+        where: { closingDate: { gte: start, lte: end } },
+        select: {
+          salesmanId: true,
+          dealPrice: true,
+          profit: true,
+          closingDate: true,
+          seller: { select: { createdAt: true } }
+        }
+      })
+    ]);
+
+    // Build fast lookup maps
+    const totalMap = {};
+    groupedTotalLeads.forEach(g => { if (g.assignedTo) totalMap[g.assignedTo] = g._count._all; });
+
+    const activeMap = {};
+    groupedActiveLeads.forEach(g => { if (g.assignedTo) activeMap[g.assignedTo] = g._count._all; });
+
+    const pendingMap = {};
+    groupedPendingLeads.forEach(g => { if (g.assignedTo) pendingMap[g.assignedTo] = g._count._all; });
+
+    const incompleteMap = {};
+    groupedIncompleteLeads.forEach(g => { if (g.assignedTo) incompleteMap[g.assignedTo] = g._count._all; });
+
+    const finishedMap = {};
+    groupedFinishedSellers.forEach(g => { if (g.assignedTo) finishedMap[g.assignedTo] = g._count._all; });
+
+    const dealsMap = {};
+    allDeals.forEach(d => {
+      if (!dealsMap[d.salesmanId]) dealsMap[d.salesmanId] = [];
+      dealsMap[d.salesmanId].push(d);
     });
 
-    const reportData = await Promise.all(
-      salesmen.map(async (sm) => {
-        const salesmanFilter = {
-          OR: [
-            { assignedTo: sm.id },
-            { createdBy: sm.id }
-          ]
-        };
+    const reportData = salesmen.map((sm) => {
+      const totalLeadsCount = totalMap[sm.id] || 0;
+      const activeLeadsCount = activeMap[sm.id] || 0;
+      const pendingLeadsCount = pendingMap[sm.id] || 0;
+      const incompleteLeadsCount = incompleteMap[sm.id] || 0;
+      const finishedSellersCount = finishedMap[sm.id] || 0;
 
-        const [
-          totalLeadsCount,
-          activeLeadsCount,
-          pendingLeadsCount,
-          incompleteLeadsCount,
-          dealsClosedList,
-          finishedSellersCount
-        ] = await Promise.all([
-          prisma.seller.count({
-            where: {
-              ...salesmanFilter,
-              createdAt: { gte: start, lte: end }
-            }
-          }),
-          prisma.seller.count({
-            where: {
-              ...salesmanFilter,
-              leadStatus: { in: ['New Lead', 'Contacted', 'Follow Up', 'Interested', 'Negotiation'] },
-              createdAt: { gte: start, lte: end }
-            }
-          }),
-          prisma.seller.count({
-            where: {
-              ...salesmanFilter,
-              leadStatus: 'Follow Up',
-              createdAt: { gte: start, lte: end }
-            }
-          }),
-          prisma.seller.count({
-            where: {
-              ...salesmanFilter,
-              leadStatus: 'Incomplete',
-              createdAt: { gte: start, lte: end }
-            }
-          }),
-          prisma.deal.findMany({
-            where: {
-              salesmanId: sm.id,
-              closingDate: { gte: start, lte: end }
-            },
-            include: { seller: true }
-          }),
-          prisma.seller.count({
-            where: {
-              ...salesmanFilter,
-              leadStatus: 'Deal Closed',
-              updatedAt: { gte: start, lte: end }
-            }
-          })
-        ]);
+      const smDeals = dealsMap[sm.id] || [];
+      const dealsClosedCount = smDeals.length;
+      const totalRevenue = smDeals.reduce((sum, d) => sum + d.dealPrice, 0);
+      const totalProfit = smDeals.reduce((sum, d) => sum + d.profit, 0);
 
-        const dealsClosedCount = dealsClosedList.length;
-        const totalRevenue = dealsClosedList.reduce((sum, d) => sum + d.dealPrice, 0);
-        const totalProfit = dealsClosedList.reduce((sum, d) => sum + d.profit, 0);
+      const conversionRate = totalLeadsCount > 0 
+        ? ((dealsClosedCount / totalLeadsCount) * 100).toFixed(1) 
+        : '0.0';
 
-        // Conversion Rate = (Deals Closed / Total Leads) * 100
-        const conversionRate = totalLeadsCount > 0 
-          ? ((dealsClosedCount / totalLeadsCount) * 100).toFixed(1) 
-          : '0.0';
+      let totalDays = 0;
+      let validDealsForTime = 0;
 
-        // Average Deal Time (in days)
-        let totalDays = 0;
-        let validDealsForTime = 0;
+      smDeals.forEach(d => {
+        if (d.seller && d.seller.createdAt) {
+          const diffTime = Math.abs(new Date(d.closingDate) - new Date(d.seller.createdAt));
+          const diffDays = diffTime / (1000 * 60 * 60 * 24);
+          totalDays += diffDays;
+          validDealsForTime += 1;
+        }
+      });
 
-        dealsClosedList.forEach(d => {
-          if (d.seller && d.seller.createdAt) {
-            const diffTime = Math.abs(new Date(d.closingDate) - new Date(d.seller.createdAt));
-            const diffDays = diffTime / (1000 * 60 * 60 * 24);
-            totalDays += diffDays;
-            validDealsForTime += 1;
-          }
-        });
+      const avgDealTimeDays = validDealsForTime > 0 
+        ? (totalDays / validDealsForTime).toFixed(1) 
+        : 'N/A';
 
-        const avgDealTimeDays = validDealsForTime > 0 
-          ? (totalDays / validDealsForTime).toFixed(1) 
-          : 'N/A';
+      return {
+        salesmanId: sm.id,
+        salesmanName: sm.name,
+        email: sm.email,
+        phone: sm.phone,
+        totalLeads: totalLeadsCount,
+        dealsClosed: dealsClosedCount,
+        activeLeads: activeLeadsCount,
+        pendingLeads: pendingLeadsCount,
+        finishedDeals: finishedSellersCount,
+        incompleteLeads: incompleteLeadsCount,
+        totalRevenue,
+        totalProfit,
+        conversionRate: `${conversionRate}%`,
+        avgDealTime: avgDealTimeDays === 'N/A' ? 'N/A' : `${avgDealTimeDays} days`
+      };
+    });
 
-        return {
-          salesmanId: sm.id,
-          salesmanName: sm.name,
-          email: sm.email,
-          phone: sm.phone,
-          totalLeads: totalLeadsCount,
-          dealsClosed: dealsClosedCount,
-          activeLeads: activeLeadsCount,
-          pendingLeads: pendingLeadsCount,
-          finishedDeals: finishedSellersCount,
-          incompleteLeads: incompleteLeadsCount,
-          totalRevenue,
-          totalProfit,
-          conversionRate: `${conversionRate}%`,
-          avgDealTime: avgDealTimeDays === 'N/A' ? 'N/A' : `${avgDealTimeDays} days`
-        };
-      })
-    );
+    // Filter out dummy/empty salesmen with 0 leads/deals in period and sort by volume
+    const activeReports = reportData
+      .filter(r => r.totalLeads > 0 || r.dealsClosed > 0)
+      .sort((a, b) => b.totalLeads - a.totalLeads);
 
     return res.json({
       range,
       startDate: start,
       endDate: end,
-      reports: reportData
+      reports: activeReports
     });
   } catch (error) {
     return res.status(500).json({ message: 'Failed to generate performance reports', error: error.message });
@@ -169,7 +198,7 @@ const exportReportsCSV = async (req, res) => {
     const { start, end } = getDateRange(range, startDate, endDate);
 
     const salesmen = await prisma.user.findMany({
-      where: { role: 'SALESMAN' },
+      where: { role: 'SALESMAN', status: 'ACTIVE' },
       select: { id: true, name: true, email: true }
     });
 
@@ -191,6 +220,8 @@ const exportReportsCSV = async (req, res) => {
         prisma.deal.findMany({ where: { salesmanId: sm.id, closingDate: { gte: start, lte: end } }, include: { seller: true } }),
         prisma.seller.count({ where: { ...salesmanFilter, leadStatus: 'Deal Closed', updatedAt: { gte: start, lte: end } } })
       ]);
+
+      if (totalLeads === 0 && deals.length === 0) continue; // Skip dummy entries
 
       const dealsClosed = deals.length;
       const revenue = deals.reduce((s, d) => s + d.dealPrice, 0);
