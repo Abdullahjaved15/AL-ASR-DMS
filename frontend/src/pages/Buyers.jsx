@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Filter, Edit, Trash2, Phone, MapPin, DollarSign, UserCheck, Eye, Printer, Building2, ClipboardCheck } from 'lucide-react';
+import { Users, Plus, Filter, Edit, Trash2, Phone, MapPin, DollarSign, UserCheck, Eye, Printer, Building2, ClipboardCheck, FileText } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import BuyerDetailModal from '../components/BuyerDetailModal';
 import BankChecklistModal from '../components/BankChecklistModal';
