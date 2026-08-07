@@ -137,8 +137,11 @@ const createBuyer = async (req, res) => {
     const numBudget = parseFloat(budget) || 0;
     const numDownPercent = parseFloat(downpaymentPercent) || 0;
     const numProcessingFees = parseFloat(processingFees) || 0;
-    const numDownAmount = isBankCase ? (numBudget * (numDownPercent / 100)) : 0;
-    const calculatedDueAmount = isBankCase ? (numBudget - numDownAmount) : 0;
+    
+    // For bank case, total amount includes vehicle price + processing fees
+    const totalBankAmount = isBankCase ? (numBudget + numProcessingFees) : numBudget;
+    const numDownAmount = isBankCase ? (totalBankAmount * (numDownPercent / 100)) : 0;
+    const calculatedDueAmount = isBankCase ? (totalBankAmount - numDownAmount) : 0;
 
     const assignedSalesman = assignedTo || req.user.id;
 
@@ -230,8 +233,9 @@ const updateBuyer = async (req, res) => {
       updateData.processingFees = targetIsBankCase ? targetProcessingFees : 0;
       updateData.downpaymentPercent = targetIsBankCase ? targetDownPercent : 0;
       
-      const computedDownAmount = targetIsBankCase ? (targetBudget * (targetDownPercent / 100)) : 0;
-      const computedDueAmount = targetIsBankCase ? (targetBudget - computedDownAmount) : 0;
+      const totalBankAmount = targetIsBankCase ? (targetBudget + targetProcessingFees) : targetBudget;
+      const computedDownAmount = targetIsBankCase ? (totalBankAmount * (targetDownPercent / 100)) : 0;
+      const computedDueAmount = targetIsBankCase ? (totalBankAmount - computedDownAmount) : 0;
 
       updateData.downpaymentAmount = computedDownAmount;
       updateData.dueAmount = computedDueAmount;

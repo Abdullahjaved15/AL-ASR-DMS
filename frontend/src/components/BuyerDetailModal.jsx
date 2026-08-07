@@ -91,25 +91,49 @@ export default function BuyerDetailModal({ buyer, onClose, onEdit }) {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400 font-mono">Target Budget:</span>
-                  <span className="font-mono font-extrabold text-emerald-400 text-base">
+                  <span className="text-slate-400 font-mono">Vehicle Price:</span>
+                  <span className="font-mono font-bold text-white">
                     Rs. {buyer.budget?.toLocaleString()}
                   </span>
                 </div>
-                <div className="flex justify-between">
+                {buyer.isBankCase && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 font-mono">Processing Fees:</span>
+                      <span className="font-mono text-purple-300 font-bold">
+                        + Rs. {(buyer.processingFees || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between pt-1 border-t border-white/10">
+                      <span className="text-slate-300 font-mono font-bold">Total Amount:</span>
+                      <span className="font-mono font-extrabold text-sky-400 text-sm">
+                        Rs. {((buyer.budget || 0) + (buyer.processingFees || 0)).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 font-mono">Downpayment ({buyer.downpaymentPercent || 0}%):</span>
+                      <span className="font-mono text-amber-300 font-bold">
+                        Rs. {(buyer.downpaymentAmount || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 font-mono">Bank Due Loan Balance:</span>
+                      <span className="font-mono text-cyan-300 font-bold">
+                        Rs. {(buyer.dueAmount || 0).toLocaleString()}
+                      </span>
+                    </div>
+                  </>
+                )}
+                <div className="flex justify-between pt-1 border-t border-white/5">
                   <span className="text-slate-400 font-mono">Desired Vehicle:</span>
                   <span className="font-bold text-white">{buyer.vehicle} {buyer.model}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400 font-mono">Model Year Target:</span>
-                  <span className="font-mono text-white font-semibold">{buyer.year}</span>
+                  <span className="text-slate-400 font-mono">Condition:</span>
+                  <span className="font-mono text-cyan-300 font-semibold">{buyer.carCondition || 'Used'} {buyer.carCondition === 'Zero Meter' ? `(${buyer.zeroMeterType || 'Cash'})` : ''}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400 font-mono">Color Preference:</span>
-                  <span className="text-white font-medium">{buyer.color}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400 font-mono">Assigned Agent:</span>
+                  <span className="text-slate-400 font-mono">Assigned Salesman:</span>
                   <span className="font-mono text-emerald-400 font-semibold">
                     {buyer.assignedUser?.name || 'Unassigned'}
                   </span>

@@ -427,7 +427,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                     onClick={() => openDetailModal(buyer)}
                     className="hover:bg-cyan-500/5 cursor-pointer transition-colors group"
                   >
-                    <td className="py-4 px-4">
+                    <td className="py-4 px-4" onClick={() => openDetailModal(buyer)}>
                       <div className="font-bold text-white text-sm group-hover:text-cyan-400 transition-colors">{buyer.buyerName}</div>
                       <div className="text-slate-400 font-mono text-[11px] flex items-center space-x-1 mt-0.5">
                         <span>{buyer.buyerPhone}</span>
@@ -436,21 +436,21 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                       </div>
                     </td>
 
-                    <td className="py-4 px-4 font-mono">
+                    <td className="py-4 px-4 font-mono" onClick={() => openDetailModal(buyer)}>
                       <div className="font-bold text-sky-400">{buyer.vehicle} {buyer.model}</div>
                       <div className="text-slate-400 text-[11px]">Year: {buyer.year} • Color: {buyer.color || 'Any'}</div>
                     </td>
 
-                    <td className="py-4 px-4">
+                    <td className="py-4 px-4" onClick={() => openDetailModal(buyer)}>
                       <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[11px] font-bold border border-white/10">
                         {buyer.carCondition || 'Used'} {buyer.carCondition === 'Zero Meter' ? `(${buyer.zeroMeterType || 'Cash'})` : ''}
                       </span>
                     </td>
 
-                    <td className="py-4 px-4 font-mono">
+                    <td className="py-4 px-4 font-mono" onClick={() => openDetailModal(buyer)}>
                       {buyer.isBankCase ? (
                         <div className="space-y-0.5">
-                          <div className="text-emerald-400 font-bold">Total: Rs. {buyer.budget?.toLocaleString()}</div>
+                          <div className="text-emerald-400 font-bold">Total: Rs. {(buyer.budget + (buyer.processingFees || 0))?.toLocaleString()}</div>
                           <div className="text-amber-300 text-[10px]">Down ({buyer.downpaymentPercent || 0}%): Rs. {(buyer.downpaymentAmount || 0).toLocaleString()}</div>
                           <div className="text-cyan-300 text-[10px] font-bold">Due: Rs. {(buyer.dueAmount || 0).toLocaleString()}</div>
                         </div>
@@ -459,7 +459,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                       )}
                     </td>
 
-                    <td className="py-4 px-4">
+                    <td className="py-4 px-4" onClick={() => openDetailModal(buyer)}>
                       {buyer.isBankCase ? (
                         <div className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-300 text-[11px] font-bold">
                           <Building2 className="w-3 h-3 text-sky-400" />
@@ -470,7 +470,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                       )}
                     </td>
 
-                    <td className="py-4 px-4 font-mono text-[11px]">
+                    <td className="py-4 px-4 font-mono text-[11px]" onClick={() => openDetailModal(buyer)}>
                       {buyer.assignedUser ? (
                         <div className="text-slate-200">{buyer.assignedUser.name}</div>
                       ) : (
@@ -478,7 +478,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                       )}
                     </td>
 
-                    <td className="py-4 px-4">
+                    <td className="py-4 px-4" onClick={() => openDetailModal(buyer)}>
                       <StatusBadge status={buyer.leadStatus} />
                     </td>
 
@@ -737,12 +737,8 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                     {Boolean(formData.budget) && (
                       <div className="bg-slate-950/80 p-3.5 rounded-xl border border-sky-500/20 text-xs space-y-1.5 font-mono">
                         <div className="flex justify-between text-slate-300">
-                          <span>Total Vehicle Amount:</span>
+                          <span>Vehicle Price:</span>
                           <span className="font-bold text-white">Rs. {parseFloat(formData.budget || 0).toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between text-amber-300">
-                          <span>Downpayment ({formData.downpaymentPercent || 0}%):</span>
-                          <span className="font-bold">- Rs. {(parseFloat(formData.budget || 0) * ((parseFloat(formData.downpaymentPercent) || 0) / 100)).toLocaleString()}</span>
                         </div>
                         {Boolean(parseFloat(formData.processingFees)) && (
                           <div className="flex justify-between text-purple-300">
@@ -750,9 +746,17 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                             <span>+ Rs. {parseFloat(formData.processingFees || 0).toLocaleString()}</span>
                           </div>
                         )}
+                        <div className="flex justify-between text-sky-400 font-bold border-t border-white/10 pt-1">
+                          <span>Total Amount (Vehicle + Fees):</span>
+                          <span>Rs. {(parseFloat(formData.budget || 0) + (parseFloat(formData.processingFees) || 0)).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-amber-300">
+                          <span>Downpayment ({formData.downpaymentPercent || 0}% of Total):</span>
+                          <span className="font-bold">- Rs. {((parseFloat(formData.budget || 0) + (parseFloat(formData.processingFees) || 0)) * ((parseFloat(formData.downpaymentPercent) || 0) / 100)).toLocaleString()}</span>
+                        </div>
                         <div className="flex justify-between text-cyan-300 font-bold text-sm pt-1.5 border-t border-white/10">
                           <span>Calculated Due Amount (Bank Loan Balance):</span>
-                          <span>Rs. {(parseFloat(formData.budget || 0) - (parseFloat(formData.budget || 0) * ((parseFloat(formData.downpaymentPercent) || 0) / 100))).toLocaleString()}</span>
+                          <span>Rs. {((parseFloat(formData.budget || 0) + (parseFloat(formData.processingFees) || 0)) - ((parseFloat(formData.budget || 0) + (parseFloat(formData.processingFees) || 0)) * ((parseFloat(formData.downpaymentPercent) || 0) / 100))).toLocaleString()}</span>
                         </div>
                       </div>
                     )}
