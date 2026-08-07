@@ -235,8 +235,17 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
   const exportBuyersPDF = () => {
     const printWindow = window.open('', '_blank');
     const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    const totalBudget = buyers.reduce((acc, b) => acc + (b.budget || 0), 0);
-    const bankCasesCount = buyers.filter(b => b.isBankCase).length;
+    const totalValuation = buyers.reduce((acc, b) => acc + (b.budget || 0), 0);
+
+    const formatDateStr = (dateVal) => {
+      if (!dateVal) return '-';
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return '-';
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const year = d.getUTCFullYear();
+      return `${day}-${month}-${year}`;
+    };
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -257,9 +266,9 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
             th { background: #0f172a; color: #ffffff; text-align: left; padding: 9px; font-size: 10px; text-transform: uppercase; }
             td { padding: 9px; border-bottom: 1px solid #e2e8f0; font-size: 11px; }
             tr:nth-child(even) { background: #f8fafc; }
-            .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; font-family: monospace; }
+            .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; }
             .bank-badge { background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; }
-            .cash-badge { background: #dcfce7; color: #15803d; }
+            .cash-badge { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
             .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }
           </style>
         </head>
@@ -268,12 +277,12 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
             <div class="logo-box">
               <img src="${logoBase64}" alt="AL ASR MOTORS Logo" style="height: 90px; width: auto; object-fit: contain;" />
               <div>
-                <div class="title">AL ASR MOTORS - Buyer Inquiries & Leads Report</div>
-                <div class="subtitle">Filtered Buyers Export • Generated: ${todayStr}</div>
+                <div class="title">AL ASR MOTORS - Buyer Inquiries Report</div>
+                <div class="subtitle">Filtered Buyer Leads Export • Generated: ${todayStr}</div>
               </div>
             </div>
             <div style="text-align: right;">
-              <div style="font-size: 14px; font-weight: bold; color: #0284c7;">Main Showroom Floor</div>
+              <div style="font-size: 14px; font-weight: bold; color: #0284c7;">Customer Care & Sales</div>
               <div style="font-size: 10px; color: #64748b;">Sahiwal, Pakistan</div>
             </div>
           </div>
@@ -284,12 +293,8 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
               <div class="stat-val">${buyers.length} Leads</div>
             </div>
             <div class="stat-box">
-              <div class="stat-label">Bank Finance Cases</div>
-              <div class="stat-val">${bankCasesCount} Cases</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-label">Combined Target Budget</div>
-              <div class="stat-val">Rs. ${totalBudget.toLocaleString()}</div>
+              <div class="stat-label">Total Target Budget Volume</div>
+              <div class="stat-val">Rs. ${totalValuation.toLocaleString()}</div>
             </div>
           </div>
 
@@ -313,7 +318,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
               ${buyers.map((b, idx) => `
                 <tr>
                   <td>${idx + 1}</td>
-                  <td><strong style="color:#0284c7; font-family:monospace;">${new Date(b.createdAt).toLocaleDateString()}</strong></td>
+                  <td><strong style="color:#0284c7; font-family:monospace;">${formatDateStr(b.createdAt)}</strong></td>
                   <td><strong>${b.buyerName}</strong><br/><span style="color:#64748b; font-size:10px;">${b.buyerPhone}</span></td>
                   <td>${b.buyerCity}</td>
                   <td><strong>${b.vehicle} ${b.model}</strong> (${b.year})</td>
@@ -439,7 +444,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                     className="hover:bg-cyan-500/5 cursor-pointer transition-colors group"
                   >
                     <td className="py-4 px-4 font-mono font-bold text-cyan-400 text-xs whitespace-nowrap">
-                      {new Date(buyer.createdAt).toLocaleDateString()}
+                      {formatDateStr(buyer.createdAt)}
                     </td>
                     <td className="py-4 px-4" onClick={() => openDetailModal(buyer)}>
                       <div className="font-bold text-white text-sm group-hover:text-cyan-400 transition-colors">{buyer.buyerName}</div>

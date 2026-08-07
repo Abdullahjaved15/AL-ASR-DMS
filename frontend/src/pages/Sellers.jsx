@@ -221,41 +221,49 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
     const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const totalValuation = sellers.reduce((acc, s) => acc + (s.demandPrice || 0), 0);
 
+    const formatDateStr = (dateVal) => {
+      if (!dateVal) return '-';
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return '-';
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const year = d.getUTCFullYear();
+      return `${day}-${month}-${year}`;
+    };
+
     const htmlContent = `
       <!DOCTYPE html>
       <html>
         <head>
-          <title>AL ASR MOTORS - Filtered Vehicle Inventory Report (${todayStr})</title>
+          <title>AL ASR MOTORS - Seller Inventory Export</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 25px; color: #1e293b; background: #ffffff; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0284c7; padding-bottom: 15px; margin-bottom: 20px; }
-            .logo-box { display: flex; align-items: center; gap: 15px; }
-            .title { font-size: 22px; font-weight: bold; color: #0f172a; }
-            .subtitle { font-size: 12px; color: #64748b; font-family: monospace; }
-            .stats { display: flex; gap: 15px; margin-bottom: 20px; }
-            .stat-box { flex: 1; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; }
-            .stat-label { font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: bold; }
-            .stat-val { font-size: 18px; font-weight: bold; color: #0284c7; margin-top: 4px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            th { background: #0f172a; color: #ffffff; text-align: left; padding: 9px; font-size: 10px; text-transform: uppercase; }
-            td { padding: 9px; border-bottom: 1px solid #e2e8f0; font-size: 11px; }
-            tr:nth-child(even) { background: #f8fafc; }
-            .plate-tag { display: inline-block; padding: 2px 6px; background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; border-radius: 4px; font-size: 10px; font-weight: bold; font-family: monospace; }
-            .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+            @page { size: A4 landscape; margin: 10mm; }
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #0f172a; margin: 0; padding: 10px; font-size: 11px; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-b: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 12px; }
+            .logo-title { display: flex; items-center; gap: 15px; }
+            .title { font-size: 18px; font-weight: 800; color: #0f172a; text-transform: uppercase; tracking: 0.5px; }
+            .subtitle { font-size: 11px; color: #64748b; margin-top: 2px; }
+            .stats { display: flex; gap: 20px; background: #f8fafc; padding: 8px 14px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 12px; }
+            .stat-box { font-size: 11px; }
+            .stat-label { color: #64748b; font-size: 10px; text-transform: uppercase; font-weight: 600; }
+            .stat-val { font-weight: 700; color: #0284c7; font-size: 13px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+            th { background-color: #0f172a; color: #ffffff; text-align: left; padding: 6px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+            td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+            tr:nth-child(even) { background-color: #f8fafc; }
+            .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+            .plate-tag { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; padding: 1px 4px; border-radius: 3px; font-family: monospace; font-weight: bold; }
+            .footer { margin-top: 15px; font-size: 9px; color: #94a3b8; text-align: center; border-t: 1px solid #e2e8f0; padding-top: 8px; }
           </style>
         </head>
         <body>
           <div class="header">
-            <div class="logo-box">
+            <div class="logo-title">
               <img src="${logoBase64}" alt="AL ASR MOTORS Logo" style="height: 90px; width: auto; object-fit: contain;" />
               <div>
                 <div class="title">AL ASR MOTORS - Showroom Vehicle Inventory</div>
                 <div class="subtitle">Filtered Stock Export • Generated: ${todayStr}</div>
               </div>
-            </div>
-            <div style="text-align: right;">
-              <div style="font-size: 14px; font-weight: bold; color: #0284c7;">Main Showroom Floor</div>
-              <div style="font-size: 10px; color: #64748b;">Sahiwal, Pakistan</div>
             </div>
           </div>
 
@@ -290,7 +298,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
               ${sellers.map((s, idx) => `
                 <tr>
                   <td>${idx + 1}</td>
-                  <td><strong style="color:#0284c7; font-family:monospace;">${new Date(s.createdAt).toLocaleDateString()}</strong></td>
+                  <td><strong style="color:#0284c7; font-family:monospace;">${formatDateStr(s.createdAt)}</strong></td>
                   <td><strong>${s.vehicle} ${s.model}</strong> (${s.year})<br/><span style="color:#64748b; font-size:10px;">Color: ${s.color || 'N/A'}</span></td>
                   <td>${s.numberPlate ? `<span class="plate-tag">${s.numberPlate}</span>` : '<span style="color:#94a3b8;">Unregistered</span>'}</td>
                   <td><strong>${s.carCondition || 'Used'}</strong> ${s.carCondition === 'Zero Meter' ? `(${s.zeroMeterType || 'Cash'})` : ''}</td>
@@ -390,7 +398,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                   className="hover:bg-cyan-500/5 cursor-pointer transition-colors group"
                 >
                   <td className="py-4 px-4 font-mono font-bold text-cyan-400 text-xs whitespace-nowrap">
-                    {new Date(seller.createdAt).toLocaleDateString()}
+                    {formatDateStr(seller.createdAt)}
                   </td>
                   <td className="py-4 px-4">
                     <div className="flex items-center space-x-3">
