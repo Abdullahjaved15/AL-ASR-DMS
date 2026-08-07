@@ -5,7 +5,7 @@ const DASHBOARD_CACHE_TTL = 10000; // 10 seconds
 
 const getDashboardStats = async (req, res) => {
   try {
-    const isSalesman = req.user.role !== 'ADMIN';
+    const isSalesman = req.user.role === 'SALESMAN';
     const userId = req.user.id;
     const cacheKey = `${req.user.role}_${userId}`;
 
