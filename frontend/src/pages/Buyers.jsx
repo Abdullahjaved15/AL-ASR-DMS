@@ -106,8 +106,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
       });
       let filteredData = data;
       if (scope === 'mine' && user?.id) {
-        const mine = data.filter(b => b.assignedTo === user.id || b.createdBy === user.id);
-        filteredData = (isAdmin && mine.length === 0) ? data : mine;
+        filteredData = data.filter(b => b.assignedTo === user.id || b.createdBy === user.id);
       }
       if (scope === 'bank_cases') {
         filteredData = filteredData.filter(b => b.isBankCase);

@@ -99,8 +99,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
       });
       let filteredData = data;
       if (scope === 'mine' && user?.id) {
-        const mine = data.filter(s => s.assignedTo === user.id || s.createdBy === user.id);
-        filteredData = (isAdmin && mine.length === 0) ? data : mine;
+        filteredData = data.filter(s => s.assignedTo === user.id || s.createdBy === user.id);
       }
       setSellers(filteredData);
     } catch (err) {
