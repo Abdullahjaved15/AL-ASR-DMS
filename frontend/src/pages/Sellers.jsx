@@ -92,6 +92,8 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
       const activeFilters = { ...filters };
       if (scope === 'mine' && user?.id) {
         activeFilters.assignedTo = user.id;
+      } else if (scope === 'all') {
+        delete activeFilters.assignedTo;
       }
       const data = await api.getSellers({
         search,
@@ -99,7 +101,13 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
       });
       let filteredData = data;
       if (scope === 'mine' && user?.id) {
-        filteredData = data.filter(s => s.assignedTo === user.id || s.createdBy === user.id);
+        const cleanUserName = user?.name ? user.name.replace(/^(mr\.|ma'am|mrs\.)\s+/i, '').toLowerCase().trim() : '';
+        const mine = data.filter(s => 
+          s.assignedTo === user.id || 
+          s.createdBy === user.id || 
+          (cleanUserName && s.leadReference?.toLowerCase().includes(cleanUserName))
+        );
+        filteredData = mine.length > 0 ? mine : data;
       }
       setSellers(filteredData);
     } catch (err) {

@@ -96,6 +96,8 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
       const activeFilters = { ...filters };
       if (scope === 'mine' && user?.id) {
         activeFilters.assignedTo = user.id;
+      } else if (scope === 'all') {
+        delete activeFilters.assignedTo;
       }
       if (scope === 'bank_cases') {
         activeFilters.isBankCase = 'true';
@@ -106,7 +108,13 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
       });
       let filteredData = data;
       if (scope === 'mine' && user?.id) {
-        filteredData = data.filter(b => b.assignedTo === user.id || b.createdBy === user.id);
+        const cleanUserName = user?.name ? user.name.replace(/^(mr\.|ma'am|mrs\.)\s+/i, '').toLowerCase().trim() : '';
+        const mine = data.filter(b => 
+          b.assignedTo === user.id || 
+          b.createdBy === user.id || 
+          (cleanUserName && b.leadReference?.toLowerCase().includes(cleanUserName))
+        );
+        filteredData = mine.length > 0 ? mine : data;
       }
       if (scope === 'bank_cases') {
         filteredData = filteredData.filter(b => b.isBankCase);

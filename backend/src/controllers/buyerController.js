@@ -8,10 +8,16 @@ const getBuyers = async (req, res) => {
     const where = {};
 
     if (assignedTo) {
+      const targetUser = await prisma.user.findUnique({ where: { id: assignedTo }, select: { name: true } });
+      const searchName = targetUser?.name ? targetUser.name.replace(/^(mr\.|ma'am|mrs\.)\s+/i, '').trim() : '';
+
       where.OR = [
         { assignedTo: assignedTo },
         { createdBy: assignedTo }
       ];
+      if (searchName && searchName.length >= 3) {
+        where.OR.push({ leadReference: { contains: searchName, mode: 'insensitive' } });
+      }
     }
 
     if (leadStatus) {
