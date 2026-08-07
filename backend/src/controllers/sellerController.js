@@ -26,9 +26,11 @@ const getSellers = async (req, res) => {
 
     const where = {};
 
-    // Allow all authenticated users (Admin and Salesmen) to view full dealership inventory
     if (assignedTo) {
-      where.assignedTo = assignedTo;
+      where.OR = [
+        { assignedTo: assignedTo },
+        { createdBy: assignedTo }
+      ];
     }
 
     if (leadStatus) {

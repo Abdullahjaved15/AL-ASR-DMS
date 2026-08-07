@@ -8,7 +8,10 @@ const getBuyers = async (req, res) => {
     const where = {};
 
     if (assignedTo) {
-      where.assignedTo = assignedTo;
+      where.OR = [
+        { assignedTo: assignedTo },
+        { createdBy: assignedTo }
+      ];
     }
 
     if (leadStatus) {
