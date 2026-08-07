@@ -67,6 +67,8 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
     mileage: 0,
     numberPlate: '',
     demandPrice: '',
+    carCondition: 'Used',
+    zeroMeterType: 'Cash',
     sellerName: '',
     sellerPhone: '',
     sellerCity: '',
@@ -122,10 +124,12 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
       vehicle: '',
       model: '',
       year: new Date().getFullYear(),
-      color: '',
+      color: 'White',
       mileage: 0,
       numberPlate: '',
       demandPrice: '',
+      carCondition: 'Used',
+      zeroMeterType: 'Cash',
       sellerName: '',
       sellerPhone: '',
       sellerCity: '',
@@ -181,6 +185,8 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
       mileage: seller.mileage,
       numberPlate: seller.numberPlate || '',
       demandPrice: seller.demandPrice,
+      carCondition: seller.carCondition || 'Used',
+      zeroMeterType: seller.zeroMeterType || 'Cash',
       sellerName: seller.sellerName,
       sellerPhone: seller.sellerPhone,
       sellerCity: seller.sellerCity,
@@ -227,8 +233,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
             th { background: #0f172a; color: #ffffff; text-align: left; padding: 9px; font-size: 10px; text-transform: uppercase; }
             td { padding: 9px; border-bottom: 1px solid #e2e8f0; font-size: 11px; }
             tr:nth-child(even) { background: #f8fafc; }
-            .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; font-family: monospace; }
-            .plate-badge { background: #fef08a; color: #854d0e; border: 1px solid #ca8a04; }
+            .plate-tag { display: inline-block; padding: 2px 6px; background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; border-radius: 4px; font-size: 10px; font-weight: bold; font-family: monospace; }
             .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }
           </style>
         </head>
@@ -237,8 +242,8 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
             <div class="logo-box">
               <img src="${logoBase64}" alt="AL ASR MOTORS Logo" style="height: 90px; width: auto; object-fit: contain;" />
               <div>
-                <div class="title">AL ASR MOTORS - Sellers & Inventory Report</div>
-                <div class="subtitle">Filtered Vehicles Export • Generated: ${todayStr}</div>
+                <div class="title">AL ASR MOTORS - Showroom Vehicle Inventory</div>
+                <div class="subtitle">Filtered Stock Export • Generated: ${todayStr}</div>
               </div>
             </div>
             <div style="text-align: right;">
@@ -253,7 +258,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
               <div class="stat-val">${sellers.length} Units</div>
             </div>
             <div class="stat-box">
-              <div class="stat-label">Total Inventory Valuation</div>
+              <div class="stat-label">Combined Valuation</div>
               <div class="stat-val">Rs. ${totalValuation.toLocaleString()}</div>
             </div>
           </div>
@@ -262,13 +267,12 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
             <thead>
               <tr>
                 <th>#</th>
-                <th>Vehicle & Model</th>
+                <th>Vehicle & Specs</th>
                 <th>Reg / Plate #</th>
-                <th>Year</th>
-                <th>Color</th>
-                <th>Mileage</th>
+                <th>Condition</th>
+                <th>Seller Name & Contact</th>
+                <th>City</th>
                 <th>Demand Price (PKR)</th>
-                <th>Seller Contact & City</th>
                 <th>Salesman</th>
                 <th>Status</th>
               </tr>
@@ -277,13 +281,12 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
               ${sellers.map((s, idx) => `
                 <tr>
                   <td>${idx + 1}</td>
-                  <td><strong>${s.vehicle} ${s.model}</strong></td>
-                  <td><span class="badge plate-badge">${s.numberPlate || 'UNREGISTERED'}</span></td>
-                  <td>${s.year}</td>
-                  <td>${s.color || '-'}</td>
-                  <td>${s.mileage ? s.mileage.toLocaleString() + ' km' : '0 km'}</td>
+                  <td><strong>${s.vehicle} ${s.model}</strong> (${s.year})<br/><span style="color:#64748b; font-size:10px;">Color: ${s.color}</span></td>
+                  <td>${s.numberPlate ? `<span class="plate-tag">${s.numberPlate}</span>` : '<span style="color:#94a3b8;">Unregistered</span>'}</td>
+                  <td><strong>${s.carCondition || 'Used'}</strong> ${s.carCondition === 'Zero Meter' ? `(${s.zeroMeterType || 'Cash'})` : ''}</td>
+                  <td><strong>${s.sellerName}</strong><br/><span style="color:#64748b; font-size:10px;">${s.sellerPhone}</span></td>
+                  <td>${s.sellerCity}</td>
                   <td><strong>Rs. ${s.demandPrice?.toLocaleString()}</strong></td>
-                  <td>${s.sellerName} (${s.sellerPhone}) - ${s.sellerCity}</td>
                   <td>${s.assignedUser?.name || 'Unassigned'}</td>
                   <td>${s.leadStatus}</td>
                 </tr>
@@ -313,9 +316,9 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
       {/* Top Header Bar with Count and Action */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-extrabold text-white tracking-tight">Vehicle Inventory & Sellers</h2>
+          <h2 className="text-xl font-extrabold text-white tracking-tight">Showroom Seller Inventory</h2>
           <p className="text-xs font-mono text-slate-400 mt-0.5">
-            Showing <strong className="text-cyan-400">{sellers.length}</strong> matching seller lead(s)
+            Showing <strong className="text-cyan-400">{sellers.length}</strong> matching seller vehicle(s)
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -326,13 +329,15 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
             <Printer className="w-4 h-4 text-cyan-400" />
             <span>Export PDF</span>
           </button>
-          <button
-            onClick={() => { resetForm(); setIsAddModalOpen(true); }}
-            className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold rounded-xl text-xs shadow-lg shadow-cyan-500/20 transition-all flex items-center space-x-1.5"
-          >
-            <Plus className="w-4 h-4" />
-            <span>New Seller Entry</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => { resetForm(); setIsAddModalOpen(true); }}
+              className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold rounded-xl text-xs shadow-lg shadow-cyan-500/20 transition-all flex items-center space-x-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              <span>New Seller Entry</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -589,6 +594,34 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-900/60 p-3 rounded-2xl border border-white/5">
+                <div>
+                  <label className="block text-xs font-mono text-cyan-400 font-bold mb-1">Vehicle Condition *</label>
+                  <select
+                    value={formData.carCondition}
+                    onChange={(e) => setFormData({ ...formData, carCondition: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-bold"
+                  >
+                    <option value="Used">Used Car</option>
+                    <option value="Zero Meter">Zero Meter (Brand New)</option>
+                  </select>
+                </div>
+
+                {formData.carCondition === 'Zero Meter' && (
+                  <div>
+                    <label className="block text-xs font-mono text-emerald-400 font-bold mb-1">Zero Meter Payment Option *</label>
+                    <select
+                      value={formData.zeroMeterType}
+                      onChange={(e) => setFormData({ ...formData, zeroMeterType: e.target.value })}
+                      className="w-full bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-2 text-sm text-emerald-300 focus:outline-none focus:border-emerald-500 font-bold"
+                    >
+                      <option value="Cash">Cash (Immediate Ready Stock)</option>
+                      <option value="Booking">Booking (Advance Booking)</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -67,8 +67,12 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
     color: '',
     mileage: 0,
     budget: '',
+    carCondition: 'Used',
+    zeroMeterType: 'Cash',
     isBankCase: false,
     bankName: '',
+    processingFees: 0,
+    downpaymentPercent: 20,
     buyerName: '',
     buyerPhone: '',
     buyerCity: '',
@@ -133,8 +137,12 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
       color: 'Any',
       mileage: 0,
       budget: '',
+      carCondition: 'Used',
+      zeroMeterType: 'Cash',
       isBankCase: scope === 'bank_cases',
       bankName: '',
+      processingFees: 0,
+      downpaymentPercent: 20,
       buyerName: '',
       buyerPhone: '',
       buyerCity: '',
@@ -189,8 +197,12 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
       color: buyer.color,
       mileage: buyer.mileage,
       budget: buyer.budget,
+      carCondition: buyer.carCondition || 'Used',
+      zeroMeterType: buyer.zeroMeterType || 'Cash',
       isBankCase: Boolean(buyer.isBankCase),
       bankName: buyer.bankName || '',
+      processingFees: buyer.processingFees || 0,
+      downpaymentPercent: buyer.downpaymentPercent || 20,
       buyerName: buyer.buyerName,
       buyerPhone: buyer.buyerPhone,
       buyerCity: buyer.buyerCity,
@@ -348,13 +360,15 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
             <Printer className="w-4 h-4 text-cyan-400" />
             <span>Export PDF</span>
           </button>
-          <button
-            onClick={() => { resetForm(); setIsAddModalOpen(true); }}
-            className="px-4 py-2 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-black font-bold rounded-xl text-xs shadow-lg shadow-sky-500/20 transition-all flex items-center space-x-1.5"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{scope === 'bank_cases' ? 'New Bank Case Entry' : 'New Buyer Entry'}</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => { resetForm(); setIsAddModalOpen(true); }}
+              className="px-4 py-2 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-black font-bold rounded-xl text-xs shadow-lg shadow-sky-500/20 transition-all flex items-center space-x-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              <span>{scope === 'bank_cases' ? 'New Bank Case Entry' : 'New Buyer Entry'}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -365,7 +379,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
         resetFilters={resetFilters}
         salesmenList={salesmenList}
         isAdmin={isAdmin}
-        priceLabel="Budget Range"
+        priceLabel="Target Budget Range"
       />
 
       {/* Buyers Data Table */}
@@ -374,158 +388,138 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-900/80 border-b border-white/10 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
-                <th className="py-3.5 px-4">Buyer Name & Contact</th>
-                <th className="py-3.5 px-4">Vehicle Desired</th>
-                <th className="py-3.5 px-4">Target Budget</th>
+                <th className="py-3.5 px-4">Buyer & Contact</th>
+                <th className="py-3.5 px-4">Desired Vehicle</th>
+                <th className="py-3.5 px-4">Condition</th>
+                <th className="py-3.5 px-4">Financial Details</th>
+                <th className="py-3.5 px-4">Type / Bank</th>
                 <th className="py-3.5 px-4">Assigned Salesman</th>
                 <th className="py-3.5 px-4">Lead Status</th>
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5 text-xs">
-              {buyers.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((buyer) => (
-                <tr key={buyer.id} className="hover:bg-white/5 transition-colors">
-                  <td className="py-4 px-4 cursor-pointer" onClick={() => openDetailModal(buyer)}>
-                    <div className="flex items-center space-x-2">
-                      <p className="font-extrabold text-white text-sm hover:text-cyan-400 transition-colors">{buyer.buyerName}</p>
-                      {buyer.isBankCase ? (
-                        <span className="px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/40 font-mono text-[10px] font-bold flex items-center space-x-1">
-                          <Building2 className="w-3 h-3" />
-                          <span>BANK CASE</span>
-                        </span>
-                      ) : (
-                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono text-[9px]">
-                          CASH
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-slate-400 font-mono flex items-center space-x-1 mt-0.5">
-                      <Phone className="w-3 h-3 text-cyan-400" />
-                      <span>{buyer.buyerPhone}</span>
-                    </p>
-                    <p className="text-[10px] text-slate-500 font-mono flex items-center space-x-1">
-                      <MapPin className="w-2.5 h-2.5" />
-                      <span>{buyer.buyerCity}</span>
-                    </p>
-                  </td>
-
-                  <td className="py-4 px-4 cursor-pointer" onClick={() => openDetailModal(buyer)}>
-                    <p className="font-semibold text-white hover:text-cyan-400 transition-colors">{buyer.vehicle} {buyer.model}</p>
-                    <p className="text-[11px] text-slate-400 font-mono">
-                      Target Year: {buyer.year} • Color: {buyer.color}
-                    </p>
-                    {buyer.isBankCase && buyer.bankName && (
-                      <p className="text-[10px] text-sky-400 font-mono mt-0.5">
-                        Bank: {buyer.bankName}
-                      </p>
-                    )}
-                  </td>
-
-                  <td className="py-4 px-4 font-mono font-extrabold text-emerald-400 text-sm">
-                    Rs. {buyer.budget?.toLocaleString()}
-                  </td>
-
-                  <td className="py-4 px-4 font-mono text-slate-300">
-                    <div className="flex items-center space-x-1.5">
-                      <UserCheck className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>{buyer.assignedUser?.name || 'Unassigned'}</span>
-                    </div>
-                  </td>
-
-                  <td className="py-4 px-4">
-                    <StatusBadge status={buyer.leadStatus} />
-                  </td>
-
-                  <td className="py-4 px-4 text-right">
-                    <div className="flex items-center justify-end space-x-2">
-                      {buyer.isBankCase && (
-                        <button
-                          onClick={() => openChecklistModal(buyer)}
-                          className="px-2.5 py-1 bg-sky-900/60 hover:bg-sky-800 border border-sky-500/40 text-sky-300 rounded-lg font-mono text-[11px] flex items-center space-x-1.5 transition-colors shadow-sm"
-                          title="Open 12-item Bank Case Checklist"
-                        >
-                          <ClipboardCheck className="w-3.5 h-3.5 text-sky-400" />
-                          <span>Checklist</span>
-                        </button>
-                      )}
-
-                      {(isAdmin || buyer.assignedTo === user?.id || buyer.createdBy === user?.id) ? (
-                        <>
-                          <button
-                            onClick={() => openEditModal(buyer)}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
-                            title="Edit buyer details"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-
-                          {isAdmin && (
-                            <button
-                              onClick={() => handleDeleteBuyer(buyer.id)}
-                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-colors"
-                              title="Delete record"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </>
-                      ) : (
-                        <button
-                          onClick={() => openDetailModal(buyer)}
-                          className="px-2 py-1 rounded-lg bg-slate-800/80 border border-white/10 text-slate-400 font-mono text-[10px] hover:text-cyan-400 flex items-center space-x-1"
-                        >
-                          <Eye className="w-3 h-3" />
-                          <span>View Only</span>
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-
-              {buyers.length === 0 && (
+            <tbody className="divide-y divide-white/5 text-xs text-slate-200">
+              {loading ? (
                 <tr>
-                  <td colSpan="6" className="py-12 text-center text-slate-500 font-mono text-xs">
-                    No buyer inquiries found.
+                  <td colSpan="8" className="py-12 text-center text-slate-400">
+                    <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-sky-500 border-t-transparent mb-2"></div>
+                    <p className="font-mono">Loading buyer leads...</p>
                   </td>
                 </tr>
+              ) : buyers.length === 0 ? (
+                <tr>
+                  <td colSpan="8" className="py-12 text-center text-slate-400 font-mono">
+                    No buyer inquiries found matching your filters.
+                  </td>
+                </tr>
+              ) : (
+                buyers.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((buyer) => (
+                  <tr key={buyer.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="py-4 px-4">
+                      <div className="font-bold text-white text-sm">{buyer.buyerName}</div>
+                      <div className="text-slate-400 font-mono text-[11px] flex items-center space-x-1 mt-0.5">
+                        <span>{buyer.buyerPhone}</span>
+                        <span>•</span>
+                        <span>{buyer.buyerCity}</span>
+                      </div>
+                    </td>
+
+                    <td className="py-4 px-4 font-mono">
+                      <div className="font-bold text-sky-400">{buyer.vehicle} {buyer.model}</div>
+                      <div className="text-slate-400 text-[11px]">Year: {buyer.year} • Color: {buyer.color || 'Any'}</div>
+                    </td>
+
+                    <td className="py-4 px-4">
+                      <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[11px] font-bold border border-white/10">
+                        {buyer.carCondition || 'Used'} {buyer.carCondition === 'Zero Meter' ? `(${buyer.zeroMeterType || 'Cash'})` : ''}
+                      </span>
+                    </td>
+
+                    <td className="py-4 px-4 font-mono">
+                      {buyer.isBankCase ? (
+                        <div className="space-y-0.5">
+                          <div className="text-emerald-400 font-bold">Total: Rs. {buyer.budget?.toLocaleString()}</div>
+                          <div className="text-amber-300 text-[10px]">Down ({buyer.downpaymentPercent || 0}%): Rs. {(buyer.downpaymentAmount || 0).toLocaleString()}</div>
+                          <div className="text-cyan-300 text-[10px] font-bold">Due: Rs. {(buyer.dueAmount || 0).toLocaleString()}</div>
+                        </div>
+                      ) : (
+                        <div className="text-emerald-400 font-bold">Rs. {buyer.budget?.toLocaleString()}</div>
+                      )}
+                    </td>
+
+                    <td className="py-4 px-4">
+                      {buyer.isBankCase ? (
+                        <div className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-300 text-[11px] font-bold">
+                          <Building2 className="w-3 h-3 text-sky-400" />
+                          <span>{buyer.bankName || 'Bank Financing'}</span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 text-[11px] font-mono">Cash Buyer</span>
+                      )}
+                    </td>
+
+                    <td className="py-4 px-4 font-mono text-[11px]">
+                      {buyer.assignedUser ? (
+                        <div className="text-slate-200">{buyer.assignedUser.name}</div>
+                      ) : (
+                        <span className="text-slate-500">Unassigned</span>
+                      )}
+                    </td>
+
+                    <td className="py-4 px-4">
+                      <StatusBadge status={buyer.leadStatus} />
+                    </td>
+
+                    <td className="py-4 px-4 text-right">
+                      <div className="flex items-center justify-end space-x-1.5">
+                        {buyer.isBankCase && (
+                          <button
+                            onClick={() => { setSelectedBuyer(buyer); setIsChecklistModalOpen(true); }}
+                            className="px-2 py-1 bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/40 text-sky-300 rounded-lg text-[10px] font-mono font-bold flex items-center space-x-1"
+                            title="Bank Document Checklist"
+                          >
+                            <FileText className="w-3 h-3" />
+                            <span>Checklist</span>
+                          </button>
+                        )}
+
+                        {(isAdmin || buyer.assignedTo === user?.id || buyer.createdBy === user?.id) ? (
+                          <>
+                            <button
+                              onClick={() => openEditModal(buyer)}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                              title="Edit buyer details"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+
+                            {isAdmin && (
+                              <button
+                                onClick={() => handleDeleteBuyer(buyer.id)}
+                                className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-colors"
+                                title="Delete record"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => openDetailModal(buyer)}
+                            className="px-2 py-1 rounded-lg bg-slate-800/80 border border-white/10 text-slate-400 font-mono text-[10px] hover:text-cyan-400 flex items-center space-x-1"
+                          >
+                            <Eye className="w-3 h-3" />
+                            <span>View</span>
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
         </div>
-
-        {/* Table Pagination Footer */}
-        {buyers.length > 0 && (
-          <div className="p-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-4 font-mono text-xs text-slate-400 bg-slate-900/40">
-            <div>
-              Showing <strong className="text-cyan-400">{(currentPage - 1) * pageSize + 1}</strong> to{' '}
-              <strong className="text-cyan-400">{Math.min(currentPage * pageSize, buyers.length)}</strong> of{' '}
-              <strong className="text-white">{buyers.length}</strong> buyer inquiries
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 rounded-xl bg-slate-800 border border-white/10 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition-all"
-              >
-                Previous
-              </button>
-
-              <span className="px-3 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-cyan-400 font-bold">
-                Page {currentPage} of {Math.ceil(buyers.length / pageSize) || 1}
-              </span>
-
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(buyers.length / pageSize) || 1))}
-                disabled={currentPage === (Math.ceil(buyers.length / pageSize) || 1)}
-                className="px-3 py-1.5 rounded-xl bg-slate-800 border border-white/10 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition-all"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* CREATE / EDIT BUYER MODAL */}
@@ -533,10 +527,10 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="glass-modal rounded-3xl p-6 w-full max-w-2xl border border-white/10 shadow-2xl my-8">
             <h3 className="text-xl font-bold text-white mb-1">
-              {isEditModalOpen ? 'Edit Buyer Lead' : 'New Buyer Inquiry Entry'}
+              {isEditModalOpen ? 'Edit Buyer Lead' : 'New Buyer Entry'}
             </h3>
             <p className="text-xs text-slate-400 font-mono mb-6">
-              Enter buyer requirements, budget, and contact info.
+              Enter buyer requirements, budget, and bank financing details.
             </p>
 
             <form onSubmit={isEditModalOpen ? handleUpdateBuyer : handleCreateBuyer} className="space-y-4">
@@ -558,7 +552,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                   <input
                     type="text"
                     required
-                    placeholder="+1 (555) 000-0000"
+                    placeholder="+92 300 0000000"
                     value={formData.buyerPhone}
                     onChange={(e) => setFormData({ ...formData, buyerPhone: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
@@ -570,7 +564,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                   <input
                     type="text"
                     required
-                    placeholder="Los Angeles"
+                    placeholder="Lahore / Sahiwal"
                     value={formData.buyerCity}
                     onChange={(e) => setFormData({ ...formData, buyerCity: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
@@ -584,7 +578,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Porsche"
+                    placeholder="e.g. Toyota / Honda"
                     value={formData.vehicle}
                     onChange={(e) => setFormData({ ...formData, vehicle: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
@@ -596,7 +590,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                   <input
                     type="text"
                     required
-                    placeholder="e.g. 911"
+                    placeholder="e.g. Fortuner / Civic"
                     value={formData.model}
                     onChange={(e) => setFormData({ ...formData, model: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
@@ -604,9 +598,40 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                 </div>
               </div>
 
+              {/* Vehicle Condition Selector */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-900/60 p-3 rounded-2xl border border-white/5">
+                <div>
+                  <label className="block text-xs font-mono text-cyan-400 font-bold mb-1">Vehicle Condition *</label>
+                  <select
+                    value={formData.carCondition}
+                    onChange={(e) => setFormData({ ...formData, carCondition: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-bold"
+                  >
+                    <option value="Used">Used Car</option>
+                    <option value="Zero Meter">Zero Meter (Brand New)</option>
+                  </select>
+                </div>
+
+                {formData.carCondition === 'Zero Meter' && (
+                  <div>
+                    <label className="block text-xs font-mono text-emerald-400 font-bold mb-1">Zero Meter Payment Option *</label>
+                    <select
+                      value={formData.zeroMeterType}
+                      onChange={(e) => setFormData({ ...formData, zeroMeterType: e.target.value })}
+                      className="w-full bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-2 text-sm text-emerald-300 focus:outline-none focus:border-emerald-500 font-bold"
+                    >
+                      <option value="Cash">Cash (Immediate Ready Stock)</option>
+                      <option value="Booking">Booking (Advance Booking)</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Target Budget (PKR / Rs.) *</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">
+                    {formData.isBankCase ? 'Total Amount (PKR / Rs.) *' : 'Target Budget (PKR / Rs.) *'}
+                  </label>
                   <input
                     type="number"
                     required
@@ -640,33 +665,84 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
               </div>
 
               {/* Bank Case Financing Option */}
-              <div className="p-3.5 bg-slate-900/80 rounded-2xl border border-white/10 space-y-3">
+              <div className="p-4 bg-slate-900/80 rounded-2xl border border-sky-500/30 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <Building2 className="w-4 h-4 text-sky-400" />
+                    <Building2 className="w-5 h-5 text-sky-400" />
                     <div>
                       <label className="text-xs font-bold text-white">Bank Case Financing Buyer</label>
-                      <p className="text-[10px] text-slate-400">Is this buyer purchasing via bank financing / car loan?</p>
+                      <p className="text-[10px] text-slate-400">Enable bank loan financial calculations & document checklist</p>
                     </div>
                   </div>
                   <input
                     type="checkbox"
                     checked={formData.isBankCase}
                     onChange={(e) => setFormData({ ...formData, isBankCase: e.target.checked })}
-                    className="w-4 h-4 rounded border-white/20 bg-slate-800 text-sky-500 focus:ring-sky-500 cursor-pointer"
+                    className="w-5 h-5 rounded border-white/20 bg-slate-800 text-sky-500 focus:ring-sky-500 cursor-pointer"
                   />
                 </div>
 
                 {formData.isBankCase && (
-                  <div>
-                    <label className="block text-xs font-mono text-sky-300 mb-1">Bank Name / Institution *</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Meezan Bank, Bank Alfalah, HBL"
-                      value={formData.bankName}
-                      onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
-                      className="w-full bg-slate-950 border border-sky-500/30 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-400 font-mono"
-                    />
+                  <div className="space-y-4 pt-2 border-t border-white/10">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-mono text-sky-300 mb-1">Bank Name *</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Meezan Bank, HBL"
+                          value={formData.bankName}
+                          onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
+                          className="w-full bg-slate-950 border border-sky-500/30 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-400 font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-mono text-amber-300 mb-1">Downpayment (%) *</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          placeholder="20"
+                          value={formData.downpaymentPercent}
+                          onChange={(e) => setFormData({ ...formData, downpaymentPercent: e.target.value })}
+                          className="w-full bg-slate-950 border border-amber-500/30 rounded-xl px-3 py-2 text-sm text-amber-300 focus:outline-none focus:border-amber-400 font-mono font-bold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-mono text-purple-300 mb-1">Processing Fees (PKR)</label>
+                        <input
+                          type="number"
+                          placeholder="50000"
+                          value={formData.processingFees}
+                          onChange={(e) => setFormData({ ...formData, processingFees: e.target.value })}
+                          className="w-full bg-slate-950 border border-purple-500/30 rounded-xl px-3 py-2 text-sm text-purple-300 focus:outline-none focus:border-purple-400 font-mono font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Calculated Summary Box */}
+                    {Boolean(formData.budget) && (
+                      <div className="bg-slate-950/80 p-3.5 rounded-xl border border-sky-500/20 text-xs space-y-1.5 font-mono">
+                        <div className="flex justify-between text-slate-300">
+                          <span>Total Vehicle Amount:</span>
+                          <span className="font-bold text-white">Rs. {parseFloat(formData.budget || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-amber-300">
+                          <span>Downpayment ({formData.downpaymentPercent || 0}%):</span>
+                          <span className="font-bold">- Rs. {(parseFloat(formData.budget || 0) * ((parseFloat(formData.downpaymentPercent) || 0) / 100)).toLocaleString()}</span>
+                        </div>
+                        {Boolean(parseFloat(formData.processingFees)) && (
+                          <div className="flex justify-between text-purple-300">
+                            <span>Processing Fees:</span>
+                            <span>+ Rs. {parseFloat(formData.processingFees || 0).toLocaleString()}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-cyan-300 font-bold text-sm pt-1.5 border-t border-white/10">
+                          <span>Calculated Due Amount (Bank Loan Balance):</span>
+                          <span>Rs. {(parseFloat(formData.budget || 0) - (parseFloat(formData.budget || 0) * ((parseFloat(formData.downpaymentPercent) || 0) / 100))).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

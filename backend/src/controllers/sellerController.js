@@ -20,13 +20,16 @@ const getSellers = async (req, res) => {
     const hasFilters = Boolean(search || leadStatus || assignedTo || city || vehicle || model || minYear || maxYear || year || minPrice || maxPrice);
 
     // Return cached response for default un-filtered ADMIN requests within 15s TTL
-    if (!hasFilters && req.user.role === 'ADMIN' && sellersCache && (Date.now() - sellersCacheTime < CACHE_TTL_MS)) {
+    if (!hasFilters && (req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN') && sellersCache && (Date.now() - sellersCacheTime < CACHE_TTL_MS)) {
       return res.json(sellersCache);
     }
 
     const where = {};
 
-    if (assignedTo) {
+    // A Salesman can ONLY view seller leads assigned to them
+    if (req.user.role === 'SALESMAN') {
+      where.assignedTo = req.user.id;
+    } else if (assignedTo) {
       where.OR = [
         { assignedTo: assignedTo },
         { createdBy: assignedTo }
@@ -58,7 +61,7 @@ const getSellers = async (req, res) => {
       if (maxYear) where.year.lte = parseInt(maxYear);
     }
 
-    // Price Filter (demandPrice)
+    // Price Filter
     if (minPrice || maxPrice) {
       where.demandPrice = {};
       if (minPrice) where.demandPrice.gte = parseFloat(minPrice);
@@ -66,12 +69,13 @@ const getSellers = async (req, res) => {
     }
 
     if (search) {
-      const searchFilter = [
+      const searchOR = [
+        { vehicle: { contains: search, mode: 'insensitive' } },
+        { model: { contains: search, mode: 'insensitive' } },
         { sellerName: { contains: search, mode: 'insensitive' } },
         { sellerPhone: { contains: search, mode: 'insensitive' } },
         { sellerCity: { contains: search, mode: 'insensitive' } },
-        { vehicle: { contains: search, mode: 'insensitive' } },
-        { model: { contains: search, mode: 'insensitive' } },
+        { color: { contains: search, mode: 'insensitive' } },
         { numberPlate: { contains: search, mode: 'insensitive' } },
         { comments: { contains: search, mode: 'insensitive' } }
       ];
@@ -79,20 +83,27 @@ const getSellers = async (req, res) => {
       if (where.OR) {
         where.AND = [
           { OR: where.OR },
-          { OR: searchFilter }
+          { OR: searchOR }
         ];
         delete where.OR;
       } else {
-        where.OR = searchFilter;
+        where.OR = searchOR;
       }
     }
 
     const sellers = await prisma.seller.findMany({
       where,
       include: {
-        createdByUser: { select: { id: true, name: true, email: true } },
-        assignedUser: { select: { id: true, name: true, email: true } },
-        images: { select: { id: true, category: true, imageUrl: true } }
+        assignedUser: {
+          select: { id: true, name: true, email: true, phone: true }
+        },
+        createdByUser: {
+          select: { id: true, name: true, email: true }
+        },
+        images: true,
+        _count: {
+          select: { images: true, deals: true }
+        }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -104,7 +115,7 @@ const getSellers = async (req, res) => {
 
     return res.json(sellers);
   } catch (error) {
-    return res.status(500).json({ message: 'Failed to fetch sellers', error: error.message });
+    return res.status(500).json({ message: 'Failed to fetch seller leads', error: error.message });
   }
 };
 
@@ -139,8 +150,14 @@ const getSellerById = async (req, res) => {
 
 const createSeller = async (req, res) => {
   try {
+    // Only Admin and Super Admin can create seller records
+    if (req.user.role === 'SALESMAN') {
+      return res.status(403).json({ message: 'Access denied: Only Administrators can add seller records.' });
+    }
+
     const {
       vehicle, model, year, color, mileage, numberPlate, demandPrice,
+      carCondition, zeroMeterType,
       sellerName, sellerPhone, sellerCity,
       leadSource, leadReference, assignedTo, leadStatus, comments
     } = req.body;
@@ -168,8 +185,7 @@ const createSeller = async (req, res) => {
       }
     }
 
-    const isAdminUser = req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN';
-    const assignedSalesman = (isAdminUser && assignedTo) ? assignedTo : req.user.id;
+    const assignedSalesman = assignedTo || req.user.id;
 
     const newSeller = await prisma.seller.create({
       data: {
@@ -179,8 +195,10 @@ const createSeller = async (req, res) => {
         year: parseInt(year) || new Date().getFullYear(),
         color: color || 'N/A',
         mileage: parseInt(mileage) || 0,
-        numberPlate: numberPlate ? numberPlate.trim().toUpperCase() : null,
+        numberPlate: numberPlate ? numberPlate.trim() : null,
         demandPrice: parseFloat(demandPrice),
+        carCondition: carCondition || 'Used',
+        zeroMeterType: carCondition === 'Zero Meter' ? zeroMeterType || 'Cash' : null,
         sellerName,
         sellerPhone: formatPakistaniPhone(sellerPhone),
         sellerCity,
@@ -250,25 +268,28 @@ const updateSeller = async (req, res) => {
       }
     }
 
-    const updateData = {};
-    if (vehicle) updateData.vehicle = vehicle;
-    if (model) updateData.model = model;
-    if (year) updateData.year = parseInt(year);
-    if (color) updateData.color = color;
-    if (mileage !== undefined) updateData.mileage = parseInt(mileage);
-    if (numberPlate !== undefined) updateData.numberPlate = numberPlate ? numberPlate.trim().toUpperCase() : null;
-    if (demandPrice) updateData.demandPrice = parseFloat(demandPrice);
-    if (sellerName) updateData.sellerName = sellerName;
-    if (sellerPhone) updateData.sellerPhone = formatPakistaniPhone(sellerPhone);
-    if (sellerCity) updateData.sellerCity = sellerCity;
-    if (leadSource) updateData.leadSource = leadSource;
-    if (leadReference !== undefined) updateData.leadReference = leadReference;
-    if (leadStatus) updateData.leadStatus = leadStatus;
-    if (comments !== undefined) updateData.comments = comments;
+    const {
+      carCondition, zeroMeterType
+    } = req.body;
 
-    if (isAdminUser && assignedTo) {
-      updateData.assignedTo = assignedTo;
-    }
+    const updateData = {};
+    if (vehicle !== undefined) updateData.vehicle = vehicle;
+    if (model !== undefined) updateData.model = model;
+    if (year !== undefined) updateData.year = parseInt(year);
+    if (color !== undefined) updateData.color = color;
+    if (mileage !== undefined) updateData.mileage = parseInt(mileage);
+    if (numberPlate !== undefined) updateData.numberPlate = numberPlate ? numberPlate.trim() : null;
+    if (demandPrice !== undefined) updateData.demandPrice = parseFloat(demandPrice);
+    if (carCondition !== undefined) updateData.carCondition = carCondition;
+    if (zeroMeterType !== undefined) updateData.zeroMeterType = carCondition === 'Zero Meter' ? zeroMeterType : null;
+    if (sellerName !== undefined) updateData.sellerName = sellerName;
+    if (sellerPhone !== undefined) updateData.sellerPhone = formatPakistaniPhone(sellerPhone);
+    if (sellerCity !== undefined) updateData.sellerCity = sellerCity;
+    if (leadSource !== undefined) updateData.leadSource = leadSource;
+    if (leadReference !== undefined) updateData.leadReference = leadReference;
+    if (isAdminUser && assignedTo !== undefined) updateData.assignedTo = assignedTo;
+    if (leadStatus !== undefined) updateData.leadStatus = leadStatus;
+    if (comments !== undefined) updateData.comments = comments;
 
     const updatedSeller = await prisma.seller.update({
       where: { id },

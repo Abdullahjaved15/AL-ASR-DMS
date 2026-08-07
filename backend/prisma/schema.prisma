@@ -45,6 +45,8 @@ model Seller {
 
   numberPlate      String?       // Unique Vehicle Registration / License Plate Number
   demandPrice      Float
+  carCondition     String?       @default("Used") // Used, Zero Meter
+  zeroMeterType    String?       // Cash, Booking
 
   sellerName       String
   sellerPhone      String
@@ -103,10 +105,16 @@ model Buyer {
   mileage          Int
 
   budget           Float
+  carCondition     String?  @default("Used") // Used, Zero Meter
+  zeroMeterType    String?  // Cash, Booking
 
   isBankCase       Boolean  @default(false)
   bankName         String?
   bankChecklist    Json?    // Detailed 12-item Bank Case Requirement Checklist
+  processingFees   Float?   @default(0)
+  downpaymentPercent Float? @default(0)
+  downpaymentAmount Float?  @default(0)
+  dueAmount        Float?   @default(0)
 
   buyerName        String
   buyerPhone       String
