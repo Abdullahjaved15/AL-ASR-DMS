@@ -94,7 +94,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
     setLoading(true);
     try {
       const activeFilters = { ...filters };
-      if (scope === 'mine' && user?.id && !isAdmin) {
+      if (scope === 'mine' && user?.id) {
         activeFilters.assignedTo = user.id;
       }
       if (scope === 'bank_cases') {

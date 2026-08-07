@@ -7,10 +7,7 @@ const getBuyers = async (req, res) => {
 
     const where = {};
 
-    // A Salesman can ONLY view buyer leads assigned to them
-    if (req.user.role === 'SALESMAN') {
-      where.assignedTo = req.user.id;
-    } else if (assignedTo) {
+    if (assignedTo) {
       where.OR = [
         { assignedTo: assignedTo },
         { createdBy: assignedTo }
