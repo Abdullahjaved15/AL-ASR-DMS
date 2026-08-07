@@ -18,7 +18,7 @@ import ReceivingLetter from './pages/ReceivingLetter';
 import Settings from './pages/Settings';
 
 function MainLayout() {
-  const { user, loading } = useAuth();
+  const { user, isAdmin, loading } = useAuth();
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [search, setSearch] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -120,7 +120,7 @@ function MainLayout() {
             />
           </div>
 
-          <div className={currentTab === 'bank_cases' ? 'block' : 'hidden'}>
+          <div className={(currentTab === 'bank_cases' && isAdmin) ? 'block' : 'hidden'}>
             <Buyers
               scope="bank_cases"
               search={search}

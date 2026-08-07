@@ -18,7 +18,11 @@ const getBuyers = async (req, res) => {
       where.leadStatus = leadStatus;
     }
 
-    if (isBankCase !== undefined && isBankCase !== '') {
+    if (req.user.role === 'SALESMAN') {
+      if (isBankCase === 'true' || isBankCase === true) {
+        return res.status(403).json({ message: 'Access denied: Bank cases are restricted exclusively to Administrators.' });
+      }
+    } else if (isBankCase !== undefined && isBankCase !== '') {
       where.isBankCase = isBankCase === 'true' || isBankCase === true;
     }
 
