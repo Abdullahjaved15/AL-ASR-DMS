@@ -34,10 +34,8 @@ export default function CurrentStock() {
   });
 
   useEffect(() => {
-    if (isAdmin) {
-      fetchStock();
-    }
-  }, [search, statusFilter]);
+    fetchStock();
+  }, [search, statusFilter, isAdmin]);
 
   const fetchStock = async () => {
     setLoading(true);

@@ -1,7 +1,7 @@
 const prisma = require('../config/db');
 
 const checkAdmin = (req, res) => {
-  if (req.user.role !== 'ADMIN') {
+  if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN') {
     res.status(403).json({ message: 'Access denied: Showroom Current Stock is restricted exclusively to Administrators.' });
     return false;
   }
