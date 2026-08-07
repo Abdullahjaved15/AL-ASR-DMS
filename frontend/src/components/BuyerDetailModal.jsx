@@ -1,8 +1,10 @@
 import React from 'react';
 import { X, Users, Phone, MapPin, Calendar, Tag, UserCheck, Edit, DollarSign, FileText } from 'lucide-react';
 import StatusBadge from './StatusBadge';
+import { useAuth } from '../context/AuthContext';
 
 export default function BuyerDetailModal({ buyer, onClose, onEdit }) {
+  const { isAdmin } = useAuth();
   if (!buyer) return null;
 
   return (
@@ -26,13 +28,15 @@ export default function BuyerDetailModal({ buyer, onClose, onEdit }) {
           </div>
 
           <div className="flex items-center space-x-2">
-            <button
-              onClick={() => onEdit(buyer)}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 rounded-xl text-xs font-mono flex items-center space-x-1.5 transition-colors"
-            >
-              <Edit className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Edit Inquiry</span>
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => onEdit(buyer)}
+                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 rounded-xl text-xs font-mono flex items-center space-x-1.5 transition-colors"
+              >
+                <Edit className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Edit Inquiry</span>
+              </button>
+            )}
 
             <button
               onClick={onClose}
@@ -86,17 +90,17 @@ export default function BuyerDetailModal({ buyer, onClose, onEdit }) {
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between">
                   <span className="text-slate-400 font-mono">Payment / Financing:</span>
-                  <span className={`font-mono font-bold ${buyer.isBankCase ? 'text-sky-400' : 'text-emerald-400'}`}>
-                    {buyer.isBankCase ? `BANK CASE (${buyer.bankName || 'Standard Bank'})` : 'CASH SALE'}
+                  <span className={`font-mono font-bold ${buyer.isBankCase && isAdmin ? 'text-sky-400' : 'text-emerald-400'}`}>
+                    {buyer.isBankCase && isAdmin ? `BANK CASE (${buyer.bankName || 'Standard Bank'})` : 'DIRECT SALE'}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400 font-mono">Vehicle Price:</span>
-                  <span className="font-mono font-bold text-white">
+                  <span className="text-slate-400 font-mono">Vehicle Target Budget:</span>
+                  <span className="font-mono font-bold text-emerald-400 text-sm">
                     Rs. {buyer.budget?.toLocaleString()}
                   </span>
                 </div>
-                {buyer.isBankCase && (
+                {buyer.isBankCase && isAdmin && (
                   <>
                     <div className="flex justify-between">
                       <span className="text-slate-400 font-mono">Downpayment ({buyer.downpaymentPercent || 0}% of Vehicle Price):</span>

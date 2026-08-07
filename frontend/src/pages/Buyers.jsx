@@ -448,7 +448,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                     </td>
 
                     <td className="py-4 px-4 font-mono" onClick={() => openDetailModal(buyer)}>
-                      {buyer.isBankCase ? (
+                      {buyer.isBankCase && isAdmin ? (
                         <div className="space-y-0.5">
                           <div className="text-emerald-400 font-bold">Total: Rs. {(buyer.budget + (buyer.processingFees || 0))?.toLocaleString()}</div>
                           <div className="text-amber-300 text-[10px]">Down ({buyer.downpaymentPercent || 0}%): Rs. {(buyer.downpaymentAmount || 0).toLocaleString()}</div>
@@ -460,13 +460,13 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                     </td>
 
                     <td className="py-4 px-4" onClick={() => openDetailModal(buyer)}>
-                      {buyer.isBankCase ? (
+                      {buyer.isBankCase && isAdmin ? (
                         <div className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-300 text-[11px] font-bold">
                           <Building2 className="w-3 h-3 text-sky-400" />
                           <span>{buyer.bankName || 'Bank Financing'}</span>
                         </div>
                       ) : (
-                        <span className="text-slate-400 text-[11px] font-mono">Cash Buyer</span>
+                        <span className="text-slate-400 text-[11px] font-mono">Direct Buyer</span>
                       )}
                     </td>
 
@@ -493,7 +493,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                           <span>View</span>
                         </button>
 
-                        {buyer.isBankCase && (
+                        {buyer.isBankCase && isAdmin && (
                           <button
                             onClick={() => { setSelectedBuyer(buyer); setIsChecklistModalOpen(true); }}
                             className="px-2 py-1 bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/40 text-sky-300 rounded-lg text-[10px] font-mono font-bold flex items-center space-x-1"
