@@ -1,4 +1,5 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
 
 const getHeaders = (isMultipart = false) => {
   const token = localStorage.getItem('dms_token');
