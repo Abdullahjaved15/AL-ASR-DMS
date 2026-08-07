@@ -9,8 +9,6 @@ const checkAdmin = (req, res) => {
 };
 
 const getCurrentStock = async (req, res) => {
-  if (!checkAdmin(req, res)) return;
-
   try {
     const { search, status } = req.query;
     const where = {};

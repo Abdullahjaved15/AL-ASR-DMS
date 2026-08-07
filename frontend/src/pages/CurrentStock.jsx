@@ -237,20 +237,6 @@ export default function CurrentStock() {
     printWindow.document.close();
   };
 
-  if (!isAdmin) {
-    return (
-      <div className="p-8 max-w-4xl mx-auto text-center space-y-4 my-12">
-        <div className="w-16 h-16 rounded-3xl bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center mx-auto">
-          <ShieldAlert className="w-8 h-8" />
-        </div>
-        <h2 className="text-2xl font-bold text-white">Access Restricted</h2>
-        <p className="text-sm font-mono text-slate-400 max-w-md mx-auto">
-          Showroom Current Stock management is restricted exclusively to Administrators. Please contact your manager for access.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="p-4 sm:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Top Banner Header */}
@@ -259,11 +245,11 @@ export default function CurrentStock() {
 
         <div>
           <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-400 font-mono text-[10px] uppercase font-bold border border-amber-500/30">
-            Admin Exclusive Module
+            Showroom Floor Stock
           </span>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">Showroom Current Stock</h1>
           <p className="text-xs text-slate-400 font-mono mt-1">
-            Manage vehicles currently available on the showroom floor. Export daily printable stock reports.
+            Browse vehicles currently available on the showroom floor. Export daily printable stock reports.
           </p>
         </div>
 
@@ -276,13 +262,15 @@ export default function CurrentStock() {
             <span>📄 Export Daily Stock PDF</span>
           </button>
 
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-black font-bold rounded-xl text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center space-x-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Showroom Stock</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-black font-bold rounded-xl text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center space-x-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Showroom Stock</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -432,21 +420,29 @@ export default function CurrentStock() {
 
                   <td className="py-4 px-4 text-right">
                     <div className="flex items-center justify-end space-x-2">
-                      <button
-                        onClick={() => openEditModal(item)}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
-                        title="Edit stock entry"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
+                      {isAdmin ? (
+                        <>
+                          <button
+                            onClick={() => openEditModal(item)}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                            title="Edit stock entry"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
 
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-colors"
-                        title="Delete stock entry"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                          <button
+                            onClick={() => handleDelete(item.id)}
+                            className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-colors"
+                            title="Delete stock entry"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono text-[10px] border border-white/10">
+                          View Only
+                        </span>
+                      )}
                     </div>
                   </td>
                 </tr>

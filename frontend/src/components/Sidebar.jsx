@@ -32,7 +32,7 @@ export default function Sidebar({ currentTab, setCurrentTab, isMobileOpen, setIs
     { id: 'receiving_letter', label: 'Receiving Letter', icon: FileCheck, role: 'ALL' },
     { id: 'deals', label: 'Closed Deals', icon: Handshake, role: 'ALL' },
     { id: 'collaboration', label: 'Collaboration Center', icon: Handshake, role: 'ALL' },
-    { id: 'stock', label: 'Showroom Current Stock', icon: Package, role: 'ADMIN' },
+    { id: 'stock', label: 'Showroom Current Stock', icon: Package, role: 'ALL' },
     { id: 'invoices', label: 'Invoices & Vouchers', icon: Receipt, role: 'SUPER_ADMIN' },
     { id: 'users', label: 'User & Salesmen', icon: UserCheck, role: 'ADMIN' },
     { id: 'reports', label: 'Sales Reports', icon: BarChart3, role: 'ADMIN' },
