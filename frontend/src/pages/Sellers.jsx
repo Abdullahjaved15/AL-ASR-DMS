@@ -72,7 +72,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
   const [formData, setFormData] = useState({
     vehicle: '',
     model: '',
-    year: new Date().getFullYear(),
+    year: String(new Date().getFullYear()),
     color: '',
     mileage: 0,
     numberPlate: '',
@@ -614,7 +614,8 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">Model Year</label>
                   <input
-                    type="number"
+                    type="text"
+                    placeholder="e.g. 2022 or 2022/23"
                     value={formData.year}
                     onChange={(e) => setFormData({ ...formData, year: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"

@@ -39,7 +39,7 @@ model Seller {
 
   vehicle          String
   model            String
-  year             Int
+  year             String
   color            String
   mileage          Int
 
@@ -100,7 +100,7 @@ model Buyer {
 
   vehicle          String
   model            String
-  year             Int
+  year             String
   color            String
   mileage          Int
 
@@ -206,7 +206,7 @@ model Invoice {
   customerCity     String?
   carVehicle       String?
   carModel         String?
-  carYear          Int?
+  carYear          String?
   carRegNumber     String?
   saleAmount       Float    @default(0)
   commissionPercent Float   @default(0)
@@ -290,7 +290,7 @@ model CurrentStock {
   id            String   @id @default(uuid())
   vehicle       String
   model         String
-  year          Int
+  year          String
   color         String   @default("White")
   mileage       Int      @default(0)
   askingPrice   Float

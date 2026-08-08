@@ -57,11 +57,11 @@ const getSellers = async (req, res) => {
 
     // Year Filter
     if (year) {
-      where.year = parseInt(year);
+      where.year = { contains: year.toString(), mode: 'insensitive' };
     } else if (minYear || maxYear) {
       where.year = {};
-      if (minYear) where.year.gte = parseInt(minYear);
-      if (maxYear) where.year.lte = parseInt(maxYear);
+      if (minYear) where.year.gte = minYear.toString();
+      if (maxYear) where.year.lte = maxYear.toString();
     }
 
     // Lead Registration Date Range Filter
@@ -208,7 +208,7 @@ const createSeller = async (req, res) => {
         createdBy: req.user.id,
         vehicle,
         model,
-        year: parseInt(year) || new Date().getFullYear(),
+        year: year ? String(year) : String(new Date().getFullYear()),
         color: color || 'N/A',
         mileage: parseInt(mileage) || 0,
         numberPlate: numberPlate ? numberPlate.trim() : null,
@@ -291,7 +291,7 @@ const updateSeller = async (req, res) => {
     const updateData = {};
     if (vehicle !== undefined) updateData.vehicle = vehicle;
     if (model !== undefined) updateData.model = model;
-    if (year !== undefined) updateData.year = parseInt(year);
+    if (year !== undefined) updateData.year = String(year);
     if (color !== undefined) updateData.color = color;
     if (mileage !== undefined) updateData.mileage = parseInt(mileage);
     if (numberPlate !== undefined) updateData.numberPlate = numberPlate ? numberPlate.trim() : null;

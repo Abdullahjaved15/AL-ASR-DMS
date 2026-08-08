@@ -21,7 +21,7 @@ export default function CurrentStock() {
   const [formData, setFormData] = useState({
     vehicle: '',
     model: '',
-    year: new Date().getFullYear(),
+    year: String(new Date().getFullYear()),
     color: 'White',
     mileage: 0,
     askingPrice: '',
@@ -527,8 +527,9 @@ export default function CurrentStock() {
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">Model Year *</label>
                   <input
-                    type="number"
+                    type="text"
                     required
+                    placeholder="e.g. 2022 or 2022/23"
                     value={formData.year}
                     onChange={(e) => setFormData({ ...formData, year: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none font-mono"

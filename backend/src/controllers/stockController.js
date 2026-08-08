@@ -67,7 +67,7 @@ const createStockItem = async (req, res) => {
       data: {
         vehicle,
         model,
-        year: parseInt(year) || new Date().getFullYear(),
+        year: year ? String(year) : String(new Date().getFullYear()),
         color: color || 'White',
         mileage: parseInt(mileage) || 0,
         askingPrice: parseFloat(askingPrice),
@@ -112,7 +112,7 @@ const updateStockItem = async (req, res) => {
       data: {
         vehicle: vehicle !== undefined ? vehicle : existing.vehicle,
         model: model !== undefined ? model : existing.model,
-        year: year !== undefined ? parseInt(year) : existing.year,
+        year: year !== undefined ? String(year) : existing.year,
         color: color !== undefined ? color : existing.color,
         mileage: mileage !== undefined ? parseInt(mileage) : existing.mileage,
         askingPrice: askingPrice !== undefined ? parseFloat(askingPrice) : existing.askingPrice,
