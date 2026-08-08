@@ -231,83 +231,119 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
     const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
     const totalValuation = sellers.reduce((acc, s) => acc + (s.demandPrice || 0), 0);
 
+    const pageSize = 20;
+    const pageChunks = [];
+    for (let i = 0; i < sellers.length; i += pageSize) {
+      pageChunks.push(sellers.slice(i, i + pageSize));
+    }
+    if (pageChunks.length === 0) pageChunks.push([]);
+    const totalPages = pageChunks.length;
+
     const htmlContent = `
       <!DOCTYPE html>
       <html>
         <head>
           <title>AL ASR MOTORS - Seller Inventory Export (${todayStr})</title>
           <style>
-            @page { size: A4 landscape; margin: 4mm 6mm; }
-            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 2px; color: #0f172a; background: #ffffff; font-size: 8.5px; line-height: 1.15; }
+            @page { size: portrait; margin: 4mm 6mm; }
+            * { box-sizing: border-box; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 0; margin: 0; color: #0f172a; background: #ffffff; font-size: 8.5px; line-height: 1.15; }
+            .sheet {
+              page-break-after: always;
+              break-after: page;
+              box-sizing: border-box;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              padding: 2px;
+            }
+            .sheet:last-child {
+              page-break-after: auto;
+              break-after: auto;
+            }
             .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #0284c7; padding-bottom: 4px; margin-bottom: 4px; }
             .logo-title { display: flex; align-items: center; gap: 8px; }
-            .title { font-size: 14px; font-weight: 800; color: #0f172a; letter-spacing: 0.5px; }
-            .subtitle { font-size: 8.5px; color: #64748b; font-family: monospace; }
-            .stats-inline { display: flex; gap: 12px; font-size: 8.5px; background: #f8fafc; padding: 3px 8px; border-radius: 4px; border: 1px solid #e2e8f0; }
+            .title { font-size: 13px; font-weight: 800; color: #0f172a; letter-spacing: 0.3px; }
+            .subtitle { font-size: 8px; color: #64748b; font-family: monospace; }
+            .stats-inline { display: flex; gap: 10px; font-size: 8px; background: #f8fafc; padding: 3px 8px; border-radius: 4px; border: 1px solid #e2e8f0; }
             .stat-item { font-weight: 600; color: #334155; }
             .stat-item strong { color: #0284c7; font-weight: 800; }
             table { width: 100%; border-collapse: collapse; margin-top: 2px; }
-            th { background: #0f172a; color: #ffffff; text-align: left; padding: 3px 5px; font-size: 8px; font-weight: 700; text-transform: uppercase; border: 1px solid #0f172a; }
-            td { padding: 2.5px 5px; border-bottom: 1px solid #cbd5e1; font-size: 8.5px; vertical-align: middle; white-space: nowrap; }
+            th { background: #0f172a; color: #ffffff; text-align: left; padding: 3.5px 5px; font-size: 8px; font-weight: 700; text-transform: uppercase; border: 1px solid #0f172a; }
+            td { padding: 3px 5px; border-bottom: 1px solid #cbd5e1; font-size: 8.5px; vertical-align: middle; }
             tr:nth-child(even) { background: #f8fafc; }
             .badge { display: inline-block; padding: 1px 4px; border-radius: 3px; font-size: 7.5px; font-weight: 700; }
             .plate-tag { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; padding: 0px 3px; border-radius: 2px; font-family: monospace; font-weight: bold; }
-            .footer { margin-top: 4px; text-align: center; font-size: 7.5px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 2px; }
+            .footer { margin-top: 6px; text-align: center; font-size: 7.5px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 3px; }
           </style>
         </head>
         <body>
-          <div class="header">
-            <div class="logo-title">
-              <img src="${logoBase64}" alt="AL ASR MOTORS" style="height: 38px; width: auto; object-fit: contain;" />
-              <div>
-                <div class="title">AL ASR MOTORS — SELLERS INVENTORY REPORT</div>
-                <div class="subtitle">Filtered Stock Export • Generated: ${todayStr} • Sahiwal, Pakistan</div>
+          ${pageChunks.map((chunk, pageIdx) => {
+            const startIdx = pageIdx * pageSize;
+            return `
+              <div class="sheet">
+                <div>
+                  <div class="header">
+                    <div class="logo-title">
+                      <img src="${logoBase64}" alt="AL ASR MOTORS" style="height: 36px; width: auto; object-fit: contain;" />
+                      <div>
+                        <div class="title">AL ASR MOTORS — SELLERS INVENTORY REPORT</div>
+                        <div class="subtitle">Filtered Stock Export • Generated: ${todayStr} • Sahiwal, Pakistan</div>
+                      </div>
+                    </div>
+                    <div class="stats-inline">
+                      <div class="stat-item">Total Vehicles: <strong>${sellers.length} Units</strong></div>
+                      <div class="stat-item">Valuation: <strong>Rs. ${totalValuation.toLocaleString()}</strong></div>
+                      <div class="stat-item" style="color: #0284c7;">Sheet <strong>${pageIdx + 1} of ${totalPages}</strong></div>
+                    </div>
+                  </div>
+
+                  <table>
+                    <thead>
+                      <tr>
+                        <th style="width: 25px;">#</th>
+                        <th style="width: 70px;">Date</th>
+                        <th>Vehicle Specs & Color</th>
+                        <th>Seller Name & Contact</th>
+                        <th style="width: 65px;">Condition</th>
+                        <th style="width: 90px;">Demand (PKR)</th>
+                        <th>Assigned Salesman</th>
+                        <th style="width: 65px;">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${chunk.length === 0 ? `
+                        <tr>
+                          <td colspan="8" style="text-align: center; padding: 20px; color: #64748b;">No seller records found.</td>
+                        </tr>
+                      ` : chunk.map((s, idx) => {
+                        const globalIdx = startIdx + idx + 1;
+                        return `
+                        <tr>
+                          <td><strong>${globalIdx}</strong></td>
+                          <td style="color:#0284c7; font-family:monospace; font-weight:600;">${formatDateStr(s.createdAt)}</td>
+                          <td>
+                            <strong>${s.vehicle || ''} ${s.model || ''}</strong> (${s.year || 'N/A'}) - ${s.color || 'N/A'}
+                            ${s.numberPlate ? `<br/><span class="plate-tag">${s.numberPlate}</span>` : ''}
+                          </td>
+                          <td><strong>${s.sellerName || ''}</strong><br/><span style="color:#64748b; font-size:7.5px;">${s.sellerPhone || ''} ${s.sellerCity ? '• ' + s.sellerCity : ''}</span></td>
+                          <td><strong>${s.carCondition || 'Used'}</strong> ${s.carCondition === 'Zero Meter' ? `(${s.zeroMeterType || 'Cash'})` : ''}</td>
+                          <td><strong style="color:#0f172a;">Rs. ${(s.demandPrice || 0).toLocaleString()}</strong></td>
+                          <td>${s.assignedUser?.name || 'Unassigned'}</td>
+                          <td><strong>${s.leadStatus || 'New'}</strong></td>
+                        </tr>
+                        `;
+                      }).join('')}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="footer">
+                  AL ASR MOTORS Dealership System • Sheet ${pageIdx + 1} of ${totalPages} • Showing records ${chunk.length > 0 ? startIdx + 1 : 0} to ${startIdx + chunk.length} of ${sellers.length} (Max 20 per sheet)
+                </div>
               </div>
-            </div>
-            <div class="stats-inline">
-              <div class="stat-item">Total Vehicles: <strong>${sellers.length} Units</strong></div>
-              <div class="stat-item">Total Demand Valuation: <strong>Rs. ${totalValuation.toLocaleString()}</strong></div>
-            </div>
-          </div>
-
-          <table>
-            <thead>
-              <tr>
-                <th style="width: 25px;">#</th>
-                <th>Date</th>
-                <th>Vehicle Specs & Color</th>
-                <th>Reg / Plate #</th>
-                <th>Condition</th>
-                <th>Seller Name & Contact</th>
-                <th>City</th>
-                <th>Demand (PKR)</th>
-                <th>Lead Source / Ref</th>
-                <th>Assigned Salesman</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${sellers.map((s, idx) => `
-                <tr>
-                  <td><strong>${idx + 1}</strong></td>
-                  <td style="color:#0284c7; font-family:monospace; font-weight:600;">${formatDateStr(s.createdAt)}</td>
-                  <td><strong>${s.vehicle} ${s.model}</strong> (${s.year}) - ${s.color || 'N/A'}</td>
-                  <td>${s.numberPlate ? `<span class="plate-tag">${s.numberPlate}</span>` : '<span style="color:#94a3b8;">Unregistered</span>'}</td>
-                  <td><strong>${s.carCondition || 'Used'}</strong> ${s.carCondition === 'Zero Meter' ? `(${s.zeroMeterType || 'Cash'})` : ''}</td>
-                  <td><strong>${s.sellerName}</strong> (${s.sellerPhone})</td>
-                  <td>${s.sellerCity}</td>
-                  <td><strong style="color:#0f172a;">Rs. ${s.demandPrice?.toLocaleString()}</strong></td>
-                  <td>${s.leadReference || s.leadSource || 'Direct'}</td>
-                  <td>${s.assignedUser?.name || 'Unassigned'}</td>
-                  <td><strong>${s.leadStatus}</strong></td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-
-          <div class="footer">
-            AL ASR MOTORS Dealership System • Showing ${sellers.length} seller records on single page document
-          </div>
+            `;
+          }).join('')}
 
           <script>
             window.onload = function() { window.print(); };
