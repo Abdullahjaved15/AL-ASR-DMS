@@ -25,27 +25,39 @@ const handleCloudinaryUpload = async (photoStr, folderName) => {
 
 const getInvoices = async (req, res) => {
   try {
-    const { page = 1, limit = 20, search = '' } = req.query;
+    const { page = 1, limit = 20, search = '', category = '' } = req.query;
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
 
-    const whereClause = search ? {
-      OR: [
-        { invoiceNumber: { contains: search, mode: 'insensitive' } },
-        { registrationNo: { contains: search, mode: 'insensitive' } },
-        { buyerName: { contains: search, mode: 'insensitive' } },
-        { buyerPhone: { contains: search, mode: 'insensitive' } },
-        { buyerCnic: { contains: search, mode: 'insensitive' } },
-        { sellerName: { contains: search, mode: 'insensitive' } },
-        { sellerPhone: { contains: search, mode: 'insensitive' } },
-        { sellerCnic: { contains: search, mode: 'insensitive' } },
-        { vehicleMaker: { contains: search, mode: 'insensitive' } },
-        { vehicleModel: { contains: search, mode: 'insensitive' } },
-        { customerName: { contains: search, mode: 'insensitive' } },
-        { customerPhone: { contains: search, mode: 'insensitive' } }
-      ]
-    } : {};
+    const whereClause = {};
+    if (category && category !== 'ALL') {
+      whereClause.category = category;
+    }
+
+    if (search) {
+      whereClause.AND = [
+        category && category !== 'ALL' ? { category } : {},
+        {
+          OR: [
+            { invoiceNumber: { contains: search, mode: 'insensitive' } },
+            { registrationNo: { contains: search, mode: 'insensitive' } },
+            { buyerName: { contains: search, mode: 'insensitive' } },
+            { buyerPhone: { contains: search, mode: 'insensitive' } },
+            { buyerCnic: { contains: search, mode: 'insensitive' } },
+            { sellerName: { contains: search, mode: 'insensitive' } },
+            { sellerPhone: { contains: search, mode: 'insensitive' } },
+            { sellerCnic: { contains: search, mode: 'insensitive' } },
+            { payeeName: { contains: search, mode: 'insensitive' } },
+            { headOfAccount: { contains: search, mode: 'insensitive' } },
+            { vehicleMaker: { contains: search, mode: 'insensitive' } },
+            { vehicleModel: { contains: search, mode: 'insensitive' } },
+            { customerName: { contains: search, mode: 'insensitive' } },
+            { customerPhone: { contains: search, mode: 'insensitive' } }
+          ]
+        }
+      ];
+    }
 
     const [invoices, totalCount, statsRaw] = await Promise.all([
       prisma.invoice.findMany({
@@ -114,27 +126,27 @@ const getInvoiceById = async (req, res) => {
 const createInvoice = async (req, res) => {
   try {
     const {
+      category,
       registrationNo,
-      // Seller Details
       sellerName,
       sellerFatherName,
       sellerCnic,
       sellerAddress,
       sellerPhone,
       sellerPhoto,
-      // Buyer Details
       buyerName,
       buyerFatherName,
       buyerCnic,
       buyerAddress,
       buyerPhone,
       buyerPhoto,
-      // Vehicle Details
       vehicleMaker,
       vehicleModel,
+      carYear,
       engineNumber,
       chassisNumber,
       powerCapacity,
+      color,
       postOffice,
       lastToken,
       regName,
@@ -146,6 +158,16 @@ const createInvoice = async (req, res) => {
       agreedAmountWords,
       agreementTime,
       agreementDay,
+      // Additional Voucher Specific Fields
+      payeeName,
+      headOfAccount,
+      inWords,
+      bankStatus,
+      chequeNo,
+      dueDate,
+      onAccount,
+      accountOf,
+      time,
       // Imported Vehicle
       isImported,
       billOfEntryNo,
@@ -164,7 +186,6 @@ const createInvoice = async (req, res) => {
       customerCity,
       carVehicle,
       carModel,
-      carYear,
       carRegNumber,
       saleAmount,
       commissionPercent,
@@ -193,15 +214,21 @@ const createInvoice = async (req, res) => {
     const commissionAmount = (numericTotalPrice * numericCommPercent) / 100;
     const totalAmountCalculated = numericTotalPrice + commissionAmount;
 
-    // Generate unique invoice number: REC-YYYYMMDD-XXX
+    // Generate unique prefix based on category
+    let prefix = 'REC';
+    if (category === 'DELIVERY_LETTER') prefix = 'DL';
+    else if (category === 'PAYMENT_VOUCHER') prefix = 'PV';
+    else if (category === 'BOOKING_RECEIPT') prefix = 'BK';
+
     const today = new Date();
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const invoiceNumber = `REC-${dateStr}-${randomSuffix}`;
+    const invoiceNumber = `${prefix}-${dateStr}-${randomSuffix}`;
 
     const newInvoice = await prisma.invoice.create({
       data: {
         invoiceNumber,
+        category: category || 'SALES_RECEIPT',
         date: new Date(),
         registrationNo: registrationNo || carRegNumber || null,
         
@@ -224,9 +251,11 @@ const createInvoice = async (req, res) => {
         // Vehicle Details
         vehicleMaker: finalVehicleMaker,
         vehicleModel: finalVehicleModel,
+        carYear: carYear !== undefined && carYear !== null ? String(carYear) : null,
         engineNumber: engineNumber || null,
         chassisNumber: chassisNumber || null,
         powerCapacity: powerCapacity || null,
+        color: color || null,
         postOffice: postOffice || null,
         lastToken: lastToken || null,
         regName: regName || null,
@@ -305,6 +334,7 @@ const updateInvoice = async (req, res) => {
     }
 
     const {
+      category,
       registrationNo,
       sellerName,
       sellerFatherName,
@@ -324,6 +354,7 @@ const updateInvoice = async (req, res) => {
       engineNumber,
       chassisNumber,
       powerCapacity,
+      color,
       postOffice,
       lastToken,
       regName,
@@ -334,6 +365,15 @@ const updateInvoice = async (req, res) => {
       agreedAmountWords,
       agreementTime,
       agreementDay,
+      payeeName,
+      headOfAccount,
+      inWords,
+      bankStatus,
+      chequeNo,
+      dueDate,
+      onAccount,
+      accountOf,
+      time,
       totalPrice,
       advanceAmount,
       remainingAmount,
@@ -361,6 +401,7 @@ const updateInvoice = async (req, res) => {
     const updatedInvoice = await prisma.invoice.update({
       where: { id },
       data: {
+        category: category !== undefined ? category : existing.category,
         registrationNo: registrationNo !== undefined ? registrationNo : existing.registrationNo,
         sellerName: sellerName !== undefined ? sellerName : existing.sellerName,
         sellerFatherName: sellerFatherName !== undefined ? sellerFatherName : existing.sellerFatherName,
@@ -382,6 +423,7 @@ const updateInvoice = async (req, res) => {
         engineNumber: engineNumber !== undefined ? engineNumber : existing.engineNumber,
         chassisNumber: chassisNumber !== undefined ? chassisNumber : existing.chassisNumber,
         powerCapacity: powerCapacity !== undefined ? powerCapacity : existing.powerCapacity,
+        color: color !== undefined ? color : existing.color,
         postOffice: postOffice !== undefined ? postOffice : existing.postOffice,
         lastToken: lastToken !== undefined ? lastToken : existing.lastToken,
         regName: regName !== undefined ? regName : existing.regName,
@@ -393,6 +435,16 @@ const updateInvoice = async (req, res) => {
         agreedAmountWords: agreedAmountWords !== undefined ? agreedAmountWords : existing.agreedAmountWords,
         agreementTime: agreementTime !== undefined ? agreementTime : existing.agreementTime,
         agreementDay: agreementDay !== undefined ? agreementDay : existing.agreementDay,
+
+        payeeName: payeeName !== undefined ? payeeName : existing.payeeName,
+        headOfAccount: headOfAccount !== undefined ? headOfAccount : existing.headOfAccount,
+        inWords: inWords !== undefined ? inWords : existing.inWords,
+        bankStatus: bankStatus !== undefined ? bankStatus : existing.bankStatus,
+        chequeNo: chequeNo !== undefined ? chequeNo : existing.chequeNo,
+        dueDate: dueDate !== undefined ? dueDate : existing.dueDate,
+        onAccount: onAccount !== undefined ? onAccount : existing.onAccount,
+        accountOf: accountOf !== undefined ? accountOf : existing.accountOf,
+        time: time !== undefined ? time : existing.time,
 
         totalPrice: numericTotalPrice,
         advanceAmount: numericAdvance,

@@ -181,12 +181,14 @@ export default function Invoices() {
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
 
   const [formData, setFormData] = useState({
+    category: 'SALES_RECEIPT',
     registrationNo: '',
     // Seller Details
     sellerName: '',
@@ -205,9 +207,11 @@ export default function Invoices() {
     // Vehicle Details
     vehicleMaker: '',
     vehicleModel: '',
+    carYear: '',
     engineNumber: '',
     chassisNumber: '',
     powerCapacity: '',
+    color: '',
     postOffice: '',
     lastToken: '',
     regName: '',
@@ -219,6 +223,16 @@ export default function Invoices() {
     agreedAmountWords: '',
     agreementTime: '',
     agreementDay: '',
+    // Voucher Specific Fields
+    payeeName: '',
+    headOfAccount: '',
+    inWords: '',
+    bankStatus: '',
+    chequeNo: '',
+    dueDate: '',
+    onAccount: '',
+    accountOf: '',
+    time: '',
     // Imported Vehicle
     isImported: false,
     billOfEntryNo: '',
@@ -242,12 +256,12 @@ export default function Invoices() {
     if (isSuperAdmin) {
       fetchInvoices();
     }
-  }, [search, isSuperAdmin]);
+  }, [search, selectedCategory, isSuperAdmin]);
 
   const fetchInvoices = async () => {
     setLoading(true);
     try {
-      const data = await api.getInvoices({ search });
+      const data = await api.getInvoices({ search, category: selectedCategory });
       if (data) {
         setInvoices(data.invoices || []);
         setStats(data.stats || {});
@@ -291,6 +305,7 @@ export default function Invoices() {
   const openEditModal = (inv) => {
     setSelectedInvoice(inv);
     setFormData({
+      category: inv.category || 'SALES_RECEIPT',
       registrationNo: inv.registrationNo || '',
       sellerName: inv.sellerName || '',
       sellerFatherName: inv.sellerFatherName || '',
@@ -306,9 +321,11 @@ export default function Invoices() {
       buyerPhoto: inv.buyerPhoto || '',
       vehicleMaker: inv.vehicleMaker || inv.carVehicle || '',
       vehicleModel: inv.vehicleModel || inv.carModel || '',
+      carYear: inv.carYear || '',
       engineNumber: inv.engineNumber || '',
       chassisNumber: inv.chassisNumber || '',
       powerCapacity: inv.powerCapacity || '',
+      color: inv.color || '',
       postOffice: inv.postOffice || '',
       lastToken: inv.lastToken || '',
       regName: inv.regName || '',
@@ -319,6 +336,15 @@ export default function Invoices() {
       agreedAmountWords: inv.agreedAmountWords || '',
       agreementTime: inv.agreementTime || '',
       agreementDay: inv.agreementDay || '',
+      payeeName: inv.payeeName || '',
+      headOfAccount: inv.headOfAccount || '',
+      inWords: inv.inWords || '',
+      bankStatus: inv.bankStatus || '',
+      chequeNo: inv.chequeNo || '',
+      dueDate: inv.dueDate || '',
+      onAccount: inv.onAccount || '',
+      accountOf: inv.accountOf || '',
+      time: inv.time || '',
       isImported: Boolean(inv.isImported),
       billOfEntryNo: inv.billOfEntryNo || '',
       portName: inv.portName || '',
@@ -341,6 +367,7 @@ export default function Invoices() {
   const resetForm = () => {
     setSelectedInvoice(null);
     setFormData({
+      category: 'SALES_RECEIPT',
       registrationNo: '',
       sellerName: '',
       sellerFatherName: '',
@@ -356,9 +383,11 @@ export default function Invoices() {
       buyerPhoto: '',
       vehicleMaker: '',
       vehicleModel: '',
+      carYear: '',
       engineNumber: '',
       chassisNumber: '',
       powerCapacity: '',
+      color: '',
       postOffice: '',
       lastToken: '',
       regName: '',
@@ -369,6 +398,15 @@ export default function Invoices() {
       agreedAmountWords: '',
       agreementTime: '',
       agreementDay: '',
+      payeeName: '',
+      headOfAccount: '',
+      inWords: '',
+      bankStatus: '',
+      chequeNo: '',
+      dueDate: '',
+      onAccount: '',
+      accountOf: '',
+      time: '',
       isImported: false,
       billOfEntryNo: '',
       portName: '',
@@ -431,6 +469,7 @@ export default function Invoices() {
     });
 
     const receiptNo = inv.receiptNo || inv.invoiceNumber;
+    const category = inv.category || 'SALES_RECEIPT';
     const buyerName = inv.buyerName || inv.customerName || 'N/A';
     const buyerFather = inv.buyerFatherName || 'N/A';
     const buyerAddress = inv.buyerAddress || inv.customerCity || 'N/A';
@@ -455,7 +494,7 @@ export default function Invoices() {
 
     const agreedSum = inv.agreedAmount || inv.totalPrice || inv.saleAmount || 0;
     const agreedHalf = inv.agreedAmountHalf || (agreedSum / 2);
-    const agreedWords = inv.agreedAmountWords || '';
+    const agreedWords = inv.agreedAmountWords || inv.inWords || '';
     const agreementTime = inv.agreementTime || 'N/A';
     const agreementDay = inv.agreementDay || 'N/A';
 
@@ -481,11 +520,457 @@ export default function Invoices() {
       `;
     };
 
+    let innerHTMLBody = '';
+
+    if (category === 'DELIVERY_LETTER') {
+      innerHTMLBody = `
+        <div class="receipt-card">
+          <div style="text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 12px;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 14px;">
+              <img src="${logoBase64}" style="height: 52px;" />
+              <div>
+                <h1 style="font-size: 22px; font-weight: 900; letter-spacing: 1px; color: #0f172a; margin: 0;">AL-ASR MOTORS</h1>
+                <p style="font-size: 10px; color: #475569; margin: 2px 0 0 0;">Lahore by pass near McDonald, Sahiwal. Tel: 040-4400688</p>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding: 0 4px;">
+              <h2 style="font-size: 16px; font-weight: 900; text-decoration: underline; margin: 0; color: #0f172a;">DELIVERY LETTER</h2>
+              <span style="font-size: 13px; font-weight: 800; font-family: monospace; color: #dc2626;">No. ${receiptNo}</span>
+            </div>
+          </div>
+
+          <p style="font-size: 11px; text-align: justify; line-height: 1.6; margin-bottom: 12px; font-weight: 600;">
+            I, the undersigned, here declare that I have thoroughly checked the machine as and whatever it is and the relevant documents of Motor Car, Bearing
+          </p>
+
+          <table class="grid-tbl" style="margin-bottom: 12px;">
+            <tr>
+              <td class="lbl">Make:</td><td class="val">${vehicleMaker}</td>
+              <td class="lbl">Power:</td><td class="val">${powerCapacity}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Chassis No:</td><td class="val">${chassisNo}</td>
+              <td class="lbl">Engine No:</td><td class="val">${engineNo}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Color:</td><td class="val">${inv.color || 'N/A'}</td>
+              <td class="lbl">Model:</td><td class="val">${vehicleModel} ${inv.carYear || ''}</td>
+            </tr>
+            <tr>
+              <td class="lbl">From:</td><td class="val" colspan="3" style="font-weight: 900;">AL-ASR MOTORS SAHIWAL</td>
+            </tr>
+            <tr>
+              <td class="lbl">Date:</td><td class="val">${createdDate}</td>
+              <td class="lbl">Time:</td><td class="val">${inv.time || agreementTime}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Account of:</td><td class="val" colspan="3">${inv.accountOf || 'N/A'}</td>
+            </tr>
+          </table>
+
+          <div style="border: 1px solid #0f172a; padding: 10px; font-size: 10px; line-height: 1.6; text-align: justify; margin-bottom: 14px; background: #f8fafc; border-radius: 4px;">
+            My entire satisfaction, and have taken possession of the same in perfect satisfactory condition, I do hereby I shall be fully responsible for all accident, Tokens, Machine defects and the undertake to get the ownership of this vehicle transferred in my name from the concerned registration Authority within the stipulated period of 15 days from today, and if could not, I will do so my own responsibility and risk. During the invoice making process, if any price change occurs at company end, I will pay the invoice difference.
+          </div>
+
+          <table class="grid-tbl" style="margin-bottom: 16px;">
+            <tr>
+              <td class="lbl">Byer's Name:</td><td class="val">${buyerName}</td>
+              <td class="lbl">S/o:</td><td class="val">${buyerFather}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Address:</td><td class="val" colspan="3">${buyerAddress}</td>
+            </tr>
+            <tr>
+              <td class="lbl">N.I.C. No:</td><td class="val" colspan="3">${renderCNICBoxes(inv.buyerCnic)}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Signature:</td><td class="val" style="height: 28px;"></td>
+              <td class="lbl">Contact:</td><td class="val">${buyerPhone}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Witness Name:</td><td class="val">${inv.witness1Name || 'N/A'}</td>
+              <td class="lbl">Signature:</td><td class="val" style="height: 28px;"></td>
+            </tr>
+            <tr>
+              <td class="lbl">N.I.C. No:</td><td class="val" colspan="3">${renderCNICBoxes(inv.witness1Cnic)}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Witness Name:</td><td class="val">${inv.witness2Name || 'N/A'}</td>
+              <td class="lbl">Signature:</td><td class="val" style="height: 28px;"></td>
+            </tr>
+            <tr>
+              <td class="lbl">N.I.C. No:</td><td class="val" colspan="3">${renderCNICBoxes(inv.witness2Cnic)}</td>
+            </tr>
+          </table>
+
+          <div style="margin-top: 40px; text-align: right; font-weight: 900; font-size: 11px;">
+            Authorized Signature: ___________________________
+          </div>
+        </div>
+      `;
+    } else if (category === 'PAYMENT_VOUCHER') {
+      innerHTMLBody = `
+        <div class="receipt-card">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 14px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <img src="${logoBase64}" style="height: 54px;" />
+              <div>
+                <h1 style="font-size: 24px; font-weight: 900; margin: 0; color: #0f172a;">AL-ASR MOTORS</h1>
+                <p style="font-size: 10px; color: #475569; margin: 2px 0 0 0;">450 - A/B, Lahore Road, Sahiwal.</p>
+                <p style="font-size: 9.5px; color: #475569; margin: 0;">Tel.: 040-4403799, 4403899, Fax: 040-4462087</p>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <span style="font-size: 22px; font-weight: 900; border: 2px solid #0f172a; padding: 2px 14px; border-radius: 4px; display: inline-block;">P. V.</span>
+              <div style="font-size: 11px; margin-top: 6px; font-weight: bold;">Date: <span style="font-family: monospace;">${createdDate}</span></div>
+            </div>
+          </div>
+
+          <table class="grid-tbl" style="margin-bottom: 14px;">
+            <tr>
+              <td class="lbl" style="width: 25%;">Payee's Name:</td>
+              <td class="val" style="width: 75%; font-size: 12px;">${inv.payeeName || sellerName || buyerName || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Head of Account:</td>
+              <td class="val" style="font-size: 11px;">${inv.headOfAccount || 'Vehicle Expense / Deal Settlement'}</td>
+            </tr>
+          </table>
+
+          <table class="grid-tbl" style="margin-bottom: 14px;">
+            <thead>
+              <tr style="background: #f1f5f9; text-align: center; font-weight: bold; font-size: 10px;">
+                <td style="width: 75%;">Particulars / Description</td>
+                <td style="width: 25%;">Rupees</td>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="height: 160px; vertical-align: top;">
+                <td style="padding: 12px; font-size: 11px; line-height: 1.6;">
+                  ${inv.remarks || `Payment voucher issued for ${vehicleMaker} ${vehicleModel} (${regNo}).`}
+                </td>
+                <td style="text-align: right; padding: 12px; font-family: monospace; font-size: 14px; font-weight: 900;">
+                  ${Number(totalPrice).toLocaleString()} /-
+                </td>
+              </tr>
+              <tr>
+                <td class="lbl" style="text-align: right;">In Words:</td>
+                <td class="val" style="font-style: italic;">${agreedWords || 'Rupees Only'}</td>
+              </tr>
+              <tr style="font-weight: 900; background: #f8fafc; font-size: 13px;">
+                <td style="text-align: right;">Grand Total:</td>
+                <td style="text-align: right; font-family: monospace; color: #0284c7;">PKR ${Number(totalPrice).toLocaleString()}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 55px; text-align: center;">
+            <div style="border-top: 1.5px solid #0f172a; padding-top: 4px; font-size: 9px; font-weight: bold;">Received By</div>
+            <div style="border-top: 1.5px solid #0f172a; padding-top: 4px; font-size: 9px; font-weight: bold;">Paid By</div>
+            <div style="border-top: 1.5px solid #0f172a; padding-top: 4px; font-size: 9px; font-weight: bold;">Prepared By</div>
+            <div style="border-top: 1.5px solid #0f172a; padding-top: 4px; font-size: 9px; font-weight: bold;">Checked By</div>
+            <div style="border-top: 1.5px solid #0f172a; padding-top: 4px; font-size: 9px; font-weight: bold;">Approved By</div>
+          </div>
+        </div>
+      `;
+    } else if (category === 'BOOKING_RECEIPT') {
+      innerHTMLBody = `
+        <div class="receipt-card">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 14px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <img src="${logoBase64}" style="height: 52px;" />
+              <div>
+                <h1 style="font-size: 22px; font-weight: 900; margin: 0; color: #0f172a;">AL-ASR MOTORS</h1>
+                <p style="font-size: 9.5px; color: #475569; margin: 2px 0 0 0;">450 - A/B, Lahore Road, Sahiwal.</p>
+                <p style="font-size: 9px; color: #475569; margin: 0;">Tel: 040-4403799, 4403899, Fax: 040-4462087</p>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <span style="font-size: 18px; font-weight: 900; background: #0f172a; color: white; padding: 4px 14px; border-radius: 4px;">Receipt</span>
+              <div style="font-size: 13px; margin-top: 5px; font-weight: 800; font-family: monospace; color: #dc2626;">No. ${receiptNo}</div>
+              <div style="font-size: 10px; margin-top: 2px; font-weight: bold;">Date: <span style="font-family: monospace;">${createdDate}</span></div>
+            </div>
+          </div>
+
+          <table class="grid-tbl" style="margin-bottom: 14px;">
+            <tr>
+              <td class="lbl">Name:</td><td class="val">${buyerName}</td>
+              <td class="lbl">Tel:</td><td class="val">${buyerPhone}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Vehicle No.:</td><td class="val">${regNo}</td>
+              <td class="lbl">Engine No.:</td><td class="val">${engineNo}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Chassis No.:</td><td class="val">${chassisNo}</td>
+              <td class="lbl">Colour:</td><td class="val">${inv.color || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Total Deal:</td><td class="val" style="font-family: monospace; font-weight: 900; font-size: 11px;">PKR ${Number(totalPrice).toLocaleString()}</td>
+              <td class="lbl">Advance:</td><td class="val" style="font-family: monospace; color: #16a34a; font-weight: 900; font-size: 11px;">PKR ${Number(advanceAmount).toLocaleString()}</td>
+            </tr>
+            <tr>
+              <td class="lbl">In Words:</td><td class="val" colspan="3" style="font-style: italic;">${agreedWords || 'Rupees Only'}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Balance:</td><td class="val" style="font-family: monospace; color: #dc2626; font-weight: 900; font-size: 11px;">PKR ${Number(remainingAmount).toLocaleString()}</td>
+              <td class="lbl">Bank Status:</td><td class="val">${inv.bankStatus || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Cash:</td><td class="val">${advanceAmount ? `PKR ${Number(advanceAmount).toLocaleString()}` : 'N/A'}</td>
+              <td class="lbl">Cheque #/DD #:</td><td class="val">${inv.chequeNo || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Due Date:</td><td class="val">${inv.dueDate || 'N/A'}</td>
+              <td class="lbl">on Account:</td><td class="val">${inv.onAccount || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Status:</td><td class="val" colspan="3" style="font-weight: bold; color: #0284c7;">${inv.paymentStatus || 'PAID'}</td>
+            </tr>
+          </table>
+
+          <div style="display: flex; justify-content: space-between; margin-top: 55px; text-align: center;">
+            <div style="border-top: 1.5px solid #0f172a; width: 28%; padding-top: 4px; font-size: 10px; font-weight: bold;">Issued By</div>
+            <div style="border-top: 1.5px solid #0f172a; width: 28%; padding-top: 4px; font-size: 10px; font-weight: bold;">Customer's Signature</div>
+            <div style="border-top: 1.5px solid #0f172a; width: 28%; padding-top: 4px; font-size: 10px; font-weight: bold;">For AL-ASR Motors</div>
+          </div>
+        </div>
+      `;
+    } else {
+      // Default: SALES_RECEIPT
+      innerHTMLBody = `
+        <div class="receipt-card">
+          <!-- Top Header -->
+          <div class="header-bar">
+            <div class="logo-box">
+              <img src="${logoBase64}" class="logo-img" alt="AL ASR MOTORS" />
+            </div>
+            <div class="title-box">
+              <div class="title-urdu">سیل رسید</div>
+              <div class="title-en">AL ASR MOTORS — SALES RECEIPT</div>
+              <div class="showroom-info">Main GT Road / City Center, Sahiwal, Pakistan • Phone: +92 300 1234567</div>
+            </div>
+          </div>
+
+          <!-- Top Meta Strip -->
+          <div class="meta-strip">
+            <div>تاریخ (Date): <span class="meta-val">${createdDate}</span></div>
+            <div>رجسٹریشن نمبر (Reg No): <span class="meta-val">${regNo}</span></div>
+            <div>رسید نمبر (Receipt No): <span class="meta-val">${receiptNo}</span></div>
+          </div>
+
+          <!-- Seller Information (فروخت کنندہ) with CNIC digit boxes & Photo -->
+          <div class="section-card">
+            <div class="section-head">
+              <span>فروخت کنندہ کی تفصیلات (Seller Information)</span>
+              <span>SELLER DETAILS</span>
+            </div>
+            <table class="grid-tbl">
+              <tr>
+                <td class="lbl">فروخت کنندہ (Seller Name):</td>
+                <td class="val">${sellerName}</td>
+                <td class="lbl">ولدیت (Father Name):</td>
+                <td class="val">${sellerFather}</td>
+                ${inv.sellerPhoto ? `
+                  <td rowspan="3" style="width: 65px; text-align: center; vertical-align: middle; background: #ffffff; padding: 2px;">
+                    <img src="${inv.sellerPhoto}" alt="Seller Photo" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #0284c7;" />
+                  </td>
+                ` : ''}
+              </tr>
+              <tr>
+                <td class="lbl">شناختی کارڈ (CNIC No):</td>
+                <td class="val" colspan="${inv.sellerPhoto ? 3 : 3}">${renderCNICBoxes(inv.sellerCnic)}</td>
+              </tr>
+              <tr>
+                <td class="lbl">پتہ (Address):</td>
+                <td class="val">${sellerAddress}</td>
+                <td class="lbl">فون نمبر (Phone No):</td>
+                <td class="val">${sellerPhone}</td>
+              </tr>
+            </table>
+          </div>
+
+          <!-- Vehicle Specifications (گاڑی کی تفصیلات) -->
+          <div class="section-card">
+            <div class="section-head">
+              <span>گاڑی کی تفصیلات (Vehicle Specifications)</span>
+              <span>VEHICLE SPECS</span>
+            </div>
+            <table class="grid-tbl">
+              <tr>
+                <td class="lbl">میکر (Maker / Brand):</td>
+                <td class="val">${vehicleMaker}</td>
+                <td class="lbl">ماڈل (Model & Year):</td>
+                <td class="val">${vehicleModel} ${inv.carYear || ''}</td>
+              </tr>
+              <tr>
+                <td class="lbl">انجن نمبر (Engine No):</td>
+                <td class="val">${engineNo}</td>
+                <td class="lbl">چیسز نمبر (Chassis No):</td>
+                <td class="val">${chassisNo}</td>
+              </tr>
+              <tr>
+                <td class="lbl">پاور (Power / CC):</td>
+                <td class="val">${powerCapacity}</td>
+                <td class="lbl">ڈاک خانہ (Post Office):</td>
+                <td class="val">${postOffice}</td>
+              </tr>
+              <tr>
+                <td class="lbl">آخری ٹوکن (Last Token):</td>
+                <td class="val">${lastToken}</td>
+                <td class="lbl">رجسٹریشن نام (Reg Owner):</td>
+                <td class="val">${regName}</td>
+              </tr>
+              <tr>
+                <td class="lbl">مالک ولدیت (Reg Father):</td>
+                <td class="val">${regFatherName}</td>
+                <td class="lbl">مالک پتہ (Reg Address):</td>
+                <td class="val">${regAddress}</td>
+              </tr>
+            </table>
+          </div>
+
+          <!-- Buyer Information (خریدار) with CNIC digit boxes & Photo -->
+          <div class="section-card">
+            <div class="section-head">
+              <span>خریدار کی تفصیلات (Buyer Information)</span>
+              <span>BUYER DETAILS</span>
+            </div>
+            <table class="grid-tbl">
+              <tr>
+                <td class="lbl">خریدار (Buyer Name):</td>
+                <td class="val">${buyerName}</td>
+                <td class="lbl">ولدیت (Father Name):</td>
+                <td class="val">${buyerFather}</td>
+                ${inv.buyerPhoto ? `
+                  <td rowspan="3" style="width: 65px; text-align: center; vertical-align: middle; background: #ffffff; padding: 2px;">
+                    <img src="${inv.buyerPhoto}" alt="Buyer Photo" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #0284c7;" />
+                  </td>
+                ` : ''}
+              </tr>
+              <tr>
+                <td class="lbl">شناختی کارڈ (CNIC No):</td>
+                <td class="val" colspan="${inv.buyerPhoto ? 3 : 3}">${renderCNICBoxes(inv.buyerCnic)}</td>
+              </tr>
+              <tr>
+                <td class="lbl">پتہ (Address):</td>
+                <td class="val">${buyerAddress}</td>
+                <td class="lbl">فون نمبر (Phone No):</td>
+                <td class="val">${buyerPhone}</td>
+              </tr>
+            </table>
+          </div>
+
+          <!-- Transaction Agreement (معاہدہ اقرار نامہ) -->
+          <div class="agreement-card">
+            <div class="agr-urdu">
+              جملہ کاغذات و دیگر حقوق بعوض مبلغ Rs. ${Number(agreedSum).toLocaleString()} (جن کے نصف Rs. ${Number(agreedHalf).toLocaleString()} بنتے ہیں) بوقت ${agreementTime} بروز ${agreementDay} فریق دوئم (خریدار) پر فروخت کر دی جو کہ مندرجہ ذیل شرائط پر دونوں میں اقرارنامہ ہوا۔
+            </div>
+            <div class="agr-en">
+              All vehicle documents & ownership rights sold for PKR ${Number(agreedSum).toLocaleString()} (half sum: PKR ${Number(agreedHalf).toLocaleString()}), at ${agreementTime} on ${agreementDay}, to the buyer under the following agreed terms. ${agreedWords ? 'Amount in words: ' + agreedWords : ''}
+            </div>
+          </div>
+
+          <!-- Financial Balances -->
+          <table class="fin-tbl">
+            <thead>
+              <tr>
+                <th>کل قیمت گاڑی<br/>(Total Price)</th>
+                <th>پیشگی / بیعانہ رقم<br/>(Advance Payment)</th>
+                <th>بقایا رقم<br/>(Remaining Balance)</th>
+                <th>بقایا بحساب / ٹائم<br/>(Payment Duration)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="color: #0f172a;">PKR ${Number(totalPrice).toLocaleString()}</td>
+                <td style="color: #16a34a;">PKR ${Number(advanceAmount).toLocaleString()}</td>
+                <td style="color: #dc2626;">PKR ${Number(remainingAmount).toLocaleString()}</td>
+                <td>${paymentDuration}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Note / Terms & Conditions (8 Official Points) -->
+          <div class="terms-card">
+            <div class="terms-head">نوٹ و شرائط (TERMS & CONDITIONS)</div>
+            <div class="terms-grid">
+              <div class="term-cell">
+                <div class="term-ur">1- کاغذات کی ایکسائز اور کمپیوٹر چیکنگ اندر معیاد 24 گھنٹے کروانا ہوگی۔ بصورت دیگر شوروم کی ذمہ داری نہ ہوگی۔</div>
+                <div class="term-en">Excise & computer document check must be done within 24 hours. Showroom is not responsible thereafter.</div>
+              </div>
+
+              <div class="term-cell">
+                <div class="term-ur">2- گاڑی قبضہ میں لینے سے پہلے انجن نمبر، چیسز نمبر چیک کر لیں۔ بعد میں شوروم کسی قسم کا ذمہ دار نہ ہوگا۔ کیونکہ شوروم معمولی کمیشن لیتا ہے۔</div>
+                <div class="term-en">Inspect engine & chassis numbers before taking possession. Showroom is not responsible later as it takes nominal commission.</div>
+              </div>
+
+              <div class="term-cell">
+                <div class="term-ur">3- گاڑی کی واپسی شوروم رولز کے تحت ہوگی۔ واپسی کی صورت میں کمیشن واپس نہیں دیا جائے گا۔</div>
+                <div class="term-en">Vehicle return is subject to showroom rules. Commission is non-refundable upon return.</div>
+              </div>
+
+              <div class="term-cell">
+                <div class="term-ur">4- فریق اول گاڑی کے کاغذات میں ہر قسم کی غلطی کا ذمہ دار ہوگا۔</div>
+                <div class="term-en">First party (Seller) shall be solely responsible for any errors/defects in vehicle documents.</div>
+              </div>
+
+              <div class="term-cell">
+                <div class="term-ur">5- گاڑی کی چیسز پلیٹ اور چیسز نمبر موقع پر چیک کیا اور ٹھیک پایا۔</div>
+                <div class="term-en">Chassis plate and chassis number were verified on the spot and found correct.</div>
+              </div>
+
+              <div class="term-cell">
+                <div class="term-ur">6- یہ سودا دونوں پارٹیوں کی رضامندی سے طے پایا۔</div>
+                <div class="term-en">This transaction was finalized with the mutual consent of both parties.</div>
+              </div>
+
+              <div class="term-cell">
+                <div class="term-ur">7- شوروم، ٹرانسپورٹ رولز کے تحت صرف گواہ کی حیثیت رکھتا ہے۔</div>
+                <div class="term-en">Under transport regulations, the showroom acts solely as an official witness.</div>
+              </div>
+
+              <div class="term-cell">
+                <div class="term-ur">8- بائیومیٹرک ادارہ 15 دن تک دینے کا پابند ہے۔</div>
+                <div class="term-en">Seller / Owner is obligated to provide biometric verification within 15 days.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Signatures & Witness Bar -->
+          <div class="sig-grid">
+            <div class="sig-cell">
+              دستخط فروخت کنندہ<br/>
+              (Seller Signature)
+            </div>
+            <div class="sig-cell">
+              دستخط خریدار<br/>
+              (Buyer Signature)
+            </div>
+            <div class="sig-cell">
+              گواہ نمبر 1: ${inv.witness1Name || '___________'}
+            </div>
+            <div class="sig-cell">
+              گواہ نمبر 2: ${inv.witness2Name || '___________'}
+            </div>
+            <div class="sig-cell" style="border-top-color: #0284c7; color: #0284c7;">
+              دستخط و مہر شوروم<br/>
+              (Showroom Seal & Sign)
+            </div>
+          </div>
+
+          <div style="margin-top: 6px; text-align: center; font-size: 7.5px; color: #94a3b8; border-top: 1px dashed #cbd5e1; padding-top: 3px;">
+            Generated by AL ASR MOTORS Dealership System • Official Bilingual Voucher Record • Super Admin Verification
+          </div>
+        </div>
+      `;
+    }
+
     const htmlContent = `
       <!DOCTYPE html>
       <html dir="ltr" lang="en">
         <head>
-          <title>سیل رسید (Sales Receipt) - ${receiptNo} - AL ASR MOTORS</title>
+          <title>${category.replace('_', ' ')} - ${receiptNo} - AL ASR MOTORS</title>
           <style>
             @media print {
               @page { size: A4 portrait; margin: 4mm 6mm; }
@@ -505,7 +990,7 @@ export default function Invoices() {
             .receipt-card {
               border: 2px solid #0284c7;
               border-radius: 8px;
-              padding: 10px 14px;
+              padding: 12px 16px;
               background: #ffffff;
             }
 
@@ -751,233 +1236,10 @@ export default function Invoices() {
         </head>
         <body>
           <div class="no-print" style="text-align: right;">
-            <button onclick="window.print()" class="print-btn">🖨️ Print Official Receipt (پرنٹ کریں)</button>
+            <button onclick="window.print()" class="print-btn">🖨️ Print Official Voucher (پرنٹ کریں)</button>
           </div>
 
-          <div class="receipt-card">
-            <!-- Top Header -->
-            <div class="header-bar">
-              <div class="logo-box">
-                <img src="${logoBase64}" class="logo-img" alt="AL ASR MOTORS" />
-              </div>
-              <div class="title-box">
-                <div class="title-urdu">سیل رسید</div>
-                <div class="title-en">AL ASR MOTORS — SALES RECEIPT</div>
-                <div class="showroom-info">Main GT Road / City Center, Sahiwal, Pakistan • Phone: +92 300 1234567</div>
-              </div>
-            </div>
-
-            <!-- Top Meta Strip -->
-            <div class="meta-strip">
-              <div>تاریخ (Date): <span class="meta-val">${createdDate}</span></div>
-              <div>رجسٹریشن نمبر (Reg No): <span class="meta-val">${regNo}</span></div>
-              <div>رسید نمبر (Receipt No): <span class="meta-val">${receiptNo}</span></div>
-            </div>
-
-            <!-- Seller Information (فروخت کنندہ) with CNIC digit boxes & Photo -->
-            <div class="section-card">
-              <div class="section-head">
-                <span>فروخت کنندہ کی تفصیلات (Seller Information)</span>
-                <span>SELLER DETAILS</span>
-              </div>
-              <table class="grid-tbl">
-                <tr>
-                  <td class="lbl">فروخت کنندہ (Seller Name):</td>
-                  <td class="val">${sellerName}</td>
-                  <td class="lbl">ولدیت (Father Name):</td>
-                  <td class="val">${sellerFather}</td>
-                  ${inv.sellerPhoto ? `
-                    <td rowspan="3" style="width: 65px; text-align: center; vertical-align: middle; background: #ffffff; padding: 2px;">
-                      <img src="${inv.sellerPhoto}" alt="Seller Photo" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #0284c7;" />
-                    </td>
-                  ` : ''}
-                </tr>
-                <tr>
-                  <td class="lbl">شناختی کارڈ (CNIC No):</td>
-                  <td class="val" colspan="${inv.sellerPhoto ? 3 : 3}">${renderCNICBoxes(inv.sellerCnic)}</td>
-                </tr>
-                <tr>
-                  <td class="lbl">پتہ (Address):</td>
-                  <td class="val">${sellerAddress}</td>
-                  <td class="lbl">فون نمبر (Phone No):</td>
-                  <td class="val">${sellerPhone}</td>
-                </tr>
-              </table>
-            </div>
-
-            <!-- Vehicle Specifications (گاڑی کی تفصیلات) -->
-            <div class="section-card">
-              <div class="section-head">
-                <span>گاڑی کی تفصیلات (Vehicle Specifications)</span>
-                <span>VEHICLE SPECS</span>
-              </div>
-              <table class="grid-tbl">
-                <tr>
-                  <td class="lbl">میکر (Maker / Brand):</td>
-                  <td class="val">${vehicleMaker}</td>
-                  <td class="lbl">ماڈل (Model & Year):</td>
-                  <td class="val">${vehicleModel} ${inv.carYear || ''}</td>
-                </tr>
-                <tr>
-                  <td class="lbl">انجن نمبر (Engine No):</td>
-                  <td class="val">${engineNo}</td>
-                  <td class="lbl">چیسز نمبر (Chassis No):</td>
-                  <td class="val">${chassisNo}</td>
-                </tr>
-                <tr>
-                  <td class="lbl">پاور (Power / CC):</td>
-                  <td class="val">${powerCapacity}</td>
-                  <td class="lbl">ڈاک خانہ (Post Office):</td>
-                  <td class="val">${postOffice}</td>
-                </tr>
-                <tr>
-                  <td class="lbl">آخری ٹوکن (Last Token):</td>
-                  <td class="val">${lastToken}</td>
-                  <td class="lbl">رجسٹریشن نام (Reg Owner):</td>
-                  <td class="val">${regName}</td>
-                </tr>
-                <tr>
-                  <td class="lbl">مالک ولدیت (Reg Father):</td>
-                  <td class="val">${regFatherName}</td>
-                  <td class="lbl">مالک پتہ (Reg Address):</td>
-                  <td class="val">${regAddress}</td>
-                </tr>
-              </table>
-            </div>
-
-            <!-- Buyer Information (خریدار) with CNIC digit boxes & Photo -->
-            <div class="section-card">
-              <div class="section-head">
-                <span>خریدار کی تفصیلات (Buyer Information)</span>
-                <span>BUYER DETAILS</span>
-              </div>
-              <table class="grid-tbl">
-                <tr>
-                  <td class="lbl">خریدار (Buyer Name):</td>
-                  <td class="val">${buyerName}</td>
-                  <td class="lbl">ولدیت (Father Name):</td>
-                  <td class="val">${buyerFather}</td>
-                  ${inv.buyerPhoto ? `
-                    <td rowspan="3" style="width: 65px; text-align: center; vertical-align: middle; background: #ffffff; padding: 2px;">
-                      <img src="${inv.buyerPhoto}" alt="Buyer Photo" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #0284c7;" />
-                    </td>
-                  ` : ''}
-                </tr>
-                <tr>
-                  <td class="lbl">شناختی کارڈ (CNIC No):</td>
-                  <td class="val" colspan="${inv.buyerPhoto ? 3 : 3}">${renderCNICBoxes(inv.buyerCnic)}</td>
-                </tr>
-                <tr>
-                  <td class="lbl">پتہ (Address):</td>
-                  <td class="val">${buyerAddress}</td>
-                  <td class="lbl">فون نمبر (Phone No):</td>
-                  <td class="val">${buyerPhone}</td>
-                </tr>
-              </table>
-            </div>
-
-            <!-- Transaction Agreement (معاہدہ اقرار نامہ) -->
-            <div class="agreement-card">
-              <div class="agr-urdu">
-                جملہ کاغذات و دیگر حقوق بعوض مبلغ Rs. ${Number(agreedSum).toLocaleString()} (جن کے نصف Rs. ${Number(agreedHalf).toLocaleString()} بنتے ہیں) بوقت ${agreementTime} بروز ${agreementDay} فریق دوئم (خریدار) پر فروخت کر دی جو کہ مندرجہ ذیل شرائط پر دونوں میں اقرارنامہ ہوا۔
-              </div>
-              <div class="agr-en">
-                All vehicle documents & ownership rights sold for PKR ${Number(agreedSum).toLocaleString()} (half sum: PKR ${Number(agreedHalf).toLocaleString()}), at ${agreementTime} on ${agreementDay}, to the buyer under the following agreed terms. ${agreedWords ? 'Amount in words: ' + agreedWords : ''}
-              </div>
-            </div>
-
-            <!-- Financial Balances -->
-            <table class="fin-tbl">
-              <thead>
-                <tr>
-                  <th>کل قیمت گاڑی<br/>(Total Price)</th>
-                  <th>پیشگی / بیعانہ رقم<br/>(Advance Payment)</th>
-                  <th>بقایا رقم<br/>(Remaining Balance)</th>
-                  <th>بقایا بحساب / ٹائم<br/>(Payment Duration)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style="color: #0f172a;">PKR ${Number(totalPrice).toLocaleString()}</td>
-                  <td style="color: #16a34a;">PKR ${Number(advanceAmount).toLocaleString()}</td>
-                  <td style="color: #dc2626;">PKR ${Number(remainingAmount).toLocaleString()}</td>
-                  <td>${paymentDuration}</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <!-- Note / Terms & Conditions (8 Official Points) -->
-            <div class="terms-card">
-              <div class="terms-head">نوٹ و شرائط (TERMS & CONDITIONS)</div>
-              <div class="terms-grid">
-                <div class="term-cell">
-                  <div class="term-ur">1- کاغذات کی ایکسائز اور کمپیوٹر چیکنگ اندر معیاد 24 گھنٹے کروانا ہوگی۔ بصورت دیگر شوروم کی ذمہ داری نہ ہوگی۔</div>
-                  <div class="term-en">Excise & computer document check must be done within 24 hours. Showroom is not responsible thereafter.</div>
-                </div>
-
-                <div class="term-cell">
-                  <div class="term-ur">2- گاڑی قبضہ میں لینے سے پہلے انجن نمبر، چیسز نمبر چیک کر لیں۔ بعد میں شوروم کسی قسم کا ذمہ دار نہ ہوگا۔ کیونکہ شوروم معمولی کمیشن لیتا ہے۔</div>
-                  <div class="term-en">Inspect engine & chassis numbers before taking possession. Showroom is not responsible later as it takes nominal commission.</div>
-                </div>
-
-                <div class="term-cell">
-                  <div class="term-ur">3- گاڑی کی واپسی شوروم رولز کے تحت ہوگی۔ واپسی کی صورت میں کمیشن واپس نہیں دیا جائے گا۔</div>
-                  <div class="term-en">Vehicle return is subject to showroom rules. Commission is non-refundable upon return.</div>
-                </div>
-
-                <div class="term-cell">
-                  <div class="term-ur">4- فریق اول گاڑی کے کاغذات میں ہر قسم کی غلطی کا ذمہ دار ہوگا۔</div>
-                  <div class="term-en">First party (Seller) shall be solely responsible for any errors/defects in vehicle documents.</div>
-                </div>
-
-                <div class="term-cell">
-                  <div class="term-ur">5- گاڑی کی چیسز پلیٹ اور چیسز نمبر موقع پر چیک کیا اور ٹھیک پایا۔</div>
-                  <div class="term-en">Chassis plate and chassis number were verified on the spot and found correct.</div>
-                </div>
-
-                <div class="term-cell">
-                  <div class="term-ur">6- یہ سودا دونوں پارٹیوں کی رضامندی سے طے پایا۔</div>
-                  <div class="term-en">This transaction was finalized with the mutual consent of both parties.</div>
-                </div>
-
-                <div class="term-cell">
-                  <div class="term-ur">7- شوروم، ٹرانسپورٹ رولز کے تحت صرف گواہ کی حیثیت رکھتا ہے۔</div>
-                  <div class="term-en">Under transport regulations, the showroom acts solely as an official witness.</div>
-                </div>
-
-                <div class="term-cell">
-                  <div class="term-ur">8- بائیومیٹرک ادارہ 15 دن تک دینے کا پابند ہے۔</div>
-                  <div class="term-en">Seller / Owner is obligated to provide biometric verification within 15 days.</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Signatures & Witness Bar -->
-            <div class="sig-grid">
-              <div class="sig-cell">
-                دستخط فروخت کنندہ<br/>
-                (Seller Signature)
-              </div>
-              <div class="sig-cell">
-                دستخط خریدار<br/>
-                (Buyer Signature)
-              </div>
-              <div class="sig-cell">
-                گواہ نمبر 1: ${inv.witness1Name || '___________'}
-              </div>
-              <div class="sig-cell">
-                گواہ نمبر 2: ${inv.witness2Name || '___________'}
-              </div>
-              <div class="sig-cell" style="border-top-color: #0284c7; color: #0284c7;">
-                دستخط و مہر شوروم<br/>
-                (Showroom Seal & Sign)
-              </div>
-            </div>
-
-            <div style="margin-top: 6px; text-align: center; font-size: 7.5px; color: #94a3b8; border-top: 1px dashed #cbd5e1; padding-top: 3px;">
-              Generated by AL ASR MOTORS Dealership System • Official Bilingual Voucher Record • Super Admin Verification
-            </div>
-          </div>
+          ${innerHTMLBody}
         </body>
       </html>
     `;
@@ -1083,20 +1345,44 @@ export default function Invoices() {
         </div>
       </div>
 
-      {/* Filter and Search Rail */}
-      <div className="glass-card p-4 rounded-xl border border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search Receipt #, Buyer, Seller, Reg #..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-lg bg-slate-900/60 border border-white/10 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-          />
+      {/* Category Tabs & Filter Rail */}
+      <div className="glass-card p-4 rounded-xl border border-white/5 space-y-4">
+        <div className="flex overflow-x-auto gap-2 text-xs pb-1 border-b border-white/10">
+          {[
+            { id: 'ALL', label: 'All Vouchers & Receipts' },
+            { id: 'SALES_RECEIPT', label: '📜 Sales Receipt (سیل رسید)' },
+            { id: 'DELIVERY_LETTER', label: '📄 Delivery Letter (ڈیلیوری لیٹر)' },
+            { id: 'PAYMENT_VOUCHER', label: '💵 Payment Voucher (P.V.)' },
+            { id: 'BOOKING_RECEIPT', label: '🧾 Booking Receipt (رسید)' }
+          ].map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`px-4 py-2 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
+                selectedCategory === cat.id
+                  ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
+                  : 'bg-slate-900/60 text-slate-300 hover:bg-slate-800 hover:text-white border border-white/5'
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
         </div>
-        <div className="text-xs text-slate-400">
-          Showing <span className="text-cyan-400 font-bold">{invoices.length}</span> official receipts
+
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="relative w-full sm:w-80">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search Voucher #, Payee, Buyer, Seller, Reg #..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 rounded-lg bg-slate-900/60 border border-white/10 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+            />
+          </div>
+          <div className="text-xs text-slate-400">
+            Showing <span className="text-cyan-400 font-bold">{invoices.length}</span> official records
+          </div>
         </div>
       </div>
 
@@ -1105,12 +1391,12 @@ export default function Invoices() {
         {loading ? (
           <div className="p-12 text-center text-slate-400 text-xs font-mono">
             <div className="w-6 h-6 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-            Loading Super Admin Sales Receipts...
+            Loading Super Admin Sales Receipts & Vouchers...
           </div>
         ) : invoices.length === 0 ? (
           <div className="p-12 text-center text-slate-400 text-xs">
             <FileText className="w-8 h-8 mx-auto mb-2 text-slate-600" />
-            <p>No Sales Receipts found in the system.</p>
+            <p>No Sales Receipts or Vouchers found in the system.</p>
             <p className="text-[10px] text-slate-500 mt-1">Click "New Sales Receipt (سیل رسید)" above to issue a voucher.</p>
           </div>
         ) : (
@@ -1118,11 +1404,11 @@ export default function Invoices() {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-900/80 text-slate-400 font-mono text-[11px] uppercase border-b border-white/10">
                 <tr>
-                  <th className="p-3.5">Receipt #</th>
+                  <th className="p-3.5">Voucher # & Category</th>
                   <th className="p-3.5">Registration #</th>
-                  <th className="p-3.5">Buyer (خریدار)</th>
+                  <th className="p-3.5">Buyer / Payee</th>
                   <th className="p-3.5">Seller (فروخت کنندہ)</th>
-                  <th className="p-3.5">Vehicle Details</th>
+                  <th className="p-3.5">Vehicle Details / Head</th>
                   <th className="p-3.5">Total Amount</th>
                   <th className="p-3.5">Advance / Remaining</th>
                   <th className="p-3.5">Actions</th>
@@ -1132,16 +1418,27 @@ export default function Invoices() {
                 {invoices.map((inv) => {
                   const receiptNo = inv.receiptNo || inv.invoiceNumber;
                   const regNo = inv.registrationNo || inv.carRegNumber || 'UNREGISTERED';
-                  const buyer = inv.buyerName || inv.customerName || 'N/A';
+                  const buyer = inv.payeeName || inv.buyerName || inv.customerName || 'N/A';
                   const seller = inv.sellerName || 'N/A';
-                  const vehicle = `${inv.vehicleMaker || inv.carVehicle || ''} ${inv.vehicleModel || inv.carModel || ''}`.trim() || 'N/A';
+                  const vehicle = `${inv.vehicleMaker || inv.carVehicle || ''} ${inv.vehicleModel || inv.carModel || ''}`.trim() || inv.headOfAccount || 'N/A';
                   const total = inv.totalPrice || inv.saleAmount || 0;
                   const adv = inv.advanceAmount || 0;
                   const remaining = inv.remainingAmount !== undefined && inv.remainingAmount !== null ? inv.remainingAmount : (total - adv);
+                  const cat = inv.category || 'SALES_RECEIPT';
 
                   return (
                     <tr key={inv.id} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="p-3.5 font-mono text-cyan-400 font-bold">{receiptNo}</td>
+                      <td className="p-3.5">
+                        <div className="font-mono text-cyan-400 font-bold">{receiptNo}</div>
+                        <span className={`inline-block text-[9px] px-2 py-0.5 rounded font-bold uppercase mt-1 ${
+                          cat === 'DELIVERY_LETTER' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
+                          cat === 'PAYMENT_VOUCHER' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                          cat === 'BOOKING_RECEIPT' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                          'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                        }`}>
+                          {cat.replace('_', ' ')}
+                        </span>
+                      </td>
                       <td className="p-3.5 font-mono text-slate-200">{regNo}</td>
                       <td className="p-3.5 font-semibold text-white">
                         {buyer}
@@ -1171,7 +1468,7 @@ export default function Invoices() {
                           <button
                             onClick={() => exportInvoicePDF(inv)}
                             className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/30 font-medium text-[11px] flex items-center space-x-1"
-                            title="Print Sales Receipt"
+                            title="Print Voucher"
                           >
                             <Printer className="w-3.5 h-3.5" />
                             <span>Print</span>
@@ -1179,7 +1476,7 @@ export default function Invoices() {
                           <button
                             onClick={() => openEditModal(inv)}
                             className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30 font-medium text-[11px] flex items-center space-x-1"
-                            title="Edit Sales Receipt"
+                            title="Edit Voucher"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                             <span>Edit</span>
@@ -1230,7 +1527,7 @@ export default function Invoices() {
             {/* Modal Navigation Tabs */}
             <div className="flex overflow-x-auto border-b border-white/10 bg-slate-900/40 p-2 gap-1 text-xs">
               {[
-                { id: 'general', label: '📌 General Details' },
+                { id: 'general', label: '📌 Voucher Category & General' },
                 { id: 'seller', label: '👤 Seller Details (فروخت کنندہ)' },
                 { id: 'buyer', label: '👤 Buyer Details (خریدار)' },
                 { id: 'vehicle', label: '🚗 Vehicle Specs (گاڑی)' },
@@ -1258,9 +1555,37 @@ export default function Invoices() {
               
               {/* TAB 1: GENERAL DETAILS */}
               {activeTab === 'general' && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">General Details</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-5">
+                  <div>
+                    <label className="block text-xs font-bold text-cyan-400 mb-2 uppercase tracking-wider">
+                      Voucher / Invoice Category (اقسام واؤچر) <span className="text-rose-400">*</span>
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                      {[
+                        { id: 'SALES_RECEIPT', title: 'Sales Receipt', sub: 'سیل رسید (Dual Language)' },
+                        { id: 'DELIVERY_LETTER', title: 'Delivery Letter', sub: 'ڈیلیوری لیٹر (Handover)' },
+                        { id: 'PAYMENT_VOUCHER', title: 'Payment Voucher', sub: 'P.V. (ادائیگی واؤچر)' },
+                        { id: 'BOOKING_RECEIPT', title: 'Booking Receipt', sub: 'رسید (Payment Receipt)' }
+                      ].map(cat => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => handleInputChange('category', cat.id)}
+                          className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                            formData.category === cat.id
+                              ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400 shadow-md font-bold'
+                              : 'bg-slate-900/60 border-white/10 text-slate-400 hover:text-white hover:bg-slate-800'
+                          }`}
+                        >
+                          <div className="text-xs font-bold">{cat.title}</div>
+                          <div className="text-[10px] font-mono opacity-80 mt-0.5">{cat.sub}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Basic Metadata & Registration</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-semibold text-slate-300 mb-1">
                         Date (تاریخ) <span className="text-rose-400">*</span>
@@ -1276,7 +1601,7 @@ export default function Invoices() {
 
                     <div>
                       <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Registration No. (رجسٹریشن نمبر) <span className="text-rose-400">*</span>
+                        Registration No. (رجسٹریشن نمبر)
                       </label>
                       <input
                         type="text"
@@ -1284,10 +1609,126 @@ export default function Invoices() {
                         value={formData.registrationNo}
                         onChange={(e) => handleInputChange('registrationNo', e.target.value)}
                         className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">
+                        Time (وقت)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 03:30 PM"
+                        value={formData.time || formData.agreementTime}
+                        onChange={(e) => handleInputChange('time', e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
                       />
                     </div>
                   </div>
+
+                  {/* Category Specific Fields in General Tab */}
+                  {formData.category === 'PAYMENT_VOUCHER' && (
+                    <div className="p-4 bg-slate-900/80 rounded-xl border border-amber-500/30 space-y-4">
+                      <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">Payment Voucher (P.V.) Details</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">Payee's Name (نام پانے والا)</label>
+                          <input
+                            type="text"
+                            placeholder="Name of person receiving payment"
+                            value={formData.payeeName}
+                            onChange={(e) => handleInputChange('payeeName', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-amber-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">Head of Account (کھاتہ)</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Vehicle Purchase / Expense"
+                            value={formData.headOfAccount}
+                            onChange={(e) => handleInputChange('headOfAccount', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-amber-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {formData.category === 'DELIVERY_LETTER' && (
+                    <div className="p-4 bg-slate-900/80 rounded-xl border border-blue-500/30 space-y-4">
+                      <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider">Delivery Letter Specific Details</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">Account Of</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Self / Company Account"
+                            value={formData.accountOf}
+                            onChange={(e) => handleInputChange('accountOf', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">Vehicle Color (رنگ)</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. White / Super White"
+                            value={formData.color}
+                            onChange={(e) => handleInputChange('color', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {formData.category === 'BOOKING_RECEIPT' && (
+                    <div className="p-4 bg-slate-900/80 rounded-xl border border-emerald-500/30 space-y-4">
+                      <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Booking Receipt Banking Details</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">Bank Status</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Cleared / Pending / Cash"
+                            value={formData.bankStatus}
+                            onChange={(e) => handleInputChange('bankStatus', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">Cheque # / DD # / Online Reference</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. CHQ-9842104"
+                            value={formData.chequeNo}
+                            onChange={(e) => handleInputChange('chequeNo', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">Due Date (معیاد)</label>
+                          <input
+                            type="date"
+                            value={formData.dueDate}
+                            onChange={(e) => handleInputChange('dueDate', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">on Account</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Advance Booking"
+                            value={formData.onAccount}
+                            onChange={(e) => handleInputChange('onAccount', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

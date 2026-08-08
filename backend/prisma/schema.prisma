@@ -152,6 +152,7 @@ model Buyer {
 model Invoice {
   id               String   @id @default(uuid())
   invoiceNumber    String   @unique
+  category         String   @default("SALES_RECEIPT") // SALES_RECEIPT, DELIVERY_LETTER, PAYMENT_VOUCHER, BOOKING_RECEIPT
   date             DateTime @default(now())
   registrationNo   String?
 
@@ -177,6 +178,7 @@ model Invoice {
   engineNumber     String?
   chassisNumber    String?
   powerCapacity    String?
+  color            String?
   postOffice       String?
   lastToken        String?
   regName          String?
@@ -189,6 +191,17 @@ model Invoice {
   agreedAmountWords String?
   agreementTime    String?
   agreementDay     String?
+
+  // Additional Voucher Specific Fields (Payment Voucher, Delivery Letter, Booking Receipt)
+  payeeName        String?
+  headOfAccount    String?
+  inWords          String?
+  bankStatus       String?
+  chequeNo         String?
+  dueDate          String?
+  onAccount        String?
+  accountOf        String?
+  time             String?
 
   // Imported Vehicle Details (برائے امپورٹڈ گاڑی)
   isImported       Boolean  @default(false)
@@ -231,6 +244,7 @@ model Invoice {
   updatedAt        DateTime @updatedAt
 
   @@index([invoiceNumber])
+  @@index([category])
   @@index([createdAt])
 }
 
