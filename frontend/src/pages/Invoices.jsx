@@ -253,49 +253,49 @@ export default function Invoices() {
           <title>Sales Receipt (سیل رسید) - ${receiptNo} - AL ASR MOTORS</title>
           <style>
             @media print {
-              @page { size: A4 portrait; margin: 3mm 5mm; }
+              @page { size: A4 portrait; margin: 8mm 10mm; }
               body { padding: 0; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
               .no-print { display: none !important; }
             }
             body { 
               font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-              padding: 4px; 
+              padding: 6px; 
               color: #0f172a; 
               background: #ffffff;
-              line-height: 1.15;
-              font-size: 8.5px;
+              line-height: 1.3;
+              font-size: 9.5px;
             }
             .header-container {
               display: flex;
               justify-content: space-between;
               align-items: center;
-              border-bottom: 2px double #0284c7;
-              padding-bottom: 4px;
-              margin-bottom: 5px;
+              border-bottom: 2.5px double #0284c7;
+              padding-bottom: 8px;
+              margin-bottom: 10px;
             }
             .logo-section {
               display: flex;
               align-items: center;
-              gap: 8px;
+              gap: 12px;
             }
             .logo-img {
-              height: 42px;
+              height: 60px;
               width: auto;
               object-fit: contain;
             }
             .brand-title {
-              font-size: 16px;
+              font-size: 20px;
               font-weight: 900;
               color: #0f172a;
               letter-spacing: 0.5px;
             }
             .brand-subtitle {
-              font-size: 9.5px;
+              font-size: 11px;
               color: #0284c7;
               font-weight: bold;
             }
             .brand-contact {
-              font-size: 8px;
+              font-size: 9px;
               color: #64748b;
               margin-top: 1px;
             }
@@ -303,32 +303,32 @@ export default function Invoices() {
               text-align: right;
               background: #0f172a;
               color: #ffffff;
-              padding: 4px 10px;
-              border-radius: 6px;
+              padding: 6px 14px;
+              border-radius: 8px;
             }
             .doc-title {
-              font-size: 11px;
+              font-size: 13px;
               font-weight: 800;
               color: #38bdf8;
               text-transform: uppercase;
             }
             .doc-num {
-              font-size: 9.5px;
+              font-size: 10.5px;
               font-family: monospace;
               margin-top: 2px;
             }
 
             .section-box {
               border: 1px solid #cbd5e1;
-              border-radius: 4px;
-              margin-bottom: 4px;
+              border-radius: 5px;
+              margin-bottom: 8px;
               overflow: hidden;
             }
             .section-header {
               background: #f1f5f9;
-              padding: 2.5px 8px;
+              padding: 4px 10px;
               font-weight: bold;
-              font-size: 9.5px;
+              font-size: 10.5px;
               color: #0f172a;
               border-bottom: 1px solid #cbd5e1;
               display: flex;
@@ -341,8 +341,8 @@ export default function Invoices() {
               border-collapse: collapse;
             }
             table.details-table td {
-              padding: 2.5px 6px;
-              font-size: 8.5px;
+              padding: 4px 8px;
+              font-size: 9.5px;
               border-bottom: 1px solid #f1f5f9;
               border-right: 1px solid #f1f5f9;
               vertical-align: middle;
@@ -362,62 +362,62 @@ export default function Invoices() {
             .financial-table {
               width: 100%;
               border-collapse: collapse;
-              margin-top: 3px;
-              margin-bottom: 4px;
+              margin-top: 4px;
+              margin-bottom: 8px;
             }
             .financial-table th {
               background: #0f172a;
               color: #fff;
-              font-size: 8.5px;
-              padding: 3px 6px;
+              font-size: 9.5px;
+              padding: 5px 8px;
               text-align: left;
             }
             .financial-table td {
-              padding: 3px 6px;
+              padding: 5px 8px;
               border: 1px solid #cbd5e1;
-              font-size: 9.5px;
+              font-size: 10.5px;
               font-weight: bold;
             }
 
             .terms-box {
               background: #f8fafc;
               border: 1px solid #cbd5e1;
-              border-radius: 4px;
-              padding: 4px 8px;
-              margin-top: 4px;
-              margin-bottom: 6px;
+              border-radius: 5px;
+              padding: 6px 10px;
+              margin-top: 6px;
+              margin-bottom: 8px;
             }
             .terms-title {
-              font-size: 9.5px;
+              font-size: 10px;
               font-weight: bold;
               color: #0f172a;
               border-bottom: 1px solid #e2e8f0;
-              padding-bottom: 2px;
-              margin-bottom: 3px;
+              padding-bottom: 3px;
+              margin-bottom: 4px;
             }
             .terms-list {
-              font-size: 7.5px;
+              font-size: 8.5px;
               color: #334155;
-              padding-left: 12px;
+              padding-left: 14px;
               margin: 0;
-              line-height: 1.2;
+              line-height: 1.35;
             }
             .terms-list li {
-              margin-bottom: 1.5px;
+              margin-bottom: 2px;
             }
 
             .signature-container {
               display: flex;
               justify-content: space-between;
-              margin-top: 14px;
-              gap: 8px;
+              margin-top: 36px;
+              gap: 12px;
             }
             .sig-box {
               flex: 1;
-              border-top: 1.5px solid #475569;
-              padding-top: 3px;
+              border-top: 1.5px solid #334155;
+              padding-top: 6px;
               text-align: center;
-              font-size: 8px;
+              font-size: 9px;
               font-weight: bold;
               color: #334155;
             }
@@ -425,13 +425,13 @@ export default function Invoices() {
             .print-btn {
               background: #0284c7;
               color: white;
-              padding: 6px 14px;
+              padding: 8px 18px;
               border: none;
               border-radius: 6px;
               font-weight: bold;
-              font-size: 11px;
+              font-size: 12px;
               cursor: pointer;
-              margin-bottom: 8px;
+              margin-bottom: 10px;
             }
           </style>
         </head>
