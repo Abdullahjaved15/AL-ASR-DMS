@@ -135,7 +135,7 @@ export default function CurrentStock() {
     const printWindow = window.open('', '_blank');
     const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
 
-    const pageSize = 20;
+    const pageSize = 25;
     const pageChunks = [];
     for (let i = 0; i < stockList.length; i += pageSize) {
       pageChunks.push(stockList.slice(i, i + pageSize));
@@ -245,7 +245,7 @@ export default function CurrentStock() {
                 </div>
 
                 <div class="footer">
-                  AL ASR MOTORS Dealership Executive System • Sheet ${pageIdx + 1} of ${totalPages} • Showing records ${chunk.length > 0 ? startIdx + 1 : 0} to ${startIdx + chunk.length} of ${stockList.length} (Max 20 per sheet)
+                  AL ASR MOTORS Dealership Executive System • Sheet ${pageIdx + 1} of ${totalPages} • Showing records ${chunk.length > 0 ? startIdx + 1 : 0} to ${startIdx + chunk.length} of ${stockList.length} (25 entries per sheet)
                 </div>
               </div>
             `;

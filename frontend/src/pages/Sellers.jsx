@@ -231,7 +231,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
     const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
     const totalValuation = sellers.reduce((acc, s) => acc + (s.demandPrice || 0), 0);
 
-    const pageSize = 20;
+    const pageSize = 25;
     const pageChunks = [];
     for (let i = 0; i < sellers.length; i += pageSize) {
       pageChunks.push(sellers.slice(i, i + pageSize));
@@ -339,7 +339,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                 </div>
 
                 <div class="footer">
-                  AL ASR MOTORS Dealership System • Sheet ${pageIdx + 1} of ${totalPages} • Showing records ${chunk.length > 0 ? startIdx + 1 : 0} to ${startIdx + chunk.length} of ${sellers.length} (Max 20 per sheet)
+                  AL ASR MOTORS Dealership System • Sheet ${pageIdx + 1} of ${totalPages} • Showing records ${chunk.length > 0 ? startIdx + 1 : 0} to ${startIdx + chunk.length} of ${sellers.length} (25 entries per sheet)
                 </div>
               </div>
             `;

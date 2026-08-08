@@ -312,7 +312,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
     const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
     const totalValuation = displayBuyers.reduce((acc, b) => acc + (b.budget || 0), 0);
 
-    const pageSize = 20;
+    const pageSize = 25;
     const pageChunks = [];
     for (let i = 0; i < displayBuyers.length; i += pageSize) {
       pageChunks.push(displayBuyers.slice(i, i + pageSize));
@@ -424,7 +424,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                 </div>
 
                 <div class="footer">
-                  AL ASR MOTORS Customer Care & Sales • Sheet ${pageIdx + 1} of ${totalPages} • Showing records ${chunk.length > 0 ? startIdx + 1 : 0} to ${startIdx + chunk.length} of ${displayBuyers.length} (Max 20 per sheet)
+                  AL ASR MOTORS Customer Care & Sales • Sheet ${pageIdx + 1} of ${totalPages} • Showing records ${chunk.length > 0 ? startIdx + 1 : 0} to ${startIdx + chunk.length} of ${displayBuyers.length} (25 entries per sheet)
                 </div>
               </div>
             `;
