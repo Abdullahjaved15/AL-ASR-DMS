@@ -315,6 +315,15 @@ export const api = {
     return handleResponse(res);
   },
 
+  updateInvoice: async (id, data) => {
+    const res = await fetch(`${API_BASE}/invoices/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
   deleteInvoice: async (id) => {
     const res = await fetch(`${API_BASE}/invoices/${id}`, {
       method: 'DELETE',

@@ -1,50 +1,86 @@
 const prisma = require('../config/db');
+const cloudinary = require('../config/cloudinary');
+
+// Helper to upload image to Cloudinary if it's a base64 string
+const handleCloudinaryUpload = async (photoStr, folderName) => {
+  if (!photoStr) return null;
+  if (photoStr.startsWith('http://') || photoStr.startsWith('https://')) {
+    return photoStr;
+  }
+  if (photoStr.startsWith('data:image/')) {
+    try {
+      const useCloudinary = Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY);
+      if (useCloudinary) {
+        const uploadRes = await cloudinary.uploader.upload(photoStr, {
+          folder: `dealership/${folderName}`
+        });
+        return uploadRes.secure_url;
+      }
+    } catch (err) {
+      console.warn('Cloudinary upload warning:', err.message);
+    }
+  }
+  return photoStr;
+};
 
 const getInvoices = async (req, res) => {
   try {
-    const { search, startDate, endDate } = req.query;
-    const where = {};
+    const { page = 1, limit = 20, search = '' } = req.query;
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
 
-    if (search) {
-      where.OR = [
+    const whereClause = search ? {
+      OR: [
         { invoiceNumber: { contains: search, mode: 'insensitive' } },
         { registrationNo: { contains: search, mode: 'insensitive' } },
         { buyerName: { contains: search, mode: 'insensitive' } },
         { buyerPhone: { contains: search, mode: 'insensitive' } },
+        { buyerCnic: { contains: search, mode: 'insensitive' } },
         { sellerName: { contains: search, mode: 'insensitive' } },
         { sellerPhone: { contains: search, mode: 'insensitive' } },
+        { sellerCnic: { contains: search, mode: 'insensitive' } },
         { vehicleMaker: { contains: search, mode: 'insensitive' } },
         { vehicleModel: { contains: search, mode: 'insensitive' } },
-        { chassisNumber: { contains: search, mode: 'insensitive' } },
-        { engineNumber: { contains: search, mode: 'insensitive' } },
         { customerName: { contains: search, mode: 'insensitive' } },
-        { carVehicle: { contains: search, mode: 'insensitive' } },
-        { carRegNumber: { contains: search, mode: 'insensitive' } }
-      ];
-    }
+        { customerPhone: { contains: search, mode: 'insensitive' } }
+      ]
+    } : {};
 
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) where.createdAt.gte = new Date(startDate);
-      if (endDate) where.createdAt.lte = new Date(endDate);
-    }
+    const [invoices, totalCount, statsRaw] = await Promise.all([
+      prisma.invoice.findMany({
+        where: whereClause,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limitNum,
+        include: {
+          createdByUser: { select: { id: true, name: true, email: true } }
+        }
+      }),
+      prisma.invoice.count({ where: whereClause }),
+      prisma.invoice.aggregate({
+        _sum: {
+          totalPrice: true,
+          saleAmount: true,
+          commissionAmount: true,
+          totalAmount: true
+        }
+      })
+    ]);
 
-    const invoices = await prisma.invoice.findMany({
-      where,
-      include: {
-        createdByUser: { select: { id: true, name: true, email: true } }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    const totalSalesVolume = invoices.reduce((sum, inv) => sum + (inv.saleAmount || 0), 0);
-    const totalCommissionEarned = invoices.reduce((sum, inv) => sum + (inv.commissionAmount || 0), 0);
-    const grandTotalValue = invoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+    const totalSalesVolume = statsRaw._sum.totalPrice || statsRaw._sum.saleAmount || 0;
+    const totalCommissionEarned = statsRaw._sum.commissionAmount || 0;
+    const grandTotalValue = statsRaw._sum.totalAmount || (totalSalesVolume + totalCommissionEarned);
 
     return res.json({
       invoices,
+      meta: {
+        totalCount,
+        page: pageNum,
+        totalPages: Math.ceil(totalCount / limitNum)
+      },
       stats: {
-        totalInvoices: invoices.length,
+        totalInvoices: totalCount,
         totalSalesVolume,
         totalCommissionEarned,
         grandTotalValue
@@ -61,7 +97,7 @@ const getInvoiceById = async (req, res) => {
     const invoice = await prisma.invoice.findUnique({
       where: { id },
       include: {
-        createdByUser: { select: { id: true, name: true, email: true, phone: true } }
+        createdByUser: { select: { id: true, name: true, email: true } }
       }
     });
 
@@ -82,13 +118,17 @@ const createInvoice = async (req, res) => {
       // Seller Details
       sellerName,
       sellerFatherName,
+      sellerCnic,
       sellerAddress,
       sellerPhone,
+      sellerPhoto,
       // Buyer Details
       buyerName,
       buyerFatherName,
+      buyerCnic,
       buyerAddress,
       buyerPhone,
+      buyerPhoto,
       // Vehicle Details
       vehicleMaker,
       vehicleModel,
@@ -137,6 +177,9 @@ const createInvoice = async (req, res) => {
       witness2Cnic
     } = req.body;
 
+    const finalSellerPhoto = sellerPhoto ? await handleCloudinaryUpload(sellerPhoto, 'sellers') : null;
+    const finalBuyerPhoto = buyerPhoto ? await handleCloudinaryUpload(buyerPhoto, 'buyers') : null;
+
     const finalBuyerName = buyerName || customerName || 'N/A';
     const finalVehicleMaker = vehicleMaker || carVehicle || 'N/A';
     const finalVehicleModel = vehicleModel || carModel || 'N/A';
@@ -165,14 +208,18 @@ const createInvoice = async (req, res) => {
         // Seller Details
         sellerName: sellerName || null,
         sellerFatherName: sellerFatherName || null,
+        sellerCnic: sellerCnic || null,
         sellerAddress: sellerAddress || null,
         sellerPhone: sellerPhone || null,
+        sellerPhoto: finalSellerPhoto,
 
         // Buyer Details
         buyerName: finalBuyerName,
         buyerFatherName: buyerFatherName || null,
+        buyerCnic: buyerCnic || null,
         buyerAddress: buyerAddress || customerCity || null,
         buyerPhone: buyerPhone || customerPhone || null,
+        buyerPhoto: finalBuyerPhoto,
 
         // Vehicle Details
         vehicleMaker: finalVehicleMaker,
@@ -249,6 +296,131 @@ const createInvoice = async (req, res) => {
   }
 };
 
+const updateInvoice = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.invoice.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ message: 'Sales receipt not found' });
+    }
+
+    const {
+      registrationNo,
+      sellerName,
+      sellerFatherName,
+      sellerCnic,
+      sellerAddress,
+      sellerPhone,
+      sellerPhoto,
+      buyerName,
+      buyerFatherName,
+      buyerCnic,
+      buyerAddress,
+      buyerPhone,
+      buyerPhoto,
+      vehicleMaker,
+      vehicleModel,
+      carYear,
+      engineNumber,
+      chassisNumber,
+      powerCapacity,
+      postOffice,
+      lastToken,
+      regName,
+      regFatherName,
+      regAddress,
+      agreedAmount,
+      agreedAmountHalf,
+      agreedAmountWords,
+      agreementTime,
+      agreementDay,
+      totalPrice,
+      advanceAmount,
+      remainingAmount,
+      paymentDuration,
+      dated,
+      witness1Name,
+      witness1Cnic,
+      witness2Name,
+      witness2Cnic
+    } = req.body;
+
+    const finalSellerPhoto = sellerPhoto ? await handleCloudinaryUpload(sellerPhoto, 'sellers') : existing.sellerPhoto;
+    const finalBuyerPhoto = buyerPhoto ? await handleCloudinaryUpload(buyerPhoto, 'buyers') : existing.buyerPhoto;
+
+    const finalBuyerName = buyerName || existing.buyerName;
+    const finalVehicleMaker = vehicleMaker || existing.vehicleMaker;
+    const finalVehicleModel = vehicleModel || existing.vehicleModel;
+
+    const numericTotalPrice = parseFloat(totalPrice) || parseFloat(agreedAmount) || existing.totalPrice || 0;
+    const numericAdvance = parseFloat(advanceAmount) || 0;
+    const numericRemaining = remainingAmount !== undefined && remainingAmount !== null && remainingAmount !== '' 
+      ? parseFloat(remainingAmount) 
+      : (numericTotalPrice - numericAdvance);
+
+    const updatedInvoice = await prisma.invoice.update({
+      where: { id },
+      data: {
+        registrationNo: registrationNo !== undefined ? registrationNo : existing.registrationNo,
+        sellerName: sellerName !== undefined ? sellerName : existing.sellerName,
+        sellerFatherName: sellerFatherName !== undefined ? sellerFatherName : existing.sellerFatherName,
+        sellerCnic: sellerCnic !== undefined ? sellerCnic : existing.sellerCnic,
+        sellerAddress: sellerAddress !== undefined ? sellerAddress : existing.sellerAddress,
+        sellerPhone: sellerPhone !== undefined ? sellerPhone : existing.sellerPhone,
+        sellerPhoto: finalSellerPhoto,
+
+        buyerName: finalBuyerName,
+        buyerFatherName: buyerFatherName !== undefined ? buyerFatherName : existing.buyerFatherName,
+        buyerCnic: buyerCnic !== undefined ? buyerCnic : existing.buyerCnic,
+        buyerAddress: buyerAddress !== undefined ? buyerAddress : existing.buyerAddress,
+        buyerPhone: buyerPhone !== undefined ? buyerPhone : existing.buyerPhone,
+        buyerPhoto: finalBuyerPhoto,
+
+        vehicleMaker: finalVehicleMaker,
+        vehicleModel: finalVehicleModel,
+        carYear: carYear !== undefined ? String(carYear) : existing.carYear,
+        engineNumber: engineNumber !== undefined ? engineNumber : existing.engineNumber,
+        chassisNumber: chassisNumber !== undefined ? chassisNumber : existing.chassisNumber,
+        powerCapacity: powerCapacity !== undefined ? powerCapacity : existing.powerCapacity,
+        postOffice: postOffice !== undefined ? postOffice : existing.postOffice,
+        lastToken: lastToken !== undefined ? lastToken : existing.lastToken,
+        regName: regName !== undefined ? regName : existing.regName,
+        regFatherName: regFatherName !== undefined ? regFatherName : existing.regFatherName,
+        regAddress: regAddress !== undefined ? regAddress : existing.regAddress,
+
+        agreedAmount: parseFloat(agreedAmount) || numericTotalPrice,
+        agreedAmountHalf: parseFloat(agreedAmountHalf) || (numericTotalPrice / 2),
+        agreedAmountWords: agreedAmountWords !== undefined ? agreedAmountWords : existing.agreedAmountWords,
+        agreementTime: agreementTime !== undefined ? agreementTime : existing.agreementTime,
+        agreementDay: agreementDay !== undefined ? agreementDay : existing.agreementDay,
+
+        totalPrice: numericTotalPrice,
+        advanceAmount: numericAdvance,
+        remainingAmount: numericRemaining,
+        paymentDuration: paymentDuration !== undefined ? paymentDuration : existing.paymentDuration,
+        dated: dated !== undefined ? dated : existing.dated,
+
+        witness1Name: witness1Name !== undefined ? witness1Name : existing.witness1Name,
+        witness1Cnic: witness1Cnic !== undefined ? witness1Cnic : existing.witness1Cnic,
+        witness2Name: witness2Name !== undefined ? witness2Name : existing.witness2Name,
+        witness2Cnic: witness2Cnic !== undefined ? witness2Cnic : existing.witness2Cnic
+      }
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'UPDATE_SALES_RECEIPT',
+        details: `Updated Sales Receipt ${existing.invoiceNumber} for ${finalBuyerName}`
+      }
+    });
+
+    return res.json(updatedInvoice);
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to update sales receipt', error: error.message });
+  }
+};
+
 const deleteInvoice = async (req, res) => {
   try {
     const { id } = req.params;
@@ -278,5 +450,6 @@ module.exports = {
   getInvoices,
   getInvoiceById,
   createInvoice,
+  updateInvoice,
   deleteInvoice
 };

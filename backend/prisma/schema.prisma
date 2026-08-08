@@ -158,14 +158,18 @@ model Invoice {
   // Seller Details (فروخت کنندہ)
   sellerName       String?
   sellerFatherName String?
+  sellerCnic       String?
   sellerAddress    String?
   sellerPhone      String?
+  sellerPhoto      String?
 
   // Buyer Details (خریدار)
   buyerName        String?
   buyerFatherName  String?
+  buyerCnic       String?
   buyerAddress     String?
   buyerPhone       String?
+  buyerPhoto       String?
 
   // Vehicle Details (گاڑی کی تفصیلات)
   vehicleMaker     String?

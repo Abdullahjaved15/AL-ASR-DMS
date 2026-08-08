@@ -268,9 +268,9 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
             .stats-inline { display: flex; gap: 10px; font-size: 8px; background: #f8fafc; padding: 3px 8px; border-radius: 4px; border: 1px solid #e2e8f0; }
             .stat-item { font-weight: 600; color: #334155; }
             .stat-item strong { color: #0284c7; font-weight: 800; }
-            table { width: 100%; border-collapse: collapse; margin-top: 2px; }
-            th { background: #0f172a; color: #ffffff; text-align: left; padding: 3.5px 5px; font-size: 8px; font-weight: 700; text-transform: uppercase; border: 1px solid #0f172a; }
-            td { padding: 3px 5px; border-bottom: 1px solid #cbd5e1; font-size: 8.5px; vertical-align: middle; }
+            table { width: 100%; border-collapse: collapse; margin-top: 2px; border: 1px solid #64748b; }
+            th { background: #0f172a; color: #ffffff; text-align: left; padding: 3.5px 5px; font-size: 8px; font-weight: 700; text-transform: uppercase; border: 1px solid #334155; }
+            td { padding: 3px 5px; border: 1px solid #94a3b8; font-size: 8.5px; vertical-align: middle; }
             tr:nth-child(even) { background: #f8fafc; }
             .badge { display: inline-block; padding: 1px 4px; border-radius: 3px; font-size: 7.5px; font-weight: 700; }
             .plate-tag { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; padding: 0px 3px; border-radius: 2px; font-family: monospace; font-weight: bold; }
@@ -584,6 +584,44 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
             </p>
 
             <form onSubmit={isEditModalOpen ? handleUpdateSeller : handleCreateSeller} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Seller Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Robert Sterling"
+                    value={formData.sellerName}
+                    onChange={(e) => setFormData({ ...formData, sellerName: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Phone Number *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="+1 (555) 000-0000"
+                    value={formData.sellerPhone}
+                    onChange={(e) => setFormData({ ...formData, sellerPhone: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">City *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Los Angeles"
+                    value={formData.sellerCity}
+                    onChange={(e) => setFormData({ ...formData, sellerCity: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">Vehicle Make / Brand *</label>
@@ -705,44 +743,6 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                   >
                     {leadStatuses.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Seller Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Robert Sterling"
-                    value={formData.sellerName}
-                    onChange={(e) => setFormData({ ...formData, sellerName: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Phone Number *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="+1 (555) 000-0000"
-                    value={formData.sellerPhone}
-                    onChange={(e) => setFormData({ ...formData, sellerPhone: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">City *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Los Angeles"
-                    value={formData.sellerCity}
-                    onChange={(e) => setFormData({ ...formData, sellerCity: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
-                  />
                 </div>
               </div>
 

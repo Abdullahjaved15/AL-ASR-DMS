@@ -16,6 +16,18 @@ async function main() {
   await prisma.$executeRawUnsafe('ALTER TABLE "Invoice" ALTER COLUMN "carYear" TYPE TEXT USING "carYear"::text;');
   console.log('✓ Invoice.carYear -> TEXT');
 
+  await prisma.$executeRawUnsafe('ALTER TABLE "Invoice" ADD COLUMN IF NOT EXISTS "sellerCnic" TEXT;');
+  console.log('✓ Invoice.sellerCnic -> ADDED');
+
+  await prisma.$executeRawUnsafe('ALTER TABLE "Invoice" ADD COLUMN IF NOT EXISTS "buyerCnic" TEXT;');
+  console.log('✓ Invoice.buyerCnic -> ADDED');
+
+  await prisma.$executeRawUnsafe('ALTER TABLE "Invoice" ADD COLUMN IF NOT EXISTS "sellerPhoto" TEXT;');
+  console.log('✓ Invoice.sellerPhoto -> ADDED');
+
+  await prisma.$executeRawUnsafe('ALTER TABLE "Invoice" ADD COLUMN IF NOT EXISTS "buyerPhoto" TEXT;');
+  console.log('✓ Invoice.buyerPhoto -> ADDED');
+
   console.log('\nAll year columns successfully altered to TEXT!');
 }
 

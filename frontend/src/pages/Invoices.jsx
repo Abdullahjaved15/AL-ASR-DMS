@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Receipt, 
   Plus, 
@@ -15,11 +15,164 @@ import {
   Lock, 
   ChevronRight, 
   AlertCircle,
-  Eye
+  Eye,
+  Edit3,
+  Camera,
+  Upload,
+  X
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { logoBase64 } from '../utils/logoBase64';
+
+const CameraCaptureWidget = ({ label, currentPhoto, onPhotoCaptured, onPhotoRemoved }) => {
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const videoRef = useRef(null);
+  const [stream, setStream] = useState(null);
+
+  const compressDataUrl = (dataUrl, maxWidth = 800, maxHeight = 800) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth || height > maxHeight) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    });
+  };
+
+  const startCamera = async () => {
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } });
+      setStream(s);
+      setIsCameraActive(true);
+    } catch (err) {
+      alert('Unable to access camera: ' + err.message);
+    }
+  };
+
+  useEffect(() => {
+    if (isCameraActive && stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [isCameraActive, stream]);
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    setIsCameraActive(false);
+  };
+
+  const takeSnapshot = async () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const rawDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    const compressed = await compressDataUrl(rawDataUrl);
+    onPhotoCaptured(compressed);
+    stopCamera();
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const compressed = await compressDataUrl(reader.result);
+        onPhotoCaptured(compressed);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  return (
+    <div className="bg-slate-900/60 p-3.5 rounded-xl border border-white/10 space-y-2">
+      <div className="flex justify-between items-center text-xs font-semibold text-slate-300">
+        <span>{label}</span>
+        {currentPhoto && (
+          <button type="button" onClick={onPhotoRemoved} className="text-rose-400 hover:underline text-[11px] font-mono cursor-pointer">
+            Remove Photo
+          </button>
+        )}
+      </div>
+
+      {currentPhoto ? (
+        <div className="relative group w-32 h-32 rounded-xl overflow-hidden border-2 border-cyan-500/50 bg-black shadow-lg">
+          <img src={currentPhoto} alt={label} className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={startCamera}
+              className="px-2.5 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-xs rounded-lg shadow cursor-pointer"
+            >
+              Retake
+            </button>
+          </div>
+        </div>
+      ) : isCameraActive ? (
+        <div className="space-y-2">
+          <video ref={videoRef} autoPlay playsInline className="w-full max-h-52 rounded-xl border-2 border-cyan-500/50 bg-black shadow-inner" />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={takeSnapshot}
+              className="px-3.5 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 cursor-pointer shadow-md"
+            >
+              <Camera className="w-4 h-4" />
+              <span>📸 Snap Photo Now</span>
+            </button>
+            <button
+              type="button"
+              onClick={stopCamera}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs rounded-lg cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2.5">
+          <button
+            type="button"
+            onClick={startCamera}
+            className="px-3.5 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 font-bold text-xs rounded-xl border border-cyan-500/30 flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
+          >
+            <Camera className="w-4 h-4" />
+            <span>📷 Click Live Camera Photo</span>
+          </button>
+
+          <label className="px-3.5 py-2 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 font-semibold text-xs rounded-xl cursor-pointer flex items-center gap-1.5 border border-white/10 transition-all">
+            <Upload className="w-4 h-4" />
+            <span>📁 Select File</span>
+            <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+          </label>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function Invoices() {
   const { isSuperAdmin } = useAuth();
@@ -29,6 +182,7 @@ export default function Invoices() {
 
   const [search, setSearch] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
 
@@ -37,13 +191,17 @@ export default function Invoices() {
     // Seller Details
     sellerName: '',
     sellerFatherName: '',
+    sellerCnic: '',
     sellerAddress: '',
     sellerPhone: '',
+    sellerPhoto: '',
     // Buyer Details
     buyerName: '',
     buyerFatherName: '',
+    buyerCnic: '',
     buyerAddress: '',
     buyerPhone: '',
+    buyerPhoto: '',
     // Vehicle Details
     vehicleMaker: '',
     vehicleModel: '',
@@ -130,17 +288,72 @@ export default function Invoices() {
     });
   };
 
+  const openEditModal = (inv) => {
+    setSelectedInvoice(inv);
+    setFormData({
+      registrationNo: inv.registrationNo || '',
+      sellerName: inv.sellerName || '',
+      sellerFatherName: inv.sellerFatherName || '',
+      sellerCnic: inv.sellerCnic || '',
+      sellerAddress: inv.sellerAddress || '',
+      sellerPhone: inv.sellerPhone || '',
+      sellerPhoto: inv.sellerPhoto || '',
+      buyerName: inv.buyerName || inv.customerName || '',
+      buyerFatherName: inv.buyerFatherName || '',
+      buyerCnic: inv.buyerCnic || '',
+      buyerAddress: inv.buyerAddress || inv.customerCity || '',
+      buyerPhone: inv.buyerPhone || inv.customerPhone || '',
+      buyerPhoto: inv.buyerPhoto || '',
+      vehicleMaker: inv.vehicleMaker || inv.carVehicle || '',
+      vehicleModel: inv.vehicleModel || inv.carModel || '',
+      engineNumber: inv.engineNumber || '',
+      chassisNumber: inv.chassisNumber || '',
+      powerCapacity: inv.powerCapacity || '',
+      postOffice: inv.postOffice || '',
+      lastToken: inv.lastToken || '',
+      regName: inv.regName || '',
+      regFatherName: inv.regFatherName || '',
+      regAddress: inv.regAddress || '',
+      agreedAmount: inv.agreedAmount ? inv.agreedAmount.toString() : '',
+      agreedAmountHalf: inv.agreedAmountHalf ? inv.agreedAmountHalf.toString() : '',
+      agreedAmountWords: inv.agreedAmountWords || '',
+      agreementTime: inv.agreementTime || '',
+      agreementDay: inv.agreementDay || '',
+      isImported: Boolean(inv.isImported),
+      billOfEntryNo: inv.billOfEntryNo || '',
+      portName: inv.portName || '',
+      clearanceDate: inv.clearanceDate || '',
+      importerName: inv.importerName || '',
+      totalPrice: inv.totalPrice ? inv.totalPrice.toString() : '',
+      advanceAmount: inv.advanceAmount ? inv.advanceAmount.toString() : '0',
+      remainingAmount: inv.remainingAmount !== undefined && inv.remainingAmount !== null ? inv.remainingAmount.toString() : '',
+      paymentDuration: inv.paymentDuration || '',
+      dated: inv.dated || new Date(inv.createdAt || Date.now()).toISOString().slice(0, 10),
+      witness1Name: inv.witness1Name || '',
+      witness1Cnic: inv.witness1Cnic || '',
+      witness2Name: inv.witness2Name || '',
+      witness2Cnic: inv.witness2Cnic || ''
+    });
+    setActiveTab('general');
+    setIsAddModalOpen(true);
+  };
+
   const resetForm = () => {
+    setSelectedInvoice(null);
     setFormData({
       registrationNo: '',
       sellerName: '',
       sellerFatherName: '',
+      sellerCnic: '',
       sellerAddress: '',
       sellerPhone: '',
+      sellerPhoto: '',
       buyerName: '',
       buyerFatherName: '',
+      buyerCnic: '',
       buyerAddress: '',
       buyerPhone: '',
+      buyerPhoto: '',
       vehicleMaker: '',
       vehicleModel: '',
       engineNumber: '',
@@ -174,21 +387,26 @@ export default function Invoices() {
     setActiveTab('general');
   };
 
-  const handleCreateInvoice = async (e) => {
+  const handleSaveInvoice = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const created = await api.createInvoice(formData);
+      let savedResult;
+      if (selectedInvoice) {
+        savedResult = await api.updateInvoice(selectedInvoice.id, formData);
+      } else {
+        savedResult = await api.createInvoice(formData);
+      }
       setIsAddModalOpen(false);
       resetForm();
       fetchInvoices();
-      if (created) {
-        if (window.confirm('Sales Receipt (سیل رسید) created successfully! Do you want to print the receipt now?')) {
-          exportInvoicePDF(created);
+      if (savedResult) {
+        if (window.confirm(`Sales Receipt (سیل رسید) ${selectedInvoice ? 'updated' : 'created'} successfully! Do you want to print the receipt now?`)) {
+          exportInvoicePDF(savedResult);
         }
       }
     } catch (err) {
-      alert(err.message || 'Failed to create sales receipt');
+      alert(err.message || 'Failed to save sales receipt');
     } finally {
       setSubmitting(false);
     }
@@ -246,180 +464,276 @@ export default function Invoices() {
     const remainingAmount = inv.remainingAmount !== undefined && inv.remainingAmount !== null ? inv.remainingAmount : (totalPrice - advanceAmount);
     const paymentDuration = inv.paymentDuration || 'N/A';
 
+    const renderCNICBoxes = (cnicStr) => {
+      const digits = (cnicStr || '').replace(/\D/g, '').padEnd(13, ' ').slice(0, 13);
+      const part1 = digits.slice(0, 5).split('');
+      const part2 = digits.slice(5, 12).split('');
+      const part3 = digits.slice(12, 13).split('');
+
+      return `
+        <span class="cnic-box-group" title="${cnicStr || 'CNIC Number'}">
+          ${part1.map(d => `<span class="cnic-digit">${d !== ' ' ? d : '&nbsp;'}</span>`).join('')}
+          <span class="cnic-hyphen">-</span>
+          ${part2.map(d => `<span class="cnic-digit">${d !== ' ' ? d : '&nbsp;'}</span>`).join('')}
+          <span class="cnic-hyphen">-</span>
+          ${part3.map(d => `<span class="cnic-digit">${d !== ' ' ? d : '&nbsp;'}</span>`).join('')}
+        </span>
+      `;
+    };
+
     const htmlContent = `
       <!DOCTYPE html>
       <html dir="ltr" lang="en">
         <head>
-          <title>Sales Receipt (سیل رسید) - ${receiptNo} - AL ASR MOTORS</title>
+          <title>سیل رسید (Sales Receipt) - ${receiptNo} - AL ASR MOTORS</title>
           <style>
             @media print {
-              @page { size: A4 portrait; margin: 8mm 10mm; }
+              @page { size: A4 portrait; margin: 4mm 6mm; }
               body { padding: 0; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
               .no-print { display: none !important; }
             }
+            * { box-sizing: border-box; }
             body { 
-              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-              padding: 6px; 
+              font-family: 'Segoe UI', Arial, 'Jameel Noori Nastaleeq', 'Urdu Typesetting', sans-serif; 
+              padding: 4px; 
               color: #0f172a; 
               background: #ffffff;
-              line-height: 1.3;
+              line-height: 1.25;
               font-size: 9.5px;
             }
-            .header-container {
+            
+            .receipt-card {
+              border: 2px solid #0284c7;
+              border-radius: 8px;
+              padding: 10px 14px;
+              background: #ffffff;
+            }
+
+            .header-bar {
               display: flex;
               justify-content: space-between;
               align-items: center;
-              border-bottom: 2.5px double #0284c7;
-              padding-bottom: 8px;
-              margin-bottom: 10px;
+              border-bottom: 2px solid #0284c7;
+              padding-bottom: 6px;
+              margin-bottom: 6px;
             }
-            .logo-section {
+            .logo-box {
               display: flex;
               align-items: center;
-              gap: 12px;
+              gap: 10px;
             }
             .logo-img {
-              height: 60px;
+              height: 52px;
               width: auto;
               object-fit: contain;
             }
-            .brand-title {
-              font-size: 20px;
+            .title-box {
+              text-align: center;
+              flex: 1;
+            }
+            .title-urdu {
+              font-size: 26px;
               font-weight: 900;
-              color: #0f172a;
-              letter-spacing: 0.5px;
-            }
-            .brand-subtitle {
-              font-size: 11px;
               color: #0284c7;
-              font-weight: bold;
+              line-height: 1;
+              font-family: 'Jameel Noori Nastaleeq', 'Urdu Typesetting', Arial, sans-serif;
             }
-            .brand-contact {
-              font-size: 9px;
-              color: #64748b;
-              margin-top: 1px;
-            }
-            .doc-title-badge {
-              text-align: right;
-              background: #0f172a;
-              color: #ffffff;
-              padding: 6px 14px;
-              border-radius: 8px;
-            }
-            .doc-title {
-              font-size: 13px;
+            .title-en {
+              font-size: 11px;
               font-weight: 800;
-              color: #38bdf8;
+              color: #0f172a;
+              letter-spacing: 1.5px;
               text-transform: uppercase;
-            }
-            .doc-num {
-              font-size: 10.5px;
-              font-family: monospace;
               margin-top: 2px;
             }
-
-            .section-box {
-              border: 1px solid #cbd5e1;
-              border-radius: 5px;
-              margin-bottom: 8px;
-              overflow: hidden;
+            .showroom-info {
+              font-size: 8.5px;
+              color: #64748b;
+              font-weight: 600;
             }
-            .section-header {
-              background: #f1f5f9;
-              padding: 4px 10px;
-              font-weight: bold;
-              font-size: 10.5px;
-              color: #0f172a;
-              border-bottom: 1px solid #cbd5e1;
+
+            .meta-strip {
               display: flex;
               justify-content: space-between;
               align-items: center;
-            }
-            
-            table.details-table {
-              width: 100%;
-              border-collapse: collapse;
-            }
-            table.details-table td {
-              padding: 4px 8px;
+              background: #f0f9ff;
+              border: 1px solid #bae6fd;
+              border-radius: 6px;
+              padding: 5px 12px;
+              margin-bottom: 6px;
               font-size: 9.5px;
-              border-bottom: 1px solid #f1f5f9;
-              border-right: 1px solid #f1f5f9;
-              vertical-align: middle;
-            }
-            table.details-table td.label-col {
-              color: #475569;
-              background-color: #f8fafc;
-              font-weight: 600;
-              width: 25%;
-            }
-            table.details-table td.val-col {
-              font-weight: bold;
-              color: #0f172a;
-              width: 25%;
-            }
-
-            .financial-table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 4px;
-              margin-bottom: 8px;
-            }
-            .financial-table th {
-              background: #0f172a;
-              color: #fff;
-              font-size: 9.5px;
-              padding: 5px 8px;
-              text-align: left;
-            }
-            .financial-table td {
-              padding: 5px 8px;
-              border: 1px solid #cbd5e1;
-              font-size: 10.5px;
               font-weight: bold;
             }
+            .meta-val {
+              color: #0284c7;
+              font-family: monospace;
+              font-size: 11px;
+              font-weight: 800;
+              margin-left: 4px;
+            }
 
-            .terms-box {
-              background: #f8fafc;
+            .section-card {
               border: 1px solid #cbd5e1;
               border-radius: 5px;
-              padding: 6px 10px;
-              margin-top: 6px;
-              margin-bottom: 8px;
+              margin-bottom: 6px;
+              overflow: hidden;
             }
-            .terms-title {
-              font-size: 10px;
-              font-weight: bold;
-              color: #0f172a;
-              border-bottom: 1px solid #e2e8f0;
-              padding-bottom: 3px;
-              margin-bottom: 4px;
-            }
-            .terms-list {
-              font-size: 8.5px;
-              color: #334155;
-              padding-left: 14px;
-              margin: 0;
-              line-height: 1.35;
-            }
-            .terms-list li {
-              margin-bottom: 2px;
-            }
-
-            .signature-container {
+            .section-head {
+              background: #0f172a;
+              color: #ffffff;
+              padding: 3.5px 8px;
+              font-size: 9.5px;
+              font-weight: 800;
               display: flex;
               justify-content: space-between;
-              margin-top: 36px;
-              gap: 12px;
             }
-            .sig-box {
-              flex: 1;
-              border-top: 1.5px solid #334155;
-              padding-top: 6px;
-              text-align: center;
+
+            table.grid-tbl {
+              width: 100%;
+              border-collapse: collapse;
+              border: 1px solid #64748b;
+            }
+            table.grid-tbl td {
+              padding: 3.5px 6px;
+              border: 1px solid #64748b;
               font-size: 9px;
-              font-weight: bold;
-              color: #334155;
+              vertical-align: middle;
+            }
+            table.grid-tbl td.lbl {
+              color: #475569;
+              background-color: #f8fafc;
+              font-weight: 700;
+              width: 23%;
+            }
+            table.grid-tbl td.val {
+              font-weight: 800;
+              color: #0f172a;
+              width: 27%;
+            }
+
+            /* CNIC Digit Boxes CSS */
+            .cnic-box-group {
+              display: inline-flex;
+              align-items: center;
+              gap: 1.5px;
+              font-family: monospace;
+              vertical-align: middle;
+            }
+            .cnic-digit {
+              width: 14px;
+              height: 16px;
+              border: 1.5px solid #0284c7;
+              border-radius: 2px;
+              text-align: center;
+              line-height: 14px;
+              font-size: 9.5px;
+              font-weight: 900;
+              color: #0f172a;
+              background: #ffffff;
+              display: inline-block;
+            }
+            .cnic-hyphen {
+              font-weight: 900;
+              font-size: 11px;
+              color: #0284c7;
+              padding: 0 1px;
+            }
+
+            .agreement-card {
+              background: #fffbeb;
+              border: 1.5px solid #fcd34d;
+              border-radius: 5px;
+              padding: 6px 10px;
+              margin-bottom: 6px;
+              line-height: 1.4;
+            }
+            .agr-urdu {
+              direction: rtl;
+              font-size: 10.5px;
+              font-weight: 800;
+              color: #1e1b4b;
+              margin-bottom: 2px;
+            }
+            .agr-en {
+              font-size: 8.5px;
+              color: #475569;
+            }
+
+            .fin-tbl {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 6px;
+            }
+            .fin-tbl th {
+              background: #0284c7;
+              color: #ffffff;
+              font-size: 9px;
+              padding: 4px 6px;
+              text-align: center;
+              border: 1px solid #0284c7;
+            }
+            .fin-tbl td {
+              padding: 5px 6px;
+              border: 1px solid #cbd5e1;
+              font-size: 10px;
+              font-weight: 800;
+              text-align: center;
+            }
+
+            .terms-card {
+              border: 1px solid #cbd5e1;
+              border-radius: 5px;
+              background: #fafafa;
+              padding: 5px 8px;
+              margin-bottom: 6px;
+            }
+            .terms-head {
+              background: #334155;
+              color: #fff;
+              padding: 2px 6px;
+              border-radius: 3px;
+              font-size: 9px;
+              font-weight: 800;
+              display: inline-block;
+              margin-bottom: 4px;
+            }
+            .terms-grid {
+              display: grid;
+              grid-template-cols: 1fr 1fr;
+              gap: 4px 8px;
+            }
+            .term-cell {
+              background: #ffffff;
+              border: 1px solid #e2e8f0;
+              border-radius: 4px;
+              padding: 3px 5px;
+            }
+            .term-ur {
+              font-weight: 700;
+              direction: rtl;
+              font-size: 8.5px;
+              color: #0f172a;
+              margin-bottom: 1px;
+            }
+            .term-en {
+              color: #64748b;
+              font-size: 7.5px;
+            }
+
+            .sig-grid {
+              display: flex;
+              justify-content: space-between;
+              gap: 8px;
+              margin-top: 42px;
+            }
+            .sig-cell {
+              flex: 1;
+              border-top: 1.5px solid #0f172a;
+              padding-top: 4px;
+              text-align: center;
+              font-size: 8px;
+              font-weight: 800;
+              color: #0f172a;
             }
 
             .print-btn {
@@ -431,7 +745,7 @@ export default function Invoices() {
               font-weight: bold;
               font-size: 12px;
               cursor: pointer;
-              margin-bottom: 10px;
+              margin-bottom: 8px;
             }
           </style>
         </head>
@@ -440,189 +754,146 @@ export default function Invoices() {
             <button onclick="window.print()" class="print-btn">🖨️ Print Official Receipt (پرنٹ کریں)</button>
           </div>
 
-          <!-- Header -->
-          <div class="header-container">
-            <div class="logo-section">
-              <img src="${logoBase64}" class="logo-img" alt="AL ASR MOTORS" />
-              <div>
-                <div class="brand-title">AL ASR MOTORS</div>
-                <div class="brand-subtitle">VEHICLE SALES RECEIPT • سیل رسید</div>
-                <div class="brand-contact">Showroom Floor • Main GT Road / City Center, Sahiwal, Pakistan</div>
-                <div class="brand-contact">Phone: +92 300 1234567 • Official Dealership Copy</div>
+          <div class="receipt-card">
+            <!-- Top Header -->
+            <div class="header-bar">
+              <div class="logo-box">
+                <img src="${logoBase64}" class="logo-img" alt="AL ASR MOTORS" />
+              </div>
+              <div class="title-box">
+                <div class="title-urdu">سیل رسید</div>
+                <div class="title-en">AL ASR MOTORS — SALES RECEIPT</div>
+                <div class="showroom-info">Main GT Road / City Center, Sahiwal, Pakistan • Phone: +92 300 1234567</div>
               </div>
             </div>
-            <div class="doc-title-badge">
-              <div class="doc-title">Sales Receipt (سیل رسید)</div>
-              <div class="doc-num">Receipt No: ${receiptNo}</div>
-              <div style="font-size: 10px; color: #cbd5e1; margin-top: 3px;">Date (تاریخ): ${createdDate}</div>
-            </div>
-          </div>
 
-          <!-- General & Vehicle Plate Details -->
-          <div class="section-box">
-            <div class="section-header">
-              <span>📌 General Details (عمومی تفصیلات)</span>
-              <span>Registration No (رجسٹریشن نمبر): <strong style="color:#0284c7;">${regNo}</strong></span>
+            <!-- Top Meta Strip -->
+            <div class="meta-strip">
+              <div>تاریخ (Date): <span class="meta-val">${createdDate}</span></div>
+              <div>رجسٹریشن نمبر (Reg No): <span class="meta-val">${regNo}</span></div>
+              <div>رسید نمبر (Receipt No): <span class="meta-val">${receiptNo}</span></div>
             </div>
-            <table class="details-table">
-              <tr>
-                <td class="label-col">Date (تاریخ):</td>
-                <td class="val-col">${createdDate}</td>
-                <td class="label-col">Receipt No. (رسید نمبر):</td>
-                <td class="val-col">${receiptNo}</td>
-              </tr>
-              <tr>
-                <td class="label-col">Registration No. (رجسٹریشن نمبر):</td>
-                <td class="val-col">${regNo}</td>
-                <td class="label-col">Vehicle Maker (میکر):</td>
-                <td class="val-col">${vehicleMaker}</td>
-              </tr>
-            </table>
-          </div>
 
-          <!-- Seller Details -->
-          <div class="section-box">
-            <div class="section-header">
-              <span>👤 Seller Details (فروخت کنندہ)</span>
+            <!-- Seller Information (فروخت کنندہ) with CNIC digit boxes & Photo -->
+            <div class="section-card">
+              <div class="section-head">
+                <span>فروخت کنندہ کی تفصیلات (Seller Information)</span>
+                <span>SELLER DETAILS</span>
+              </div>
+              <table class="grid-tbl">
+                <tr>
+                  <td class="lbl">فروخت کنندہ (Seller Name):</td>
+                  <td class="val">${sellerName}</td>
+                  <td class="lbl">ولدیت (Father Name):</td>
+                  <td class="val">${sellerFather}</td>
+                  ${inv.sellerPhoto ? `
+                    <td rowspan="3" style="width: 65px; text-align: center; vertical-align: middle; background: #ffffff; padding: 2px;">
+                      <img src="${inv.sellerPhoto}" alt="Seller Photo" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #0284c7;" />
+                    </td>
+                  ` : ''}
+                </tr>
+                <tr>
+                  <td class="lbl">شناختی کارڈ (CNIC No):</td>
+                  <td class="val" colspan="${inv.sellerPhoto ? 3 : 3}">${renderCNICBoxes(inv.sellerCnic)}</td>
+                </tr>
+                <tr>
+                  <td class="lbl">پتہ (Address):</td>
+                  <td class="val">${sellerAddress}</td>
+                  <td class="lbl">فون نمبر (Phone No):</td>
+                  <td class="val">${sellerPhone}</td>
+                </tr>
+              </table>
             </div>
-            <table class="details-table">
-              <tr>
-                <td class="label-col">Seller Name (فروخت کنندہ):</td>
-                <td class="val-col">${sellerName}</td>
-                <td class="label-col">Son of / Father (ولدیت):</td>
-                <td class="val-col">${sellerFather}</td>
-              </tr>
-              <tr>
-                <td class="label-col">Phone No. (فون نمبر):</td>
-                <td class="val-col">${sellerPhone}</td>
-                <td class="label-col">Address (پتہ):</td>
-                <td class="val-col">${sellerAddress}</td>
-              </tr>
-            </table>
-          </div>
 
-          <!-- Buyer Details -->
-          <div class="section-box">
-            <div class="section-header">
-              <span>👤 Buyer Details (خریدار)</span>
+            <!-- Vehicle Specifications (گاڑی کی تفصیلات) -->
+            <div class="section-card">
+              <div class="section-head">
+                <span>گاڑی کی تفصیلات (Vehicle Specifications)</span>
+                <span>VEHICLE SPECS</span>
+              </div>
+              <table class="grid-tbl">
+                <tr>
+                  <td class="lbl">میکر (Maker / Brand):</td>
+                  <td class="val">${vehicleMaker}</td>
+                  <td class="lbl">ماڈل (Model & Year):</td>
+                  <td class="val">${vehicleModel} ${inv.carYear || ''}</td>
+                </tr>
+                <tr>
+                  <td class="lbl">انجن نمبر (Engine No):</td>
+                  <td class="val">${engineNo}</td>
+                  <td class="lbl">چیسز نمبر (Chassis No):</td>
+                  <td class="val">${chassisNo}</td>
+                </tr>
+                <tr>
+                  <td class="lbl">پاور (Power / CC):</td>
+                  <td class="val">${powerCapacity}</td>
+                  <td class="lbl">ڈاک خانہ (Post Office):</td>
+                  <td class="val">${postOffice}</td>
+                </tr>
+                <tr>
+                  <td class="lbl">آخری ٹوکن (Last Token):</td>
+                  <td class="val">${lastToken}</td>
+                  <td class="lbl">رجسٹریشن نام (Reg Owner):</td>
+                  <td class="val">${regName}</td>
+                </tr>
+                <tr>
+                  <td class="lbl">مالک ولدیت (Reg Father):</td>
+                  <td class="val">${regFatherName}</td>
+                  <td class="lbl">مالک پتہ (Reg Address):</td>
+                  <td class="val">${regAddress}</td>
+                </tr>
+              </table>
             </div>
-            <table class="details-table">
-              <tr>
-                <td class="label-col">Buyer Name (خریدار):</td>
-                <td class="val-col">${buyerName}</td>
-                <td class="label-col">Son of / Father (ولدیت):</td>
-                <td class="val-col">${buyerFather}</td>
-              </tr>
-              <tr>
-                <td class="label-col">Phone No. (فون نمبر):</td>
-                <td class="val-col">${buyerPhone}</td>
-                <td class="label-col">Address (پتہ):</td>
-                <td class="val-col">${buyerAddress}</td>
-              </tr>
-            </table>
-          </div>
 
-          <!-- Vehicle Details -->
-          <div class="section-box">
-            <div class="section-header">
-              <span>🚗 Vehicle Specifications (گاڑی کی تفصیلات)</span>
+            <!-- Buyer Information (خریدار) with CNIC digit boxes & Photo -->
+            <div class="section-card">
+              <div class="section-head">
+                <span>خریدار کی تفصیلات (Buyer Information)</span>
+                <span>BUYER DETAILS</span>
+              </div>
+              <table class="grid-tbl">
+                <tr>
+                  <td class="lbl">خریدار (Buyer Name):</td>
+                  <td class="val">${buyerName}</td>
+                  <td class="lbl">ولدیت (Father Name):</td>
+                  <td class="val">${buyerFather}</td>
+                  ${inv.buyerPhoto ? `
+                    <td rowspan="3" style="width: 65px; text-align: center; vertical-align: middle; background: #ffffff; padding: 2px;">
+                      <img src="${inv.buyerPhoto}" alt="Buyer Photo" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #0284c7;" />
+                    </td>
+                  ` : ''}
+                </tr>
+                <tr>
+                  <td class="lbl">شناختی کارڈ (CNIC No):</td>
+                  <td class="val" colspan="${inv.buyerPhoto ? 3 : 3}">${renderCNICBoxes(inv.buyerCnic)}</td>
+                </tr>
+                <tr>
+                  <td class="lbl">پتہ (Address):</td>
+                  <td class="val">${buyerAddress}</td>
+                  <td class="lbl">فون نمبر (Phone No):</td>
+                  <td class="val">${buyerPhone}</td>
+                </tr>
+              </table>
             </div>
-            <table class="details-table">
-              <tr>
-                <td class="label-col">Maker (میکر):</td>
-                <td class="val-col">${vehicleMaker}</td>
-                <td class="label-col">Model (ماڈل):</td>
-                <td class="val-col">${vehicleModel}</td>
-              </tr>
-              <tr>
-                <td class="label-col">Engine No. (انجن نمبر):</td>
-                <td class="val-col">${engineNo}</td>
-                <td class="label-col">Chassis No. (چیسز نمبر):</td>
-                <td class="val-col">${chassisNo}</td>
-              </tr>
-              <tr>
-                <td class="label-col">Power Capacity (پاور):</td>
-                <td class="val-col">${powerCapacity}</td>
-                <td class="label-col">Post Office (ڈاک خانہ):</td>
-                <td class="val-col">${postOffice}</td>
-              </tr>
-              <tr>
-                <td class="label-col">Last Token (آخری ٹوکن):</td>
-                <td class="val-col">${lastToken}</td>
-                <td class="label-col">Reg. Owner Name (رجسٹریشن نام):</td>
-                <td class="val-col">${regName}</td>
-              </tr>
-              <tr>
-                <td class="label-col">Reg Owner Father (ولدیت):</td>
-                <td class="val-col">${regFatherName}</td>
-                <td class="label-col">Reg Address (پتہ):</td>
-                <td class="val-col">${regAddress}</td>
-              </tr>
-            </table>
-          </div>
 
-          <!-- Transaction Agreement -->
-          <div class="section-box">
-            <div class="section-header">
-              <span>📜 Transaction Agreement (معاہدہ اقرار نامہ)</span>
+            <!-- Transaction Agreement (معاہدہ اقرار نامہ) -->
+            <div class="agreement-card">
+              <div class="agr-urdu">
+                جملہ کاغذات و دیگر حقوق بعوض مبلغ Rs. ${Number(agreedSum).toLocaleString()} (جن کے نصف Rs. ${Number(agreedHalf).toLocaleString()} بنتے ہیں) بوقت ${agreementTime} بروز ${agreementDay} فریق دوئم (خریدار) پر فروخت کر دی جو کہ مندرجہ ذیل شرائط پر دونوں میں اقرارنامہ ہوا۔
+              </div>
+              <div class="agr-en">
+                All vehicle documents & ownership rights sold for PKR ${Number(agreedSum).toLocaleString()} (half sum: PKR ${Number(agreedHalf).toLocaleString()}), at ${agreementTime} on ${agreementDay}, to the buyer under the following agreed terms. ${agreedWords ? 'Amount in words: ' + agreedWords : ''}
+              </div>
             </div>
-            <table class="details-table">
-              <tr>
-                <td class="label-col">All docs & rights sum (جملہ کاغذات و حقوق بعوض):</td>
-                <td class="val-col" colspan="3">PKR ${Number(agreedSum).toLocaleString()}</td>
-              </tr>
-              <tr>
-                <td class="label-col">Half sum (روپے جن کے نصف):</td>
-                <td class="val-col">PKR ${Number(agreedHalf).toLocaleString()}</td>
-                <td class="label-col">Amount in words (روپے بنتے ہیں):</td>
-                <td class="val-col">${agreedWords || 'N/A'}</td>
-              </tr>
-              <tr>
-                <td class="label-col">At time (بوقت):</td>
-                <td class="val-col">${agreementTime}</td>
-                <td class="label-col">On day (بروز):</td>
-                <td class="val-col">${agreementDay}</td>
-              </tr>
-              <tr>
-                <td colspan="4" style="font-size: 10px; color: #475569; padding: 6px 10px; background: #fafafa;">
-                  <strong>Condition:</strong> Sold to the second party (buyer), and an agreement was made between both on the following conditions: (فریق دوئم پر فروخت کر دی جو کہ مندرجہ ذیل شرائط پر دونوں میں اقرار نامہ ہوا)
-                </td>
-              </tr>
-            </table>
-          </div>
 
-          ${inv.isImported ? `
-          <!-- Imported Vehicle Section -->
-          <div class="section-box">
-            <div class="section-header">
-              <span>🚢 For Imported Vehicle (برائے امپورٹڈ گاڑی)</span>
-            </div>
-            <table class="details-table">
-              <tr>
-                <td class="label-col">Bill of Entry No. (بل آف انٹری نمبر):</td>
-                <td class="val-col">${inv.billOfEntryNo || 'N/A'}</td>
-                <td class="label-col">Port Name (نام پورٹ):</td>
-                <td class="val-col">${inv.portName || 'N/A'}</td>
-              </tr>
-              <tr>
-                <td class="label-col">Clearance Date (تاریخ کلیرنس):</td>
-                <td class="val-col">${inv.clearanceDate || 'N/A'}</td>
-                <td class="label-col">Importer Name (امپورٹر نام):</td>
-                <td class="val-col">${inv.importerName || 'N/A'}</td>
-              </tr>
-            </table>
-          </div>
-          ` : ''}
-
-          <!-- Financial Balances -->
-          <div style="margin-bottom: 12px;">
-            <table class="financial-table">
+            <!-- Financial Balances -->
+            <table class="fin-tbl">
               <thead>
                 <tr>
-                  <th>Total Price of Vehicle (کل قیمت گاڑی)</th>
-                  <th>Advance / Earnest Money (بیعانہ رقم)</th>
-                  <th>Remaining Balance (بقایا رقم)</th>
-                  <th>Time / Duration (ٹائم)</th>
+                  <th>کل قیمت گاڑی<br/>(Total Price)</th>
+                  <th>پیشگی / بیعانہ رقم<br/>(Advance Payment)</th>
+                  <th>بقایا رقم<br/>(Remaining Balance)</th>
+                  <th>بقایا بحساب / ٹائم<br/>(Payment Duration)</th>
                 </tr>
               </thead>
               <tbody>
@@ -634,49 +905,78 @@ export default function Invoices() {
                 </tr>
               </tbody>
             </table>
-          </div>
 
-          <!-- Note / Terms & Conditions -->
-          <div class="terms-box">
-            <div class="terms-title">📝 Note / Terms & Conditions (نوٹ و شرائط)</div>
-            <ol class="terms-list">
-              <li>Excise and computer checking of documents must be done within 24 hours. Otherwise, the showroom will not be responsible. (گاڑی کی ایکسائز اور کمپیوٹر چیکنگ 24 گھنٹے کے اندر اندر کروانا لازمی ہے بصورت دیگر شوروم ذمہ دار نہ ہوگا۔)</li>
-              <li>Check the engine number and chassis number before taking possession of the vehicle. Later, the showroom will not be responsible in any way because the showroom takes a nominal commission. (گاڑی کی تحویل سے قبل انجن نمبر اور چیسز نمبر تسلی سے چیک کر لیں بعد میں شوروم کی کوئی ذمہ داری نہ ہوگی کیونکہ شوروم محض برائے نام کمیشن لیتا ہے۔)</li>
-              <li>Return of the vehicle will be under showroom rules. In case of a return, the commission will not be refunded. (گاڑی کی واپسی شوروم کے قوانین کے مطابق ہوگی، واپسی کی صورت میں کمیشن واپس نہیں ہوگا۔)</li>
-              <li>The first party (seller) will be responsible for any kind of error in the vehicle's documents. (گاڑی کے کاغذات میں کسی بھی قسم کی غلطی کا ذمہ دار فریق اول (فروخت کنندہ) ہوگا۔)</li>
-              <li>The chassis plate and chassis number of the vehicle were checked on the spot and found to be correct. (گاڑی کی چیسز پلیٹ اور چیسز نمبر موقع پر چیک کر کے درست پائے گئے۔)</li>
-              <li>This deal was settled with the mutual consent of both parties. (یہ سودا دونوں فریقین کی باہمی رضامندی سے طے پایا۔)</li>
-              <li>Under transport rules, the showroom acts only as a witness. (ٹرانسپورٹ رولز کے تحت شوروم صرف بطور گواہ عمل کرتا ہے۔)</li>
-              <li>The institution is bound to provide biometrics within 15 days. (ادارہ 15 ایام کے اندر بائیومیٹرک فراہم کرنے کا پابند ہے۔)</li>
-            </ol>
-          </div>
+            <!-- Note / Terms & Conditions (8 Official Points) -->
+            <div class="terms-card">
+              <div class="terms-head">نوٹ و شرائط (TERMS & CONDITIONS)</div>
+              <div class="terms-grid">
+                <div class="term-cell">
+                  <div class="term-ur">1- کاغذات کی ایکسائز اور کمپیوٹر چیکنگ اندر معیاد 24 گھنٹے کروانا ہوگی۔ بصورت دیگر شوروم کی ذمہ داری نہ ہوگی۔</div>
+                  <div class="term-en">Excise & computer document check must be done within 24 hours. Showroom is not responsible thereafter.</div>
+                </div>
 
-          <!-- Signatures & Final Balances -->
-          <div class="signature-container">
-            <div class="sig-box">
-              Signature of Seller<br/>
-              (دستخط فروخت کنندہ)
-            </div>
-            <div class="sig-box">
-              Signature of Buyer<br/>
-              (دستخط خریدار)
-            </div>
-            <div class="sig-box">
-              Witness No. 1<br/>
-              (گواہ نمبر 1: ${inv.witness1Name || ''})
-            </div>
-            <div class="sig-box">
-              Witness No. 2<br/>
-              (گواہ نمبر 2: ${inv.witness2Name || ''})
-            </div>
-            <div class="sig-box" style="border-top-color: #0284c7; color: #0284c7;">
-              Showroom Stamp & Sign<br/>
-              (دستخط و مہر شوروم)
-            </div>
-          </div>
+                <div class="term-cell">
+                  <div class="term-ur">2- گاڑی قبضہ میں لینے سے پہلے انجن نمبر، چیسز نمبر چیک کر لیں۔ بعد میں شوروم کسی قسم کا ذمہ دار نہ ہوگا۔ کیونکہ شوروم معمولی کمیشن لیتا ہے۔</div>
+                  <div class="term-en">Inspect engine & chassis numbers before taking possession. Showroom is not responsible later as it takes nominal commission.</div>
+                </div>
 
-          <div style="margin-top: 8px; text-align: center; font-size: 7.5px; color: #94a3b8; border-top: 1px solid #cbd5e1; padding-top: 4px;">
-            Generated by AL ASR MOTORS Dealership Management System • System Verified Record • Super Admin Module
+                <div class="term-cell">
+                  <div class="term-ur">3- گاڑی کی واپسی شوروم رولز کے تحت ہوگی۔ واپسی کی صورت میں کمیشن واپس نہیں دیا جائے گا۔</div>
+                  <div class="term-en">Vehicle return is subject to showroom rules. Commission is non-refundable upon return.</div>
+                </div>
+
+                <div class="term-cell">
+                  <div class="term-ur">4- فریق اول گاڑی کے کاغذات میں ہر قسم کی غلطی کا ذمہ دار ہوگا۔</div>
+                  <div class="term-en">First party (Seller) shall be solely responsible for any errors/defects in vehicle documents.</div>
+                </div>
+
+                <div class="term-cell">
+                  <div class="term-ur">5- گاڑی کی چیسز پلیٹ اور چیسز نمبر موقع پر چیک کیا اور ٹھیک پایا۔</div>
+                  <div class="term-en">Chassis plate and chassis number were verified on the spot and found correct.</div>
+                </div>
+
+                <div class="term-cell">
+                  <div class="term-ur">6- یہ سودا دونوں پارٹیوں کی رضامندی سے طے پایا۔</div>
+                  <div class="term-en">This transaction was finalized with the mutual consent of both parties.</div>
+                </div>
+
+                <div class="term-cell">
+                  <div class="term-ur">7- شوروم، ٹرانسپورٹ رولز کے تحت صرف گواہ کی حیثیت رکھتا ہے۔</div>
+                  <div class="term-en">Under transport regulations, the showroom acts solely as an official witness.</div>
+                </div>
+
+                <div class="term-cell">
+                  <div class="term-ur">8- بائیومیٹرک ادارہ 15 دن تک دینے کا پابند ہے۔</div>
+                  <div class="term-en">Seller / Owner is obligated to provide biometric verification within 15 days.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Signatures & Witness Bar -->
+            <div class="sig-grid">
+              <div class="sig-cell">
+                دستخط فروخت کنندہ<br/>
+                (Seller Signature)
+              </div>
+              <div class="sig-cell">
+                دستخط خریدار<br/>
+                (Buyer Signature)
+              </div>
+              <div class="sig-cell">
+                گواہ نمبر 1: ${inv.witness1Name || '___________'}
+              </div>
+              <div class="sig-cell">
+                گواہ نمبر 2: ${inv.witness2Name || '___________'}
+              </div>
+              <div class="sig-cell" style="border-top-color: #0284c7; color: #0284c7;">
+                دستخط و مہر شوروم<br/>
+                (Showroom Seal & Sign)
+              </div>
+            </div>
+
+            <div style="margin-top: 6px; text-align: center; font-size: 7.5px; color: #94a3b8; border-top: 1px dashed #cbd5e1; padding-top: 3px;">
+              Generated by AL ASR MOTORS Dealership System • Official Bilingual Voucher Record • Super Admin Verification
+            </div>
           </div>
         </body>
       </html>
@@ -877,6 +1177,14 @@ export default function Invoices() {
                             <span>Print</span>
                           </button>
                           <button
+                            onClick={() => openEditModal(inv)}
+                            className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30 font-medium text-[11px] flex items-center space-x-1"
+                            title="Edit Sales Receipt"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>Edit</span>
+                          </button>
+                          <button
                             onClick={() => handleDeleteInvoice(inv.id, receiptNo)}
                             className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/30"
                             title="Delete Receipt"
@@ -894,7 +1202,7 @@ export default function Invoices() {
         )}
       </div>
 
-      {/* CREATE SALES RECEIPT (سیل رسید) BILINGUAL MODAL */}
+      {/* CREATE / EDIT SALES RECEIPT (سیل رسید) BILINGUAL MODAL */}
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-[#0b192c] border border-cyan-500/30 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
@@ -906,7 +1214,7 @@ export default function Invoices() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                    Create Sales Receipt <span className="text-cyan-400 font-normal text-sm font-mono">(سیل رسید)</span>
+                    {selectedInvoice ? 'Edit Sales Receipt' : 'Create Sales Receipt'} <span className="text-cyan-400 font-normal text-sm font-mono">(سیل رسید)</span>
                   </h2>
                   <p className="text-xs text-slate-400">Fill in seller, buyer, vehicle, and transaction agreement details</p>
                 </div>
@@ -927,7 +1235,6 @@ export default function Invoices() {
                 { id: 'buyer', label: '👤 Buyer Details (خریدار)' },
                 { id: 'vehicle', label: '🚗 Vehicle Specs (گاڑی)' },
                 { id: 'agreement', label: '📜 Agreement (معاہدہ)' },
-                { id: 'imported', label: '🚢 Imported Vehicle' },
                 { id: 'financials', label: '💰 Balances & Financials' },
                 { id: 'witnesses', label: '🖋️ Witnesses (گواہان)' }
               ].map(tab => (
@@ -947,7 +1254,7 @@ export default function Invoices() {
             </div>
 
             {/* Modal Form Content */}
-            <form onSubmit={handleCreateInvoice} className="p-6 overflow-y-auto flex-1 space-y-6">
+            <form onSubmit={handleSaveInvoice} className="p-6 overflow-y-auto flex-1 space-y-6">
               
               {/* TAB 1: GENERAL DETAILS */}
               {activeTab === 'general' && (
@@ -1018,6 +1325,19 @@ export default function Invoices() {
 
                     <div>
                       <label className="block text-xs font-semibold text-slate-300 mb-1">
+                        CNIC No. (شناختی کارڈ نمبر)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="35501-1234567-1"
+                        value={formData.sellerCnic || ''}
+                        onChange={(e) => handleInputChange('sellerCnic', e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">
                         Phone No. (فون نمبر)
                       </label>
                       <input
@@ -1039,6 +1359,15 @@ export default function Invoices() {
                         value={formData.sellerAddress}
                         onChange={(e) => handleInputChange('sellerAddress', e.target.value)}
                         className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <CameraCaptureWidget
+                        label="Seller Live Photo (تصویر فروخت کنندہ)"
+                        currentPhoto={formData.sellerPhoto}
+                        onPhotoCaptured={(dataUrl) => handleInputChange('sellerPhoto', dataUrl)}
+                        onPhotoRemoved={() => handleInputChange('sellerPhoto', '')}
                       />
                     </div>
                   </div>
@@ -1079,6 +1408,19 @@ export default function Invoices() {
 
                     <div>
                       <label className="block text-xs font-semibold text-slate-300 mb-1">
+                        CNIC No. (شناختی کارڈ نمبر)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="35501-1234567-1"
+                        value={formData.buyerCnic || ''}
+                        onChange={(e) => handleInputChange('buyerCnic', e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">
                         Phone No. (فون نمبر)
                       </label>
                       <input
@@ -1100,6 +1442,15 @@ export default function Invoices() {
                         value={formData.buyerAddress}
                         onChange={(e) => handleInputChange('buyerAddress', e.target.value)}
                         className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <CameraCaptureWidget
+                        label="Buyer Live Photo (تصویر خریدار)"
+                        currentPhoto={formData.buyerPhoto}
+                        onPhotoCaptured={(dataUrl) => handleInputChange('buyerPhoto', dataUrl)}
+                        onPhotoRemoved={() => handleInputChange('buyerPhoto', '')}
                       />
                     </div>
                   </div>

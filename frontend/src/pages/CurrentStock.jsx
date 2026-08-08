@@ -172,9 +172,9 @@ export default function CurrentStock() {
             .stats-inline { display: flex; gap: 10px; font-size: 8px; background: #f8fafc; padding: 3px 8px; border-radius: 4px; border: 1px solid #e2e8f0; }
             .stat-item { font-weight: 600; color: #334155; }
             .stat-item strong { color: #0284c7; font-weight: 800; }
-            table { width: 100%; border-collapse: collapse; margin-top: 2px; }
-            th { background: #0f172a; color: #ffffff; text-align: left; padding: 3.5px 5px; font-size: 8px; font-weight: 700; text-transform: uppercase; border: 1px solid #0f172a; }
-            td { padding: 3px 5px; border-bottom: 1px solid #cbd5e1; font-size: 8.5px; vertical-align: middle; }
+            table { width: 100%; border-collapse: collapse; margin-top: 2px; border: 1px solid #64748b; }
+            th { background: #0f172a; color: #ffffff; text-align: left; padding: 3.5px 5px; font-size: 8px; font-weight: 700; text-transform: uppercase; border: 1px solid #334155; }
+            td { padding: 3px 5px; border: 1px solid #94a3b8; font-size: 8.5px; vertical-align: middle; }
             tr:nth-child(even) { background: #f8fafc; }
             .badge { display: inline-block; padding: 1px 4px; border-radius: 3px; font-size: 7.5px; font-weight: 700; }
             .badge-available { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
