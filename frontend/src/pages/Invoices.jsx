@@ -253,81 +253,82 @@ export default function Invoices() {
           <title>Sales Receipt (سیل رسید) - ${receiptNo} - AL ASR MOTORS</title>
           <style>
             @media print {
-              @page { size: A4; margin: 12mm; }
-              body { padding: 0; background: #fff; }
-              .no-print { display: none; }
+              @page { size: A4 portrait; margin: 3mm 5mm; }
+              body { padding: 0; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              .no-print { display: none !important; }
             }
             body { 
               font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-              padding: 20px; 
-              color: #1e293b; 
+              padding: 4px; 
+              color: #0f172a; 
               background: #ffffff;
-              line-height: 1.4;
+              line-height: 1.15;
+              font-size: 8.5px;
             }
             .header-container {
               display: flex;
               justify-content: space-between;
               align-items: center;
-              border-bottom: 3px double #0284c7;
-              padding-bottom: 12px;
-              margin-bottom: 15px;
+              border-bottom: 2px double #0284c7;
+              padding-bottom: 4px;
+              margin-bottom: 5px;
             }
             .logo-section {
               display: flex;
               align-items: center;
-              gap: 15px;
+              gap: 8px;
             }
             .logo-img {
-              height: 85px;
+              height: 42px;
               width: auto;
               object-fit: contain;
             }
             .brand-title {
-              font-size: 26px;
+              font-size: 16px;
               font-weight: 900;
               color: #0f172a;
-              letter-spacing: 1px;
+              letter-spacing: 0.5px;
             }
             .brand-subtitle {
-              font-size: 13px;
+              font-size: 9.5px;
               color: #0284c7;
               font-weight: bold;
             }
             .brand-contact {
-              font-size: 10px;
+              font-size: 8px;
               color: #64748b;
-              margin-top: 2px;
+              margin-top: 1px;
             }
             .doc-title-badge {
               text-align: right;
               background: #0f172a;
               color: #ffffff;
-              padding: 10px 16px;
-              border-radius: 8px;
+              padding: 4px 10px;
+              border-radius: 6px;
             }
             .doc-title {
-              font-size: 16px;
+              font-size: 11px;
               font-weight: 800;
               color: #38bdf8;
               text-transform: uppercase;
             }
             .doc-num {
-              font-size: 13px;
+              font-size: 9.5px;
               font-family: monospace;
-              margin-top: 4px;
+              margin-top: 2px;
             }
 
             .section-box {
               border: 1px solid #cbd5e1;
-              border-radius: 6px;
-              margin-bottom: 12px;
+              border-radius: 4px;
+              margin-bottom: 4px;
               overflow: hidden;
             }
             .section-header {
               background: #f1f5f9;
-              padding: 6px 12px;
+              padding: 2.5px 8px;
               font-weight: bold;
-              font-size: 12px;
+              font-size: 9.5px;
               color: #0f172a;
               border-bottom: 1px solid #cbd5e1;
               display: flex;
@@ -340,14 +341,15 @@ export default function Invoices() {
               border-collapse: collapse;
             }
             table.details-table td {
-              padding: 6px 10px;
-              font-size: 11px;
+              padding: 2.5px 6px;
+              font-size: 8.5px;
               border-bottom: 1px solid #f1f5f9;
               border-right: 1px solid #f1f5f9;
+              vertical-align: middle;
             }
             table.details-table td.label-col {
               color: #475569;
-              background-color: #fafafa;
+              background-color: #f8fafc;
               font-weight: 600;
               width: 25%;
             }
@@ -360,60 +362,62 @@ export default function Invoices() {
             .financial-table {
               width: 100%;
               border-collapse: collapse;
-              margin-top: 5px;
+              margin-top: 3px;
+              margin-bottom: 4px;
             }
             .financial-table th {
               background: #0f172a;
               color: #fff;
-              font-size: 11px;
-              padding: 8px;
+              font-size: 8.5px;
+              padding: 3px 6px;
               text-align: left;
             }
             .financial-table td {
-              padding: 8px;
-              border: 1px solid #e2e8f0;
-              font-size: 12px;
+              padding: 3px 6px;
+              border: 1px solid #cbd5e1;
+              font-size: 9.5px;
               font-weight: bold;
             }
 
             .terms-box {
               background: #f8fafc;
               border: 1px solid #cbd5e1;
-              border-radius: 6px;
-              padding: 10px;
-              margin-top: 10px;
-              margin-bottom: 15px;
+              border-radius: 4px;
+              padding: 4px 8px;
+              margin-top: 4px;
+              margin-bottom: 6px;
             }
             .terms-title {
-              font-size: 12px;
+              font-size: 9.5px;
               font-weight: bold;
               color: #0f172a;
               border-bottom: 1px solid #e2e8f0;
-              padding-bottom: 4px;
-              margin-bottom: 6px;
+              padding-bottom: 2px;
+              margin-bottom: 3px;
             }
             .terms-list {
-              font-size: 10px;
+              font-size: 7.5px;
               color: #334155;
-              padding-left: 15px;
+              padding-left: 12px;
               margin: 0;
+              line-height: 1.2;
             }
             .terms-list li {
-              margin-bottom: 4px;
+              margin-bottom: 1.5px;
             }
 
             .signature-container {
               display: flex;
               justify-content: space-between;
-              margin-top: 35px;
-              gap: 12px;
+              margin-top: 14px;
+              gap: 8px;
             }
             .sig-box {
               flex: 1;
-              border-top: 1px solid #475569;
-              padding-top: 6px;
+              border-top: 1.5px solid #475569;
+              padding-top: 3px;
               text-align: center;
-              font-size: 10px;
+              font-size: 8px;
               font-weight: bold;
               color: #334155;
             }
@@ -421,12 +425,13 @@ export default function Invoices() {
             .print-btn {
               background: #0284c7;
               color: white;
-              padding: 10px 20px;
+              padding: 6px 14px;
               border: none;
               border-radius: 6px;
               font-weight: bold;
+              font-size: 11px;
               cursor: pointer;
-              margin-bottom: 15px;
+              margin-bottom: 8px;
             }
           </style>
         </head>
@@ -670,7 +675,7 @@ export default function Invoices() {
             </div>
           </div>
 
-          <div style="margin-top: 25px; text-align: center; font-size: 9px; color: #94a3b8; border-top: 1px solid #cbd5e1; padding-top: 8px;">
+          <div style="margin-top: 8px; text-align: center; font-size: 7.5px; color: #94a3b8; border-top: 1px solid #cbd5e1; padding-top: 4px;">
             Generated by AL ASR MOTORS Dealership Management System • System Verified Record • Super Admin Module
           </div>
         </body>
