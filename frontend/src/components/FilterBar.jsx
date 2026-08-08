@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Filter, RotateCcw, ChevronDown, ChevronUp, X, Car, Calendar, DollarSign, MapPin, Tag, UserCheck } from 'lucide-react';
+import { Filter, RotateCcw, ChevronDown, ChevronUp, X, Car, Calendar, DollarSign, MapPin, Tag, UserCheck, Building2 } from 'lucide-react';
 
 const COMMON_BRANDS = [
   'Toyota', 'Honda', 'Suzuki', 'Hyundai', 'Kia', 'BMW', 'Mercedes-Benz', 
@@ -227,6 +227,23 @@ export default function FilterBar({
                 <option value="true">Bank Financing Cases Only</option>
                 <option value="false">Cash Sales Only</option>
               </select>
+            </div>
+          )}
+
+          {/* Search by Case # */}
+          {filters.caseNo !== undefined && (
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold text-sky-300 uppercase tracking-wider flex items-center space-x-1 font-mono">
+                <Building2 className="w-3.5 h-3.5 text-sky-400" />
+                <span>Search Case #</span>
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 1, 2, Case #1..."
+                value={filters.caseNo || ''}
+                onChange={(e) => handleInputChange('caseNo', e.target.value)}
+                className="w-full bg-slate-900/90 border border-sky-500/40 rounded-xl px-3 py-2 text-xs text-sky-300 placeholder-slate-500 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400 transition-all font-mono font-bold"
+              />
             </div>
           )}
 

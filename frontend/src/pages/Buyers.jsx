@@ -37,7 +37,8 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
     city: '',
     leadStatus: '',
     assignedTo: '',
-    isBankCase: ''
+    isBankCase: '',
+    caseNo: ''
   });
 
   // UI Pagination State
@@ -59,7 +60,8 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
       city: '',
       leadStatus: '',
       assignedTo: '',
-      isBankCase: ''
+      isBankCase: '',
+      caseNo: ''
     });
   };
 
@@ -242,6 +244,12 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
     setIsChecklistModalOpen(true);
   };
 
+  useEffect(() => {
+    if (isAddModalOpen) {
+      resetForm();
+    }
+  }, [isAddModalOpen, scope]);
+
   // Bank Case Auto-Generated Sequential Case Number starting from 1
   const bankCasesOrdered = React.useMemo(() => {
     return [...buyers]
@@ -255,10 +263,54 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
     return idx + 1; // 1, 2, 3...
   };
 
+  // Client-side filtering for global search and explicit Case Number filter
+  const displayBuyers = React.useMemo(() => {
+    let result = buyers;
+
+    const q = (search || '').toLowerCase().trim();
+    const caseQuery = (filters.caseNo || '').toString().toLowerCase().trim();
+    const searchCaseNo = (caseQuery || q).replace(/^(case\s*#?|case-?)/i, '').trim();
+
+    if (searchCaseNo || q) {
+      result = result.filter(b => {
+        const caseNo = b.isBankCase ? getBankCaseNo(b.id) : null;
+        
+        let matchCase = false;
+        if (searchCaseNo && caseNo !== null) {
+          matchCase = (
+            caseNo.toString() === searchCaseNo ||
+            `case #${caseNo}`.toLowerCase().includes(searchCaseNo) ||
+            `case ${caseNo}`.toLowerCase().includes(searchCaseNo)
+          );
+        }
+
+        if (filters.caseNo && !matchCase) {
+          return false;
+        }
+
+        if (!q) return true;
+
+        const matchText = (
+          b.buyerName?.toLowerCase().includes(q) ||
+          b.buyerPhone?.includes(q) ||
+          b.buyerCity?.toLowerCase().includes(q) ||
+          b.vehicle?.toLowerCase().includes(q) ||
+          b.model?.toLowerCase().includes(q) ||
+          b.bankName?.toLowerCase().includes(q) ||
+          b.leadStatus?.toLowerCase().includes(q)
+        );
+
+        return matchCase || matchText;
+      });
+    }
+
+    return result;
+  }, [buyers, search, filters.caseNo, bankCasesOrdered]);
+
   const exportBuyersPDF = () => {
     const printWindow = window.open('', '_blank');
     const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
-    const totalValuation = buyers.reduce((acc, b) => acc + (b.budget || 0), 0);
+    const totalValuation = displayBuyers.reduce((acc, b) => acc + (b.budget || 0), 0);
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -295,7 +347,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
               </div>
             </div>
             <div class="stats-inline">
-              <div class="stat-item">Total Buyer Leads: <strong>${buyers.length} Leads</strong></div>
+              <div class="stat-item">Total Buyer Leads: <strong>${displayBuyers.length} Leads</strong></div>
               <div class="stat-item">Total Budget Volume: <strong>Rs. ${totalValuation.toLocaleString()}</strong></div>
             </div>
           </div>
@@ -317,7 +369,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
               </tr>
             </thead>
             <tbody>
-              ${buyers.map((b, idx) => {
+              ${displayBuyers.map((b, idx) => {
                 const caseNo = b.isBankCase ? getBankCaseNo(b.id) : null;
                 return `
                 <tr>
@@ -344,7 +396,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
           </table>
 
           <div class="footer">
-            AL ASR MOTORS Customer Care & Sales • Showing ${buyers.length} buyer records on single page document
+            AL ASR MOTORS Customer Care & Sales • Showing ${displayBuyers.length} buyer records on single page document
           </div>
 
           <script>
@@ -370,7 +422,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
             </h2>
           </div>
           <p className="text-xs font-mono text-slate-400 mt-0.5">
-            Showing <strong className="text-cyan-400">{buyers.length}</strong> matching {scope === 'bank_cases' ? 'bank financing case(s)' : 'buyer inquiry(ies)'}
+            Showing <strong className="text-cyan-400">{displayBuyers.length}</strong> matching {scope === 'bank_cases' ? 'bank financing case(s)' : 'buyer inquiry(ies)'}
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -428,14 +480,14 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                     <p className="font-mono">Loading buyer leads...</p>
                   </td>
                 </tr>
-              ) : buyers.length === 0 ? (
+              ) : displayBuyers.length === 0 ? (
                 <tr>
                   <td colSpan="9" className="py-12 text-center text-slate-400 font-mono">
                     No buyer inquiries found matching your filters.
                   </td>
                 </tr>
               ) : (
-                buyers.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((buyer) => (
+                displayBuyers.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((buyer) => (
                   <tr 
                     key={buyer.id} 
                     onClick={() => openDetailModal(buyer)}
@@ -558,15 +610,26 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
       {/* CREATE / EDIT BUYER MODAL */}
       {(isAddModalOpen || isEditModalOpen) && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="glass-modal rounded-3xl p-6 w-full max-w-2xl border border-white/10 shadow-2xl my-8">
-            <h3 className="text-xl font-bold text-white mb-1">
-              {isEditModalOpen ? 'Edit Buyer Lead' : 'New Buyer Entry'}
-            </h3>
-            <p className="text-xs text-slate-400 font-mono mb-6">
-              Enter buyer requirements, budget, and bank financing details.
-            </p>
+          <div className="glass-modal rounded-3xl w-full max-w-2xl border border-white/10 shadow-2xl my-auto max-h-[90vh] flex flex-col overflow-hidden relative">
+            <div className="p-6 pb-4 border-b border-white/10 flex-shrink-0 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-white mb-0.5">
+                  {isEditModalOpen ? 'Edit Buyer Lead' : (formData.isBankCase ? 'New Bank Financing Case Entry' : 'New Buyer Entry')}
+                </h3>
+                <p className="text-xs text-slate-400 font-mono">
+                  Enter buyer requirements, budget, and bank financing details.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); }}
+                className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+              >
+                ✕
+              </button>
+            </div>
 
-            <form onSubmit={isEditModalOpen ? handleUpdateBuyer : handleCreateBuyer} className="space-y-4">
+            <form onSubmit={isEditModalOpen ? handleUpdateBuyer : handleCreateBuyer} className="p-6 overflow-y-auto space-y-4 max-h-[calc(90vh-85px)] custom-scrollbar">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">Buyer Name *</label>
