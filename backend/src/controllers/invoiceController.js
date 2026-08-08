@@ -8,10 +8,17 @@ const getInvoices = async (req, res) => {
     if (search) {
       where.OR = [
         { invoiceNumber: { contains: search, mode: 'insensitive' } },
+        { registrationNo: { contains: search, mode: 'insensitive' } },
+        { buyerName: { contains: search, mode: 'insensitive' } },
+        { buyerPhone: { contains: search, mode: 'insensitive' } },
+        { sellerName: { contains: search, mode: 'insensitive' } },
+        { sellerPhone: { contains: search, mode: 'insensitive' } },
+        { vehicleMaker: { contains: search, mode: 'insensitive' } },
+        { vehicleModel: { contains: search, mode: 'insensitive' } },
+        { chassisNumber: { contains: search, mode: 'insensitive' } },
+        { engineNumber: { contains: search, mode: 'insensitive' } },
         { customerName: { contains: search, mode: 'insensitive' } },
-        { customerPhone: { contains: search, mode: 'insensitive' } },
         { carVehicle: { contains: search, mode: 'insensitive' } },
-        { carModel: { contains: search, mode: 'insensitive' } },
         { carRegNumber: { contains: search, mode: 'insensitive' } }
       ];
     }
@@ -71,6 +78,47 @@ const getInvoiceById = async (req, res) => {
 const createInvoice = async (req, res) => {
   try {
     const {
+      registrationNo,
+      // Seller Details
+      sellerName,
+      sellerFatherName,
+      sellerAddress,
+      sellerPhone,
+      // Buyer Details
+      buyerName,
+      buyerFatherName,
+      buyerAddress,
+      buyerPhone,
+      // Vehicle Details
+      vehicleMaker,
+      vehicleModel,
+      engineNumber,
+      chassisNumber,
+      powerCapacity,
+      postOffice,
+      lastToken,
+      regName,
+      regFatherName,
+      regAddress,
+      // Transaction Agreement
+      agreedAmount,
+      agreedAmountHalf,
+      agreedAmountWords,
+      agreementTime,
+      agreementDay,
+      // Imported Vehicle
+      isImported,
+      billOfEntryNo,
+      portName,
+      clearanceDate,
+      importerName,
+      // Financials
+      totalPrice,
+      advanceAmount,
+      remainingAmount,
+      paymentDuration,
+      dated,
+      // Legacy fallback
       customerName,
       customerPhone,
       customerCity,
@@ -78,47 +126,108 @@ const createInvoice = async (req, res) => {
       carModel,
       carYear,
       carRegNumber,
-      chassisNumber,
-      engineNumber,
       saleAmount,
       commissionPercent,
       paymentStatus,
-      remarks
+      remarks,
+      // Witnesses
+      witness1Name,
+      witness1Cnic,
+      witness2Name,
+      witness2Cnic
     } = req.body;
 
-    if (!customerName || !carVehicle || !carModel || !saleAmount) {
-      return res.status(400).json({ message: 'Customer name, vehicle make/model, and sale amount are required' });
-    }
+    const finalBuyerName = buyerName || customerName || 'N/A';
+    const finalVehicleMaker = vehicleMaker || carVehicle || 'N/A';
+    const finalVehicleModel = vehicleModel || carModel || 'N/A';
 
-    const numericSale = parseFloat(saleAmount) || 0;
+    const numericTotalPrice = parseFloat(totalPrice) || parseFloat(agreedAmount) || parseFloat(saleAmount) || 0;
+    const numericAdvance = parseFloat(advanceAmount) || 0;
+    const numericRemaining = remainingAmount !== undefined && remainingAmount !== null && remainingAmount !== '' 
+      ? parseFloat(remainingAmount) 
+      : (numericTotalPrice - numericAdvance);
     const numericCommPercent = parseFloat(commissionPercent) || 0;
-    const commissionAmount = (numericSale * numericCommPercent) / 100;
-    const totalAmount = numericSale + commissionAmount;
+    const commissionAmount = (numericTotalPrice * numericCommPercent) / 100;
+    const totalAmountCalculated = numericTotalPrice + commissionAmount;
 
-    // Generate unique invoice number: INV-YYYYMMDD-XXX
+    // Generate unique invoice number: REC-YYYYMMDD-XXX
     const today = new Date();
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const invoiceNumber = `INV-${dateStr}-${randomSuffix}`;
+    const invoiceNumber = `REC-${dateStr}-${randomSuffix}`;
 
     const newInvoice = await prisma.invoice.create({
       data: {
         invoiceNumber,
-        customerName,
-        customerPhone: customerPhone || null,
-        customerCity: customerCity || null,
-        carVehicle,
-        carModel,
-        carYear: parseInt(carYear) || new Date().getFullYear(),
-        carRegNumber: carRegNumber ? carRegNumber.trim().toUpperCase() : null,
-        chassisNumber: chassisNumber || null,
+        date: new Date(),
+        registrationNo: registrationNo || carRegNumber || null,
+        
+        // Seller Details
+        sellerName: sellerName || null,
+        sellerFatherName: sellerFatherName || null,
+        sellerAddress: sellerAddress || null,
+        sellerPhone: sellerPhone || null,
+
+        // Buyer Details
+        buyerName: finalBuyerName,
+        buyerFatherName: buyerFatherName || null,
+        buyerAddress: buyerAddress || customerCity || null,
+        buyerPhone: buyerPhone || customerPhone || null,
+
+        // Vehicle Details
+        vehicleMaker: finalVehicleMaker,
+        vehicleModel: finalVehicleModel,
         engineNumber: engineNumber || null,
-        saleAmount: numericSale,
+        chassisNumber: chassisNumber || null,
+        powerCapacity: powerCapacity || null,
+        postOffice: postOffice || null,
+        lastToken: lastToken || null,
+        regName: regName || null,
+        regFatherName: regFatherName || null,
+        regAddress: regAddress || null,
+
+        // Transaction Agreement
+        agreedAmount: parseFloat(agreedAmount) || numericTotalPrice,
+        agreedAmountHalf: parseFloat(agreedAmountHalf) || (numericTotalPrice / 2),
+        agreedAmountWords: agreedAmountWords || null,
+        agreementTime: agreementTime || null,
+        agreementDay: agreementDay || null,
+
+        // Imported Vehicle
+        isImported: Boolean(isImported),
+        billOfEntryNo: billOfEntryNo || null,
+        portName: portName || null,
+        clearanceDate: clearanceDate || null,
+        importerName: importerName || null,
+
+        // Financials & Balances
+        totalPrice: numericTotalPrice,
+        advanceAmount: numericAdvance,
+        remainingAmount: numericRemaining,
+        paymentDuration: paymentDuration || null,
+        dated: dated || new Date().toISOString().slice(0, 10),
+
+        // Legacy compatibility fields
+        customerName: finalBuyerName,
+        customerPhone: buyerPhone || customerPhone || null,
+        customerCity: buyerAddress || customerCity || null,
+        carVehicle: finalVehicleMaker,
+        carModel: finalVehicleModel,
+        carYear: parseInt(carYear) || new Date().getFullYear(),
+        carRegNumber: registrationNo || carRegNumber || null,
+        saleAmount: numericTotalPrice,
         commissionPercent: numericCommPercent,
         commissionAmount,
-        totalAmount,
+        totalAmount: totalAmountCalculated,
         paymentStatus: paymentStatus || 'PAID',
         remarks: remarks || null,
+
+        // Witnesses
+        witness1Name: witness1Name || null,
+        witness1Cnic: witness1Cnic || null,
+        witness2Name: witness2Name || null,
+        witness2Cnic: witness2Cnic || null,
+
         createdBy: req.user.id
       },
       include: {
@@ -129,14 +238,14 @@ const createInvoice = async (req, res) => {
     await prisma.activityLog.create({
       data: {
         userId: req.user.id,
-        action: 'CREATE_INVOICE',
-        details: `Created invoice ${invoiceNumber} for ${customerName} (${carVehicle} ${carModel} - Sale: Rs. ${numericSale}, Comm: ${numericCommPercent}%)`
+        action: 'CREATE_SALES_RECEIPT',
+        details: `Created Sales Receipt ${invoiceNumber} for ${finalBuyerName} (${finalVehicleMaker} ${finalVehicleModel} - Total: Rs. ${numericTotalPrice})`
       }
     });
 
     return res.status(201).json(newInvoice);
   } catch (error) {
-    return res.status(500).json({ message: 'Failed to create invoice', error: error.message });
+    return res.status(500).json({ message: 'Failed to create sales receipt', error: error.message });
   }
 };
 

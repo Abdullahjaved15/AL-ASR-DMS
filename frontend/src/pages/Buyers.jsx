@@ -242,115 +242,113 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
     setIsChecklistModalOpen(true);
   };
 
+  // Bank Case Auto-Generated Sequential Case Number starting from 1
+  const bankCasesOrdered = React.useMemo(() => {
+    return [...buyers]
+      .filter(b => b.isBankCase)
+      .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+  }, [buyers]);
+
+  const getBankCaseNo = (buyerId) => {
+    const idx = bankCasesOrdered.findIndex(b => b.id === buyerId);
+    if (idx === -1) return null;
+    return idx + 1; // 1, 2, 3...
+  };
+
   const exportBuyersPDF = () => {
     const printWindow = window.open('', '_blank');
-    const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
     const totalValuation = buyers.reduce((acc, b) => acc + (b.budget || 0), 0);
 
     const htmlContent = `
       <!DOCTYPE html>
       <html>
         <head>
-          <title>AL ASR MOTORS - Filtered Buyer Inquiries Report (${todayStr})</title>
+          <title>AL ASR MOTORS - Buyer Inquiries Report (${todayStr})</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 25px; color: #1e293b; background: #ffffff; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0284c7; padding-bottom: 15px; margin-bottom: 20px; }
-            .logo-box { display: flex; align-items: center; gap: 15px; }
-            .title { font-size: 22px; font-weight: bold; color: #0f172a; }
-            .subtitle { font-size: 12px; color: #64748b; font-family: monospace; }
-            .stats { display: flex; gap: 15px; margin-bottom: 20px; }
-            .stat-box { flex: 1; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; }
-            .stat-label { font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: bold; }
-            .stat-val { font-size: 18px; font-weight: bold; color: #0284c7; margin-top: 4px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            th { background: #0f172a; color: #ffffff; text-align: left; padding: 9px; font-size: 10px; text-transform: uppercase; }
-            td { padding: 9px; border-bottom: 1px solid #e2e8f0; font-size: 11px; }
+            @page { size: A4 landscape; margin: 4mm 6mm; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 2px; color: #0f172a; background: #ffffff; font-size: 8.5px; line-height: 1.15; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #0284c7; padding-bottom: 4px; margin-bottom: 4px; }
+            .logo-box { display: flex; align-items: center; gap: 8px; }
+            .title { font-size: 14px; font-weight: 800; color: #0f172a; letter-spacing: 0.5px; }
+            .subtitle { font-size: 8.5px; color: #64748b; font-family: monospace; }
+            .stats-inline { display: flex; gap: 12px; font-size: 8.5px; background: #f8fafc; padding: 3px 8px; border-radius: 4px; border: 1px solid #e2e8f0; }
+            .stat-item { font-weight: 600; color: #334155; }
+            .stat-item strong { color: #0284c7; font-weight: 800; }
+            table { width: 100%; border-collapse: collapse; margin-top: 2px; }
+            th { background: #0f172a; color: #ffffff; text-align: left; padding: 3px 5px; font-size: 8px; font-weight: 700; text-transform: uppercase; border: 1px solid #0f172a; }
+            td { padding: 2.5px 5px; border-bottom: 1px solid #cbd5e1; font-size: 8.5px; vertical-align: middle; white-space: nowrap; }
             tr:nth-child(even) { background: #f8fafc; }
-            .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; }
-            .bank-badge { background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; }
+            .badge { display: inline-block; padding: 1px 4px; border-radius: 3px; font-size: 7.5px; font-weight: 700; }
+            .bank-badge { background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; font-weight: bold; }
             .cash-badge { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
-            .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+            .footer { margin-top: 4px; text-align: center; font-size: 7.5px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 2px; }
           </style>
         </head>
         <body>
           <div class="header">
             <div class="logo-box">
-              <img src="${logoBase64}" alt="AL ASR MOTORS Logo" style="height: 90px; width: auto; object-fit: contain;" />
+              <img src="${logoBase64}" alt="AL ASR MOTORS" style="height: 38px; width: auto; object-fit: contain;" />
               <div>
-                <div class="title">AL ASR MOTORS - Buyer Inquiries Report</div>
-                <div class="subtitle">Filtered Buyer Leads Export • Generated: ${todayStr}</div>
+                <div class="title">AL ASR MOTORS — BUYER INQUIRIES & BANK CASES</div>
+                <div class="subtitle">Filtered Buyer Export • Generated: ${todayStr} • Sahiwal, Pakistan</div>
               </div>
             </div>
-            <div style="text-align: right;">
-              <div style="font-size: 14px; font-weight: bold; color: #0284c7;">Customer Care & Sales</div>
-              <div style="font-size: 10px; color: #64748b;">Sahiwal, Pakistan</div>
-            </div>
-          </div>
-
-          <div class="stats">
-            <div class="stat-box">
-              <div class="stat-label">Total Filtered Inquiries</div>
-              <div class="stat-val">${buyers.length} Leads</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-label">Total Target Budget Volume</div>
-              <div class="stat-val">Rs. ${totalValuation.toLocaleString()}</div>
+            <div class="stats-inline">
+              <div class="stat-item">Total Buyer Leads: <strong>${buyers.length} Leads</strong></div>
+              <div class="stat-item">Total Budget Volume: <strong>Rs. ${totalValuation.toLocaleString()}</strong></div>
             </div>
           </div>
 
           <table>
             <thead>
               <tr>
-                <th>#</th>
-                <th>Lead Assign Date</th>
+                <th style="width: 25px;">#</th>
+                <th>Date</th>
                 <th>Buyer Name & Contact</th>
                 <th>City</th>
                 <th>Desired Vehicle Specs</th>
                 <th>Condition</th>
-                <th>Target Budget / Total Amount</th>
-                <th>Bank Financing Breakdown</th>
-                <th>Lead Shared By / Ref</th>
+                <th>Budget (PKR)</th>
+                <th>Financing Type / Bank Case #</th>
+                <th>Ref / Source</th>
                 <th>Assigned Salesman</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              ${buyers.map((b, idx) => `
+              ${buyers.map((b, idx) => {
+                const caseNo = b.isBankCase ? getBankCaseNo(b.id) : null;
+                return `
                 <tr>
-                  <td>${idx + 1}</td>
-                  <td><strong style="color:#0284c7; font-family:monospace;">${formatDateStr(b.createdAt)}</strong></td>
-                  <td><strong>${b.buyerName}</strong><br/><span style="color:#64748b; font-size:10px;">${b.buyerPhone}</span></td>
+                  <td><strong>${idx + 1}</strong></td>
+                  <td style="color:#0284c7; font-family:monospace; font-weight:600;">${formatDateStr(b.createdAt)}</td>
+                  <td><strong>${b.buyerName}</strong> (${b.buyerPhone})</td>
                   <td>${b.buyerCity}</td>
                   <td><strong>${b.vehicle} ${b.model}</strong> (${b.year})</td>
                   <td><strong>${b.carCondition || 'Used'}</strong> ${b.carCondition === 'Zero Meter' ? `(${b.zeroMeterType || 'Cash'})` : ''}</td>
-                  <td><strong>Rs. ${b.budget?.toLocaleString()}</strong></td>
+                  <td><strong style="color:#0f172a;">Rs. ${b.budget?.toLocaleString()}</strong></td>
                   <td>
                     ${b.isBankCase 
-                      ? `<div style="font-size:10px; line-height:1.4;">
-                          <span class="badge bank-badge">BANK CASE (${b.bankName || 'Standard Bank'})</span><br/>
-                          <strong>Downpayment (${b.downpaymentPercent || 0}%):</strong> Rs. ${(b.downpaymentAmount || 0).toLocaleString()}<br/>
-                          <strong>Processing Fees:</strong> Rs. ${(b.processingFees || 0).toLocaleString()}<br/>
-                          <strong style="color:#0284c7;">Bank Due Loan:</strong> Rs. ${(b.dueAmount || 0).toLocaleString()}
-                         </div>` 
+                      ? `<span class="badge bank-badge">CASE #${caseNo || idx+1} • ${b.bankName || 'Bank Case'}</span> (Due: Rs. ${(b.dueAmount || 0).toLocaleString()})` 
                       : `<span class="badge cash-badge">CASH SALE</span>`
                     }
                   </td>
-                  <td><strong>${b.leadReference || b.leadSource || 'Direct'}</strong></td>
+                  <td>${b.leadReference || b.leadSource || 'Direct'}</td>
                   <td>${b.assignedUser?.name || 'Unassigned'}</td>
-                  <td>${b.leadStatus}</td>
+                  <td><strong>${b.leadStatus}</strong></td>
                 </tr>
-              `).join('')}
+                `;
+              }).join('')}
             </tbody>
           </table>
 
           <div class="footer">
-            Confidential Document • AL ASR MOTORS Dealership Management System • ${todayStr}
+            AL ASR MOTORS Customer Care & Sales • Showing ${buyers.length} buyer records on single page document
           </div>
 
           <script>
-            window.onload = function() {
-              window.print();
-            };
+            window.onload = function() { window.print(); };
           </script>
         </body>
       </html>
@@ -479,10 +477,13 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                     </td>
 
                     <td className="py-4 px-4" onClick={() => openDetailModal(buyer)}>
-                      {buyer.isBankCase && isAdmin ? (
-                        <div className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-300 text-[11px] font-bold">
-                          <Building2 className="w-3 h-3 text-sky-400" />
-                          <span>{buyer.bankName || 'Bank Financing'}</span>
+                      {buyer.isBankCase ? (
+                        <div className="flex flex-col space-y-1">
+                          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-500/40 text-[10px] font-mono font-extrabold w-fit">
+                            <Building2 className="w-3 h-3 text-sky-400" />
+                            <span>Case #{getBankCaseNo(buyer.id)}</span>
+                          </span>
+                          <span className="text-slate-300 text-[11px] font-semibold">{buyer.bankName || 'Bank Financing'}</span>
                         </div>
                       ) : (
                         <span className="text-slate-400 text-[11px] font-mono">Direct Buyer</span>

@@ -151,16 +151,20 @@ export default function ReceivingLetterPage() {
           </style>
         </head>
         <body>
-          <div class="header-box">
-            <div class="logo-wrap">
-              <img src="${logoBase64}" alt="AL-ASR MOTORS" style="height: 65px; width: auto; object-fit: contain;" />
+          <div class="header-box" style="border: 2px solid #0f172a; border-radius: 16px; padding: 15px 25px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; background: linear-gradient(to right, #f8fafc, #ffffff);">
+            <div class="logo-wrap" style="display: flex; align-items: center; gap: 18px;">
+              <img src="${logoBase64}" alt="AL-ASR MOTORS" style="height: 85px; width: auto; object-fit: contain;" />
               <div>
-                <div class="company-name">AL-ASR <span style="font-size:22px; font-weight:normal;">MOTORS</span></div>
-                <div class="company-sub">Toyota, Honda, Suzuki, Hyundai, Mitsubishi • All kind of commercial vehicles</div>
+                <div class="company-name" style="font-size: 28px; font-weight: 900; letter-spacing: 1px; color: #0f172a;">AL-ASR <span style="color: #0284c7;">MOTORS</span></div>
+                <div style="font-size: 13px; font-weight: bold; color: #0284c7; margin-top: 2px;">OFFICIAL VEHICLE RECEIVING LETTER • گاڑی وصولی لیٹر</div>
+                <div class="company-sub" style="font-size: 11px; color: #475569; margin-top: 2px;">Toyota, Honda, Suzuki, Hyundai, Mitsubishi • All kinds of luxury & commercial vehicles</div>
+                <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Main GT Road / City Center, Sahiwal, Pakistan • Phone: +92 300 1234567</div>
               </div>
             </div>
-            <div style="text-align: right; font-size: 11px; font-weight: bold; font-family: monospace;">
-              Ref: ${rl.letterNumber || 'RL-DOC'}
+            <div style="text-align: right; background: #0f172a; color: #ffffff; padding: 12px 18px; border-radius: 10px; min-width: 170px;">
+              <div style="font-size: 14px; font-weight: 800; color: #38bdf8; text-transform: uppercase;">RECEIVING LETTER</div>
+              <div style="font-size: 12px; font-weight: bold; font-family: monospace; color: #f8fafc; margin-top: 3px;">Ref: ${rl.letterNumber || 'RL-DOC'}</div>
+              <div style="font-size: 10px; color: #cbd5e1; margin-top: 2px;">Date: ${letterDate}</div>
             </div>
           </div>
 

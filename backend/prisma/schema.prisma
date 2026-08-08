@@ -152,21 +152,75 @@ model Buyer {
 model Invoice {
   id               String   @id @default(uuid())
   invoiceNumber    String   @unique
-  customerName     String
+  date             DateTime @default(now())
+  registrationNo   String?
+
+  // Seller Details (فروخت کنندہ)
+  sellerName       String?
+  sellerFatherName String?
+  sellerAddress    String?
+  sellerPhone      String?
+
+  // Buyer Details (خریدار)
+  buyerName        String?
+  buyerFatherName  String?
+  buyerAddress     String?
+  buyerPhone       String?
+
+  // Vehicle Details (گاڑی کی تفصیلات)
+  vehicleMaker     String?
+  vehicleModel     String?
+  engineNumber     String?
+  chassisNumber    String?
+  powerCapacity    String?
+  postOffice       String?
+  lastToken        String?
+  regName          String?
+  regFatherName    String?
+  regAddress       String?
+
+  // Transaction Agreement (ٹرانزیکشن معاہدہ)
+  agreedAmount     Float?
+  agreedAmountHalf Float?
+  agreedAmountWords String?
+  agreementTime    String?
+  agreementDay     String?
+
+  // Imported Vehicle Details (برائے امپورٹڈ گاڑی)
+  isImported       Boolean  @default(false)
+  billOfEntryNo    String?
+  portName         String?
+  clearanceDate    String?
+  importerName     String?
+
+  // Financials & Balances
+  totalPrice       Float?
+  advanceAmount    Float?
+  remainingAmount  Float?
+  paymentDuration  String?
+  dated            String?
+
+  // Legacy / fallback fields
+  customerName     String?
   customerPhone    String?
   customerCity     String?
-  carVehicle       String
-  carModel         String
-  carYear          Int
+  carVehicle       String?
+  carModel         String?
+  carYear          Int?
   carRegNumber     String?
-  chassisNumber    String?
-  engineNumber     String?
-  saleAmount       Float
+  saleAmount       Float    @default(0)
   commissionPercent Float   @default(0)
   commissionAmount Float    @default(0)
-  totalAmount      Float
+  totalAmount      Float    @default(0)
   paymentStatus    String   @default("PAID") // PAID, PENDING, CANCELLED
   remarks          String?
+
+  // Witnesses
+  witness1Name     String?
+  witness1Cnic     String?
+  witness2Name     String?
+  witness2Cnic     String?
+
   createdBy        String
   createdByUser    User     @relation(fields: [createdBy], references: [id])
   createdAt        DateTime @default(now())

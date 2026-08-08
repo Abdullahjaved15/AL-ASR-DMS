@@ -228,68 +228,60 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
 
   const exportSellersPDF = () => {
     const printWindow = window.open('', '_blank');
-    const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
     const totalValuation = sellers.reduce((acc, s) => acc + (s.demandPrice || 0), 0);
 
     const htmlContent = `
       <!DOCTYPE html>
       <html>
         <head>
-          <title>AL ASR MOTORS - Seller Inventory Export</title>
+          <title>AL ASR MOTORS - Seller Inventory Export (${todayStr})</title>
           <style>
-            @page { size: A4 landscape; margin: 10mm; }
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #0f172a; margin: 0; padding: 10px; font-size: 11px; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-b: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 12px; }
-            .logo-title { display: flex; items-center; gap: 15px; }
-            .title { font-size: 18px; font-weight: 800; color: #0f172a; text-transform: uppercase; tracking: 0.5px; }
-            .subtitle { font-size: 11px; color: #64748b; margin-top: 2px; }
-            .stats { display: flex; gap: 20px; background: #f8fafc; padding: 8px 14px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 12px; }
-            .stat-box { font-size: 11px; }
-            .stat-label { color: #64748b; font-size: 10px; text-transform: uppercase; font-weight: 600; }
-            .stat-val { font-weight: 700; color: #0284c7; font-size: 13px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 5px; }
-            th { background-color: #0f172a; color: #ffffff; text-align: left; padding: 6px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
-            td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
-            tr:nth-child(even) { background-color: #f8fafc; }
-            .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 700; text-transform: uppercase; }
-            .plate-tag { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; padding: 1px 4px; border-radius: 3px; font-family: monospace; font-weight: bold; }
-            .footer { margin-top: 15px; font-size: 9px; color: #94a3b8; text-align: center; border-t: 1px solid #e2e8f0; padding-top: 8px; }
+            @page { size: A4 landscape; margin: 4mm 6mm; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 2px; color: #0f172a; background: #ffffff; font-size: 8.5px; line-height: 1.15; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #0284c7; padding-bottom: 4px; margin-bottom: 4px; }
+            .logo-title { display: flex; align-items: center; gap: 8px; }
+            .title { font-size: 14px; font-weight: 800; color: #0f172a; letter-spacing: 0.5px; }
+            .subtitle { font-size: 8.5px; color: #64748b; font-family: monospace; }
+            .stats-inline { display: flex; gap: 12px; font-size: 8.5px; background: #f8fafc; padding: 3px 8px; border-radius: 4px; border: 1px solid #e2e8f0; }
+            .stat-item { font-weight: 600; color: #334155; }
+            .stat-item strong { color: #0284c7; font-weight: 800; }
+            table { width: 100%; border-collapse: collapse; margin-top: 2px; }
+            th { background: #0f172a; color: #ffffff; text-align: left; padding: 3px 5px; font-size: 8px; font-weight: 700; text-transform: uppercase; border: 1px solid #0f172a; }
+            td { padding: 2.5px 5px; border-bottom: 1px solid #cbd5e1; font-size: 8.5px; vertical-align: middle; white-space: nowrap; }
+            tr:nth-child(even) { background: #f8fafc; }
+            .badge { display: inline-block; padding: 1px 4px; border-radius: 3px; font-size: 7.5px; font-weight: 700; }
+            .plate-tag { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; padding: 0px 3px; border-radius: 2px; font-family: monospace; font-weight: bold; }
+            .footer { margin-top: 4px; text-align: center; font-size: 7.5px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 2px; }
           </style>
         </head>
         <body>
           <div class="header">
             <div class="logo-title">
-              <img src="${logoBase64}" alt="AL ASR MOTORS Logo" style="height: 90px; width: auto; object-fit: contain;" />
+              <img src="${logoBase64}" alt="AL ASR MOTORS" style="height: 38px; width: auto; object-fit: contain;" />
               <div>
-                <div class="title">AL ASR MOTORS - Showroom Vehicle Inventory</div>
-                <div class="subtitle">Filtered Stock Export • Generated: ${todayStr}</div>
+                <div class="title">AL ASR MOTORS — SELLERS INVENTORY REPORT</div>
+                <div class="subtitle">Filtered Stock Export • Generated: ${todayStr} • Sahiwal, Pakistan</div>
               </div>
             </div>
-          </div>
-
-          <div class="stats">
-            <div class="stat-box">
-              <div class="stat-label">Total Filtered Vehicles</div>
-              <div class="stat-val">${sellers.length} Units</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-label">Combined Valuation</div>
-              <div class="stat-val">Rs. ${totalValuation.toLocaleString()}</div>
+            <div class="stats-inline">
+              <div class="stat-item">Total Vehicles: <strong>${sellers.length} Units</strong></div>
+              <div class="stat-item">Total Demand Valuation: <strong>Rs. ${totalValuation.toLocaleString()}</strong></div>
             </div>
           </div>
 
           <table>
             <thead>
               <tr>
-                <th>#</th>
-                <th>Lead Assign Date</th>
-                <th>Vehicle & Specs</th>
+                <th style="width: 25px;">#</th>
+                <th>Date</th>
+                <th>Vehicle Specs & Color</th>
                 <th>Reg / Plate #</th>
                 <th>Condition</th>
                 <th>Seller Name & Contact</th>
                 <th>City</th>
-                <th>Demand Price (PKR)</th>
-                <th>Lead Shared By / Ref</th>
+                <th>Demand (PKR)</th>
+                <th>Lead Source / Ref</th>
                 <th>Assigned Salesman</th>
                 <th>Status</th>
               </tr>
@@ -297,30 +289,28 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
             <tbody>
               ${sellers.map((s, idx) => `
                 <tr>
-                  <td>${idx + 1}</td>
-                  <td><strong style="color:#0284c7; font-family:monospace;">${formatDateStr(s.createdAt)}</strong></td>
-                  <td><strong>${s.vehicle} ${s.model}</strong> (${s.year})<br/><span style="color:#64748b; font-size:10px;">Color: ${s.color || 'N/A'}</span></td>
+                  <td><strong>${idx + 1}</strong></td>
+                  <td style="color:#0284c7; font-family:monospace; font-weight:600;">${formatDateStr(s.createdAt)}</td>
+                  <td><strong>${s.vehicle} ${s.model}</strong> (${s.year}) - ${s.color || 'N/A'}</td>
                   <td>${s.numberPlate ? `<span class="plate-tag">${s.numberPlate}</span>` : '<span style="color:#94a3b8;">Unregistered</span>'}</td>
                   <td><strong>${s.carCondition || 'Used'}</strong> ${s.carCondition === 'Zero Meter' ? `(${s.zeroMeterType || 'Cash'})` : ''}</td>
-                  <td><strong>${s.sellerName}</strong><br/><span style="color:#64748b; font-size:10px;">${s.sellerPhone}</span></td>
+                  <td><strong>${s.sellerName}</strong> (${s.sellerPhone})</td>
                   <td>${s.sellerCity}</td>
-                  <td><strong>Rs. ${s.demandPrice?.toLocaleString()}</strong></td>
-                  <td><strong>${s.leadReference || s.leadSource || 'Direct'}</strong></td>
+                  <td><strong style="color:#0f172a;">Rs. ${s.demandPrice?.toLocaleString()}</strong></td>
+                  <td>${s.leadReference || s.leadSource || 'Direct'}</td>
                   <td>${s.assignedUser?.name || 'Unassigned'}</td>
-                  <td>${s.leadStatus}</td>
+                  <td><strong>${s.leadStatus}</strong></td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
 
           <div class="footer">
-            Confidential Document • AL ASR MOTORS Dealership Management System • ${todayStr}
+            AL ASR MOTORS Dealership System • Showing ${sellers.length} seller records on single page document
           </div>
 
           <script>
-            window.onload = function() {
-              window.print();
-            };
+            window.onload = function() { window.print(); };
           </script>
         </body>
       </html>

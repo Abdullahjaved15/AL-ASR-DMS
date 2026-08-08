@@ -133,89 +133,75 @@ export default function CurrentStock() {
   // Daily Printable PDF Exporter with AL ASR Logo
   const exportStockPDF = () => {
     const printWindow = window.open('', '_blank');
-    const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
 
     const htmlContent = `
       <!DOCTYPE html>
       <html>
         <head>
-          <title>AL ASR MOTORS - Showroom Daily Stock Report (${todayStr})</title>
+          <title>AL ASR MOTORS - Showroom Current Stock (${todayStr})</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 25px; color: #1e293b; background: #ffffff; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0284c7; padding-bottom: 15px; margin-bottom: 20px; }
-            .logo-box { display: flex; items-center; gap: 15px; }
-            .title { font-size: 22px; font-weight: bold; color: #0f172a; }
-            .subtitle { font-size: 12px; color: #64748b; font-family: monospace; }
-            .stats { display: flex; gap: 15px; margin-bottom: 20px; }
-            .stat-box { flex: 1; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; }
-            .stat-label { font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: bold; }
-            .stat-val { font-size: 18px; font-weight: bold; color: #0284c7; margin-top: 4px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            th { background: #0f172a; color: #ffffff; text-align: left; padding: 10px; font-size: 11px; text-transform: uppercase; }
-            td { padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
+            @page { size: A4 landscape; margin: 4mm 6mm; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 2px; color: #0f172a; background: #ffffff; font-size: 8.5px; line-height: 1.15; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #0284c7; padding-bottom: 4px; margin-bottom: 4px; }
+            .logo-box { display: flex; align-items: center; gap: 8px; }
+            .title { font-size: 14px; font-weight: 800; color: #0f172a; letter-spacing: 0.5px; }
+            .subtitle { font-size: 8.5px; color: #64748b; font-family: monospace; }
+            .stats-inline { display: flex; gap: 12px; font-size: 8.5px; background: #f8fafc; padding: 3px 8px; border-radius: 4px; border: 1px solid #e2e8f0; }
+            .stat-item { font-weight: 600; color: #334155; }
+            .stat-item strong { color: #0284c7; font-weight: 800; }
+            table { width: 100%; border-collapse: collapse; margin-top: 2px; }
+            th { background: #0f172a; color: #ffffff; text-align: left; padding: 3px 5px; font-size: 8px; font-weight: 700; text-transform: uppercase; border: 1px solid #0f172a; }
+            td { padding: 2.5px 5px; border-bottom: 1px solid #cbd5e1; font-size: 8.5px; vertical-align: middle; white-space: nowrap; }
             tr:nth-child(even) { background: #f8fafc; }
-            .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; }
-            .badge-available { background: #dcfce7; color: #15803d; }
-            .badge-reserved { background: #fef3c7; color: #b45309; }
-            .badge-care { background: #e0f2fe; color: #0369a1; }
-            .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+            .badge { display: inline-block; padding: 1px 4px; border-radius: 3px; font-size: 7.5px; font-weight: 700; }
+            .badge-available { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+            .badge-reserved { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+            .badge-care { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-weight: bold; }
+            .footer { margin-top: 4px; text-align: center; font-size: 7.5px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 2px; }
           </style>
         </head>
         <body>
           <div class="header">
             <div class="logo-box">
-              <img src="${logoBase64}" alt="AL ASR MOTORS Logo" style="height: 105px; width: auto; object-fit: contain;" />
+              <img src="${logoBase64}" alt="AL ASR MOTORS" style="height: 38px; width: auto; object-fit: contain;" />
               <div>
-                <div class="title">AL ASR MOTORS - Showroom Daily Stock</div>
-                <div class="subtitle">Official Inventory Management Report • Generated: ${todayStr}</div>
+                <div class="title">AL ASR MOTORS — SHOWROOM CURRENT STOCK</div>
+                <div class="subtitle">Official Floor Stock Inventory • Generated: ${todayStr} • Sahiwal, Pakistan</div>
               </div>
             </div>
-            <div style="text-align: right;">
-              <div style="font-size: 14px; font-weight: bold; color: #0284c7;">Main Showroom Floor</div>
-              <div style="font-size: 10px; color: #64748b;">Sahiwal, Pakistan</div>
-            </div>
-          </div>
-
-          <div class="stats">
-            <div class="stat-box">
-              <div class="stat-label">Total Vehicles on Floor</div>
-              <div class="stat-val">${stats.totalUnits || 0} Units</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-label">Available Vehicles</div>
-              <div class="stat-val">${stats.availableUnits || 0} Units</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-label">Showroom Stock Valuation</div>
-              <div class="stat-val">Rs. ${(stats.totalValuation || 0).toLocaleString()}</div>
+            <div class="stats-inline">
+              <div class="stat-item">Total Floor Stock: <strong>${stats.totalUnits || 0} Units</strong></div>
+              <div class="stat-item">Available: <strong>${stats.availableUnits || 0} Units</strong></div>
+              <div class="stat-item">Total Valuation: <strong>Rs. ${(stats.totalValuation || 0).toLocaleString()}</strong></div>
             </div>
           </div>
 
           <table>
             <thead>
               <tr>
-                <th>#</th>
+                <th style="width: 25px;">#</th>
                 <th>Vehicle & Model Specs</th>
                 <th>Year</th>
                 <th>Color</th>
                 <th>Mileage</th>
                 <th>Asking Price (PKR)</th>
                 <th>Care Of</th>
-                <th>Reg #</th>
+                <th>Registration / Plate #</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody>
               ${stockList.map((item, idx) => `
                 <tr>
-                  <td>${idx + 1}</td>
+                  <td><strong>${idx + 1}</strong></td>
                   <td><strong>${item.vehicle} ${item.model}</strong></td>
                   <td>${item.year}</td>
                   <td>${item.color}</td>
                   <td>${item.mileage ? item.mileage.toLocaleString() + ' km' : '0 km'}</td>
-                  <td><strong>Rs. ${item.askingPrice?.toLocaleString()}</strong></td>
+                  <td><strong style="color: #0f172a;">Rs. ${item.askingPrice?.toLocaleString()}</strong></td>
                   <td><span class="badge badge-care">${item.careOf || 'AL Asr'}</span></td>
-                  <td>${item.regNumber || '-'}</td>
+                  <td><strong style="color: #0284c7; font-family: monospace;">${item.regNumber || 'UNREGISTERED'}</strong></td>
                   <td><span class="badge ${item.status === 'AVAILABLE' ? 'badge-available' : 'badge-reserved'}">${item.status}</span></td>
                 </tr>
               `).join('')}
@@ -223,7 +209,7 @@ export default function CurrentStock() {
           </table>
 
           <div class="footer">
-            Report generated by AL ASR Motors Executive System • Confidential Internal Showroom Document
+            AL ASR MOTORS Dealership Executive System • Showing ${stockList.length} inventory records on single page document
           </div>
 
           <script>
