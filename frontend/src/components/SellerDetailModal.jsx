@@ -125,6 +125,12 @@ export default function SellerDetailModal({ seller, onClose, onEdit, onImagesUpd
                     <span className="text-slate-400 font-mono">Lead Source:</span>
                     <span className="text-slate-300 font-mono">{seller.leadSource}</span>
                   </div>
+                  {seller.leadReferredBy && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 font-mono">Referred By:</span>
+                      <span className="text-sky-400 font-mono font-bold">{seller.leadReferredBy}</span>
+                    </div>
+                  )}
                   {seller.leadReference && (
                     <div className="flex justify-between">
                       <span className="text-slate-400 font-mono">Reference:</span>

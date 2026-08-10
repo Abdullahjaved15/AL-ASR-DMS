@@ -37,23 +37,24 @@ model Seller {
   createdByUser    User          @relation("CreatedSellers", fields: [createdBy], references: [id])
   registrationDate DateTime      @default(now())
 
-  vehicle          String
-  model            String
-  year             String
-  color            String
-  mileage          Int
+  vehicle          String?       @default("")
+  model            String?       @default("")
+  year             String?       @default("")
+  color            String?       @default("")
+  mileage          Int?          @default(0)
 
   numberPlate      String?       // Unique Vehicle Registration / License Plate Number
-  demandPrice      Float
+  demandPrice      Float?        @default(0)
   carCondition     String?       @default("Used") // Used, Zero Meter
   zeroMeterType    String?       // Cash, Booking
 
-  sellerName       String
-  sellerPhone      String
-  sellerCity       String
+  sellerName       String?       @default("")
+  sellerPhone      String?       @default("")
+  sellerCity       String?       @default("")
 
-  leadSource       String
+  leadSource       String?       @default("Direct Call")
   leadReference    String?
+  leadReferredBy   String?
 
   assignedTo       String?
   assignedUser     User?         @relation("AssignedSellers", fields: [assignedTo], references: [id])
@@ -98,30 +99,33 @@ model Buyer {
   createdByUser    User     @relation("CreatedBuyers", fields: [createdBy], references: [id])
   registrationDate DateTime @default(now())
 
-  vehicle          String
-  model            String
-  year             String
-  color            String
-  mileage          Int
+  vehicle          String?  @default("")
+  model            String?  @default("")
+  year             String?  @default("")
+  color            String?  @default("")
+  mileage          Int?     @default(0)
 
-  budget           Float
+  budget           Float?   @default(0)
   carCondition     String?  @default("Used") // Used, Zero Meter
   zeroMeterType    String?  // Cash, Booking
 
   isBankCase       Boolean  @default(false)
   bankName         String?
+  bankCaseStatus   String?  @default("Not Confirmed") // Confirmed, Not Confirmed
+  bankCaseNo       Int?     // Sequential Case # assigned when confirmed
   bankChecklist    Json?    // Detailed 12-item Bank Case Requirement Checklist
   processingFees   Float?   @default(0)
   downpaymentPercent Float? @default(0)
   downpaymentAmount Float?  @default(0)
   dueAmount        Float?   @default(0)
 
-  buyerName        String
-  buyerPhone       String
-  buyerCity        String
+  buyerName        String?  @default("")
+  buyerPhone       String?  @default("")
+  buyerCity        String?  @default("")
 
-  leadSource       String
+  leadSource       String?  @default("Website")
   leadReference    String?
+  leadReferredBy   String?
 
   assignedTo       String?
   assignedUser     User?    @relation("AssignedBuyers", fields: [assignedTo], references: [id])

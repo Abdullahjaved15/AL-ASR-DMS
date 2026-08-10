@@ -175,12 +175,8 @@ const createSeller = async (req, res) => {
       vehicle, model, year, color, mileage, numberPlate, demandPrice,
       carCondition, zeroMeterType,
       sellerName, sellerPhone, sellerCity,
-      leadSource, leadReference, assignedTo, leadStatus, comments
+      leadSource, leadReference, leadReferredBy, assignedTo, leadStatus, comments
     } = req.body;
-
-    if (!vehicle || !model || !demandPrice || !sellerName || !sellerPhone || !sellerCity) {
-      return res.status(400).json({ message: 'Vehicle, model, demand price, seller name, phone, and city are required' });
-    }
 
     // Duplicate Number Plate validation (if plate provided)
     if (numberPlate && numberPlate.trim()) {
@@ -206,20 +202,21 @@ const createSeller = async (req, res) => {
     const newSeller = await prisma.seller.create({
       data: {
         createdBy: req.user.id,
-        vehicle,
-        model,
+        vehicle: vehicle || '',
+        model: model || '',
         year: year ? String(year) : String(new Date().getFullYear()),
         color: color || 'N/A',
         mileage: parseInt(mileage) || 0,
         numberPlate: numberPlate ? numberPlate.trim() : null,
-        demandPrice: parseFloat(demandPrice),
+        demandPrice: demandPrice !== undefined && demandPrice !== '' ? parseFloat(demandPrice) : 0,
         carCondition: carCondition || 'Used',
         zeroMeterType: carCondition === 'Zero Meter' ? zeroMeterType || 'Cash' : null,
-        sellerName,
-        sellerPhone: formatPakistaniPhone(sellerPhone),
-        sellerCity,
+        sellerName: sellerName || '',
+        sellerPhone: sellerPhone ? formatPakistaniPhone(sellerPhone) : '',
+        sellerCity: sellerCity || '',
         leadSource: leadSource || 'Direct Call',
         leadReference: leadReference || null,
+        leadReferredBy: leadReferredBy || null,
         assignedTo: assignedSalesman,
         leadStatus: leadStatus || 'New Lead',
         comments: comments || null
@@ -234,7 +231,7 @@ const createSeller = async (req, res) => {
       data: {
         userId: req.user.id,
         action: 'CREATE_SELLER',
-        details: `Added seller ${sellerName} for ${year} ${vehicle} ${model} (Plate: ${numberPlate || 'N/A'})`
+        details: `Added seller ${sellerName || 'N/A'} for ${year || ''} ${vehicle || ''} ${model || ''} (Plate: ${numberPlate || 'N/A'})`
       }
     });
 
@@ -262,7 +259,7 @@ const updateSeller = async (req, res) => {
     const {
       vehicle, model, year, color, mileage, numberPlate, demandPrice,
       sellerName, sellerPhone, sellerCity,
-      leadSource, leadReference, assignedTo, leadStatus, comments
+      leadSource, leadReference, leadReferredBy, assignedTo, leadStatus, comments
     } = req.body;
 
     // Check duplicate number plate if changed
@@ -293,16 +290,17 @@ const updateSeller = async (req, res) => {
     if (model !== undefined) updateData.model = model;
     if (year !== undefined) updateData.year = String(year);
     if (color !== undefined) updateData.color = color;
-    if (mileage !== undefined) updateData.mileage = parseInt(mileage);
+    if (mileage !== undefined) updateData.mileage = parseInt(mileage) || 0;
     if (numberPlate !== undefined) updateData.numberPlate = numberPlate ? numberPlate.trim() : null;
-    if (demandPrice !== undefined) updateData.demandPrice = parseFloat(demandPrice);
+    if (demandPrice !== undefined) updateData.demandPrice = demandPrice !== '' ? parseFloat(demandPrice) : 0;
     if (carCondition !== undefined) updateData.carCondition = carCondition;
     if (zeroMeterType !== undefined) updateData.zeroMeterType = carCondition === 'Zero Meter' ? zeroMeterType : null;
     if (sellerName !== undefined) updateData.sellerName = sellerName;
-    if (sellerPhone !== undefined) updateData.sellerPhone = formatPakistaniPhone(sellerPhone);
+    if (sellerPhone !== undefined) updateData.sellerPhone = sellerPhone ? formatPakistaniPhone(sellerPhone) : '';
     if (sellerCity !== undefined) updateData.sellerCity = sellerCity;
     if (leadSource !== undefined) updateData.leadSource = leadSource;
     if (leadReference !== undefined) updateData.leadReference = leadReference;
+    if (leadReferredBy !== undefined) updateData.leadReferredBy = leadReferredBy;
     if (isAdminUser && assignedTo !== undefined) updateData.assignedTo = assignedTo;
     if (leadStatus !== undefined) updateData.leadStatus = leadStatus;
     if (comments !== undefined) updateData.comments = comments;

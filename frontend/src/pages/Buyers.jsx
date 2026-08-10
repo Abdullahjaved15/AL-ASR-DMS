@@ -24,6 +24,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
   const { user, isAdmin } = useAuth();
   const [buyers, setBuyers] = useState([]);
   const [salesmenList, setSalesmenList] = useState([]);
+  const [teamList, setTeamList] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Multi-Filters state
@@ -83,6 +84,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
     zeroMeterType: 'Cash',
     isBankCase: false,
     bankName: '',
+    bankCaseStatus: 'Not Confirmed',
     processingFees: 0,
     downpaymentPercent: 20,
     buyerName: '',
@@ -90,6 +92,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
     buyerCity: '',
     leadSource: 'Website',
     leadReference: '',
+    leadReferredBy: '',
     assignedTo: '',
     leadStatus: 'New Lead',
     comments: ''
@@ -97,9 +100,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
 
   useEffect(() => {
     fetchBuyers();
-    if (isAdmin) {
-      fetchSalesmen();
-    }
+    fetchTeamMembers();
   }, [search, filters, scope]);
 
   const fetchBuyers = async () => {
@@ -124,7 +125,8 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
         const mine = data.filter(b => 
           b.assignedTo === user.id || 
           b.createdBy === user.id || 
-          (cleanUserName && b.leadReference?.toLowerCase().includes(cleanUserName))
+          (cleanUserName && b.leadReference?.toLowerCase().includes(cleanUserName)) ||
+          (cleanUserName && b.leadReferredBy?.toLowerCase().includes(cleanUserName))
         );
         filteredData = mine.length > 0 ? mine : data;
       }
@@ -139,12 +141,14 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
     }
   };
 
-  const fetchSalesmen = async () => {
+  const fetchTeamMembers = async () => {
     try {
       const data = await api.getUsers();
-      setSalesmenList(data.filter(u => u.role === 'SALESMAN' && u.status === 'ACTIVE'));
+      const activeUsers = data.filter(u => u.status === 'ACTIVE');
+      setTeamList(activeUsers);
+      setSalesmenList(activeUsers.filter(u => u.role === 'SALESMAN'));
     } catch (err) {
-      console.error('Failed to fetch salesmen:', err);
+      console.error('Failed to fetch team members:', err);
     }
   };
 
@@ -160,6 +164,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
       zeroMeterType: 'Cash',
       isBankCase: scope === 'bank_cases',
       bankName: '',
+      bankCaseStatus: 'Not Confirmed',
       processingFees: 0,
       downpaymentPercent: 20,
       buyerName: '',
@@ -167,6 +172,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
       buyerCity: '',
       leadSource: 'Website',
       leadReference: '',
+      leadReferredBy: '',
       assignedTo: user?.id || '',
       leadStatus: 'New Lead',
       comments: ''
@@ -210,25 +216,27 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
   const openEditModal = (buyer) => {
     setSelectedBuyer(buyer);
     setFormData({
-      vehicle: buyer.vehicle,
-      model: buyer.model,
-      year: buyer.year,
-      color: buyer.color,
-      mileage: buyer.mileage,
-      budget: buyer.budget,
+      vehicle: buyer.vehicle || '',
+      model: buyer.model || '',
+      year: buyer.year || '',
+      color: buyer.color || '',
+      mileage: buyer.mileage || 0,
+      budget: buyer.budget || '',
       carCondition: buyer.carCondition || 'Used',
       zeroMeterType: buyer.zeroMeterType || 'Cash',
       isBankCase: Boolean(buyer.isBankCase),
       bankName: buyer.bankName || '',
+      bankCaseStatus: buyer.bankCaseStatus || 'Not Confirmed',
       processingFees: buyer.processingFees || 0,
       downpaymentPercent: buyer.downpaymentPercent || 20,
-      buyerName: buyer.buyerName,
-      buyerPhone: buyer.buyerPhone,
-      buyerCity: buyer.buyerCity,
-      leadSource: buyer.leadSource,
+      buyerName: buyer.buyerName || '',
+      buyerPhone: buyer.buyerPhone || '',
+      buyerCity: buyer.buyerCity || '',
+      leadSource: buyer.leadSource || 'Website',
       leadReference: buyer.leadReference || '',
+      leadReferredBy: buyer.leadReferredBy || '',
       assignedTo: buyer.assignedTo || '',
-      leadStatus: buyer.leadStatus,
+      leadStatus: buyer.leadStatus || 'New Lead',
       comments: buyer.comments || ''
     });
     setIsEditModalOpen(true);
@@ -562,10 +570,17 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                     <td className="py-4 px-4" onClick={() => openDetailModal(buyer)}>
                       {buyer.isBankCase ? (
                         <div className="flex flex-col space-y-1">
-                          <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-500/40 text-[10px] font-mono font-extrabold w-fit">
-                            <Building2 className="w-3 h-3 text-sky-400" />
-                            <span>Case #{getBankCaseNo(buyer.id)}</span>
-                          </span>
+                          {buyer.bankCaseStatus === 'Confirmed' && (buyer.bankCaseNo || getBankCaseNo(buyer.id)) ? (
+                            <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono font-extrabold w-fit">
+                              <Building2 className="w-3 h-3 text-emerald-400" />
+                              <span>Case #{buyer.bankCaseNo || getBankCaseNo(buyer.id)} • CONFIRMED</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-mono font-bold w-fit">
+                              <Building2 className="w-3 h-3 text-amber-400" />
+                              <span>Not Confirmed (HOLD)</span>
+                            </span>
+                          )}
                           <span className="text-slate-300 text-[11px] font-semibold">{buyer.bankName || 'Bank Financing'}</span>
                         </div>
                       ) : (
@@ -663,10 +678,9 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
             <form onSubmit={isEditModalOpen ? handleUpdateBuyer : handleCreateBuyer} className="p-6 overflow-y-auto space-y-4 max-h-[calc(90vh-85px)] custom-scrollbar">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Buyer Name *</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Buyer Name</label>
                   <input
                     type="text"
-                    required
                     placeholder="Harrison Forde"
                     value={formData.buyerName}
                     onChange={(e) => setFormData({ ...formData, buyerName: e.target.value })}
@@ -675,10 +689,9 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Phone Number *</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Phone Number</label>
                   <input
                     type="text"
-                    required
                     placeholder="+92 300 0000000"
                     value={formData.buyerPhone}
                     onChange={(e) => setFormData({ ...formData, buyerPhone: e.target.value })}
@@ -687,10 +700,9 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">City *</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">City</label>
                   <input
                     type="text"
-                    required
                     placeholder="Lahore / Sahiwal"
                     value={formData.buyerCity}
                     onChange={(e) => setFormData({ ...formData, buyerCity: e.target.value })}
@@ -701,10 +713,9 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Desired Vehicle Make *</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Desired Vehicle Make</label>
                   <input
                     type="text"
-                    required
                     placeholder="e.g. Toyota / Honda"
                     value={formData.vehicle}
                     onChange={(e) => setFormData({ ...formData, vehicle: e.target.value })}
@@ -713,10 +724,9 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Model / Trim *</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Model / Trim</label>
                   <input
                     type="text"
-                    required
                     placeholder="e.g. Fortuner / Civic"
                     value={formData.model}
                     onChange={(e) => setFormData({ ...formData, model: e.target.value })}
@@ -728,7 +738,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
               {/* Vehicle Condition Selector */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-900/60 p-3 rounded-2xl border border-white/5">
                 <div>
-                  <label className="block text-xs font-mono text-cyan-400 font-bold mb-1">Vehicle Condition *</label>
+                  <label className="block text-xs font-mono text-cyan-400 font-bold mb-1">Vehicle Condition</label>
                   <select
                     value={formData.carCondition}
                     onChange={(e) => setFormData({ ...formData, carCondition: e.target.value })}
@@ -741,7 +751,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
 
                 {formData.carCondition === 'Zero Meter' && (
                   <div>
-                    <label className="block text-xs font-mono text-emerald-400 font-bold mb-1">Zero Meter Payment Option *</label>
+                    <label className="block text-xs font-mono text-emerald-400 font-bold mb-1">Zero Meter Payment Option</label>
                     <select
                       value={formData.zeroMeterType}
                       onChange={(e) => setFormData({ ...formData, zeroMeterType: e.target.value })}
@@ -757,11 +767,10 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">
-                    {formData.isBankCase ? 'Total Amount (PKR / Rs.) *' : 'Target Budget (PKR / Rs.) *'}
+                    {formData.isBankCase ? 'Total Amount (PKR / Rs.)' : 'Target Budget (PKR / Rs.)'}
                   </label>
                   <input
                     type="number"
-                    required
                     placeholder="20000000"
                     value={formData.budget}
                     onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
@@ -812,9 +821,9 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
 
                 {formData.isBankCase && (
                   <div className="space-y-4 pt-2 border-t border-white/10">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-mono text-sky-300 mb-1">Bank Name *</label>
+                        <label className="block text-xs font-mono text-sky-300 mb-1">Bank Name</label>
                         <input
                           type="text"
                           placeholder="e.g. Meezan Bank, HBL"
@@ -825,7 +834,21 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                       </div>
 
                       <div>
-                        <label className="block text-xs font-mono text-amber-300 mb-1">Downpayment (%) *</label>
+                        <label className="block text-xs font-mono text-amber-300 font-bold mb-1">Bank Case Confirmation Status</label>
+                        <select
+                          value={formData.bankCaseStatus}
+                          onChange={(e) => setFormData({ ...formData, bankCaseStatus: e.target.value })}
+                          className="w-full bg-slate-950 border border-amber-500/40 rounded-xl px-3 py-2 text-sm text-amber-300 font-bold focus:outline-none focus:border-amber-400 font-mono"
+                        >
+                          <option value="Not Confirmed">Not Confirmed (HOLD)</option>
+                          <option value="Confirmed">Confirmed (Assign Case #)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-mono text-amber-300 mb-1">Downpayment (%)</label>
                         <input
                           type="number"
                           step="0.1"
@@ -875,21 +898,39 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                 )}
               </div>
 
-              {isAdmin && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Assign Lead To Salesman</label>
+                  <label className="block text-xs font-mono text-sky-400 font-bold mb-1">Lead Referred By (Team Member)</label>
                   <select
-                    value={formData.assignedTo}
-                    onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
+                    value={formData.leadReferredBy}
+                    onChange={(e) => setFormData({ ...formData, leadReferredBy: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
                   >
-                    <option value="">Unassigned</option>
-                    {salesmenList.map(sm => (
-                      <option key={sm.id} value={sm.id}>{sm.name} ({sm.email})</option>
+                    <option value="">Direct / None</option>
+                    {teamList.map(member => (
+                      <option key={member.id} value={member.name}>
+                        {member.name} ({member.role ? member.role.replace('_', ' ') : 'USER'})
+                      </option>
                     ))}
                   </select>
                 </div>
-              )}
+
+                {isAdmin && (
+                  <div>
+                    <label className="block text-xs font-mono text-slate-400 mb-1">Assign Lead To Salesman</label>
+                    <select
+                      value={formData.assignedTo}
+                      onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
+                    >
+                      <option value="">Unassigned</option>
+                      {salesmenList.map(sm => (
+                        <option key={sm.id} value={sm.id}>{sm.name} ({sm.email})</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
 
               <div>
                 <label className="block text-xs font-mono text-slate-400 mb-1">Comments / Inquiry Notes</label>

@@ -7,11 +7,13 @@ const { requireRole } = require('../middleware/rbac');
 const router = express.Router();
 
 router.use(authenticateToken);
-router.use(requireRole('ADMIN'));
 
+// All authenticated users can list team members (salesmen & admins)
 router.get('/', getAllUsers);
-router.post('/create', register);
-router.put('/:id/status', updateUserStatus);
-router.delete('/:id', deleteUser);
+
+// Admin-only management endpoints
+router.post('/create', requireRole('ADMIN'), register);
+router.put('/:id/status', requireRole('ADMIN'), updateUserStatus);
+router.delete('/:id', requireRole('ADMIN'), deleteUser);
 
 module.exports = router;

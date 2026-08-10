@@ -25,6 +25,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
   const { user, isAdmin } = useAuth();
   const [sellers, setSellers] = useState([]);
   const [salesmenList, setSalesmenList] = useState([]);
+  const [teamList, setTeamList] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Multi-Filters state
@@ -84,6 +85,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
     sellerCity: '',
     leadSource: 'Direct Call',
     leadReference: '',
+    leadReferredBy: '',
     assignedTo: '',
     leadStatus: 'New Lead',
     comments: ''
@@ -91,9 +93,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
 
   useEffect(() => {
     fetchSellers();
-    if (isAdmin) {
-      fetchSalesmen();
-    }
+    fetchTeamMembers();
   }, [search, filters, scope]);
 
   const fetchSellers = async () => {
@@ -115,7 +115,8 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
         const mine = data.filter(s => 
           s.assignedTo === user.id || 
           s.createdBy === user.id || 
-          (cleanUserName && s.leadReference?.toLowerCase().includes(cleanUserName))
+          (cleanUserName && s.leadReference?.toLowerCase().includes(cleanUserName)) ||
+          (cleanUserName && s.leadReferredBy?.toLowerCase().includes(cleanUserName))
         );
         filteredData = mine.length > 0 ? mine : data;
       }
@@ -127,12 +128,14 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
     }
   };
 
-  const fetchSalesmen = async () => {
+  const fetchTeamMembers = async () => {
     try {
       const data = await api.getUsers();
-      setSalesmenList(data.filter(u => u.role === 'SALESMAN' && u.status === 'ACTIVE'));
+      const activeUsers = data.filter(u => u.status === 'ACTIVE');
+      setTeamList(activeUsers);
+      setSalesmenList(activeUsers.filter(u => u.role === 'SALESMAN'));
     } catch (err) {
-      console.error('Failed to fetch salesmen:', err);
+      console.error('Failed to fetch team members:', err);
     }
   };
 
@@ -152,6 +155,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
       sellerCity: '',
       leadSource: 'Direct Call',
       leadReference: '',
+      leadReferredBy: '',
       assignedTo: user?.id || '',
       leadStatus: 'New Lead',
       comments: ''
@@ -195,22 +199,23 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
   const openEditModal = (seller) => {
     setSelectedSeller(seller);
     setFormData({
-      vehicle: seller.vehicle,
-      model: seller.model,
-      year: seller.year,
-      color: seller.color,
-      mileage: seller.mileage,
+      vehicle: seller.vehicle || '',
+      model: seller.model || '',
+      year: seller.year || '',
+      color: seller.color || '',
+      mileage: seller.mileage || 0,
       numberPlate: seller.numberPlate || '',
-      demandPrice: seller.demandPrice,
+      demandPrice: seller.demandPrice || '',
       carCondition: seller.carCondition || 'Used',
       zeroMeterType: seller.zeroMeterType || 'Cash',
-      sellerName: seller.sellerName,
-      sellerPhone: seller.sellerPhone,
-      sellerCity: seller.sellerCity,
-      leadSource: seller.leadSource,
+      sellerName: seller.sellerName || '',
+      sellerPhone: seller.sellerPhone || '',
+      sellerCity: seller.sellerCity || '',
+      leadSource: seller.leadSource || 'Direct Call',
       leadReference: seller.leadReference || '',
+      leadReferredBy: seller.leadReferredBy || '',
       assignedTo: seller.assignedTo || '',
-      leadStatus: seller.leadStatus,
+      leadStatus: seller.leadStatus || 'New Lead',
       comments: seller.comments || ''
     });
     setIsEditModalOpen(true);
@@ -586,10 +591,9 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
             <form onSubmit={isEditModalOpen ? handleUpdateSeller : handleCreateSeller} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Seller Name *</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Seller Name</label>
                   <input
                     type="text"
-                    required
                     placeholder="Robert Sterling"
                     value={formData.sellerName}
                     onChange={(e) => setFormData({ ...formData, sellerName: e.target.value })}
@@ -598,10 +602,9 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Phone Number *</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Phone Number</label>
                   <input
                     type="text"
-                    required
                     placeholder="+1 (555) 000-0000"
                     value={formData.sellerPhone}
                     onChange={(e) => setFormData({ ...formData, sellerPhone: e.target.value })}
@@ -610,10 +613,9 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">City *</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">City</label>
                   <input
                     type="text"
-                    required
                     placeholder="Los Angeles"
                     value={formData.sellerCity}
                     onChange={(e) => setFormData({ ...formData, sellerCity: e.target.value })}
@@ -624,10 +626,9 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Vehicle Make / Brand *</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Vehicle Make / Brand</label>
                   <input
                     type="text"
-                    required
                     placeholder="e.g. Porsche"
                     value={formData.vehicle}
                     onChange={(e) => setFormData({ ...formData, vehicle: e.target.value })}
@@ -636,10 +637,9 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Car Model *</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Car Model</label>
                   <input
                     type="text"
-                    required
                     placeholder="e.g. 911 Carrera S"
                     value={formData.model}
                     onChange={(e) => setFormData({ ...formData, model: e.target.value })}
@@ -695,7 +695,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-900/60 p-3 rounded-2xl border border-white/5">
                 <div>
-                  <label className="block text-xs font-mono text-cyan-400 font-bold mb-1">Vehicle Condition *</label>
+                  <label className="block text-xs font-mono text-cyan-400 font-bold mb-1">Vehicle Condition</label>
                   <select
                     value={formData.carCondition}
                     onChange={(e) => setFormData({ ...formData, carCondition: e.target.value })}
@@ -708,7 +708,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
 
                 {formData.carCondition === 'Zero Meter' && (
                   <div>
-                    <label className="block text-xs font-mono text-emerald-400 font-bold mb-1">Zero Meter Payment Option *</label>
+                    <label className="block text-xs font-mono text-emerald-400 font-bold mb-1">Zero Meter Payment Option</label>
                     <select
                       value={formData.zeroMeterType}
                       onChange={(e) => setFormData({ ...formData, zeroMeterType: e.target.value })}
@@ -723,10 +723,9 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Demand Price (PKR / Rs.) *</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Demand Price (PKR / Rs.)</label>
                   <input
                     type="number"
-                    required
                     placeholder="19800000"
                     value={formData.demandPrice}
                     onChange={(e) => setFormData({ ...formData, demandPrice: e.target.value })}
@@ -746,21 +745,39 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                 </div>
               </div>
 
-              {isAdmin && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Assign Lead To Salesman</label>
+                  <label className="block text-xs font-mono text-sky-400 font-bold mb-1">Lead Referred By (Team Member)</label>
                   <select
-                    value={formData.assignedTo}
-                    onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
+                    value={formData.leadReferredBy}
+                    onChange={(e) => setFormData({ ...formData, leadReferredBy: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
                   >
-                    <option value="">Unassigned</option>
-                    {salesmenList.map(sm => (
-                      <option key={sm.id} value={sm.id}>{sm.name} ({sm.email})</option>
+                    <option value="">Direct / None</option>
+                    {teamList.map(member => (
+                      <option key={member.id} value={member.name}>
+                        {member.name} ({member.role ? member.role.replace('_', ' ') : 'USER'})
+                      </option>
                     ))}
                   </select>
                 </div>
-              )}
+
+                {isAdmin && (
+                  <div>
+                    <label className="block text-xs font-mono text-slate-400 mb-1">Assign Lead To Salesman</label>
+                    <select
+                      value={formData.assignedTo}
+                      onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
+                    >
+                      <option value="">Unassigned</option>
+                      {salesmenList.map(sm => (
+                        <option key={sm.id} value={sm.id}>{sm.name} ({sm.email})</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
 
               <div>
                 <label className="block text-xs font-mono text-slate-400 mb-1">Comments / Notes</label>

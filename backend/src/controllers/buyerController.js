@@ -137,6 +137,13 @@ const getBuyerById = async (req, res) => {
   }
 };
 
+const getNextBankCaseNo = async () => {
+  const result = await prisma.buyer.aggregate({
+    _max: { bankCaseNo: true }
+  });
+  return (result._max.bankCaseNo || 0) + 1;
+};
+
 const createBuyer = async (req, res) => {
   try {
     // Only Admin and Super Admin can create buyer records
@@ -147,16 +154,12 @@ const createBuyer = async (req, res) => {
     const {
       vehicle, model, year, color, mileage, budget,
       carCondition, zeroMeterType,
-      isBankCase, bankName, bankChecklist, processingFees, downpaymentPercent,
+      isBankCase, bankName, bankCaseStatus, bankChecklist, processingFees, downpaymentPercent,
       buyerName, buyerPhone, buyerCity,
-      leadSource, leadReference, assignedTo, leadStatus, comments
+      leadSource, leadReference, leadReferredBy, assignedTo, leadStatus, comments
     } = req.body;
 
-    if (!vehicle || !model || !budget || !buyerName || !buyerPhone || !buyerCity) {
-      return res.status(400).json({ message: 'Vehicle, model, budget/total amount, buyer name, phone, and city are required' });
-    }
-
-    const numBudget = parseFloat(budget) || 0;
+    const numBudget = budget !== undefined && budget !== '' ? parseFloat(budget) : 0;
     const numDownPercent = parseFloat(downpaymentPercent) || 0;
     const numProcessingFees = parseFloat(processingFees) || 0;
     
@@ -168,11 +171,18 @@ const createBuyer = async (req, res) => {
 
     const assignedSalesman = assignedTo || req.user.id;
 
+    // Bank Case Confirmation & Case # Logic
+    const targetBankCaseStatus = isBankCase ? (bankCaseStatus || 'Not Confirmed') : 'Not Confirmed';
+    let assignedCaseNo = null;
+    if (isBankCase && targetBankCaseStatus === 'Confirmed') {
+      assignedCaseNo = await getNextBankCaseNo();
+    }
+
     const newBuyer = await prisma.buyer.create({
       data: {
         createdBy: req.user.id,
-        vehicle,
-        model,
+        vehicle: vehicle || '',
+        model: model || '',
         year: year ? String(year) : String(new Date().getFullYear()),
         color: color || 'Any',
         mileage: parseInt(mileage) || 0,
@@ -181,16 +191,19 @@ const createBuyer = async (req, res) => {
         zeroMeterType: carCondition === 'Zero Meter' ? zeroMeterType || 'Cash' : null,
         isBankCase: Boolean(isBankCase),
         bankName: isBankCase ? bankName || null : null,
+        bankCaseStatus: targetBankCaseStatus,
+        bankCaseNo: assignedCaseNo,
         bankChecklist: isBankCase ? bankChecklist || null : null,
         processingFees: isBankCase ? numProcessingFees : 0,
         downpaymentPercent: isBankCase ? numDownPercent : 0,
         downpaymentAmount: numDownAmount,
         dueAmount: calculatedDueAmount,
-        buyerName,
-        buyerPhone: formatPakistaniPhone(buyerPhone),
-        buyerCity,
+        buyerName: buyerName || '',
+        buyerPhone: buyerPhone ? formatPakistaniPhone(buyerPhone) : '',
+        buyerCity: buyerCity || '',
         leadSource: leadSource || 'Website',
         leadReference: leadReference || null,
+        leadReferredBy: leadReferredBy || null,
         assignedTo: assignedSalesman,
         leadStatus: leadStatus || 'New Lead',
         comments: comments || null
@@ -204,7 +217,7 @@ const createBuyer = async (req, res) => {
       data: {
         userId: req.user.id,
         action: 'CREATE_BUYER',
-        details: `Added buyer inquiry ${buyerName} for ${vehicle} ${model} (Bank Case: ${isBankCase ? 'YES (' + (bankName || 'Bank') + ')' : 'NO'})`
+        details: `Added buyer inquiry ${buyerName || 'N/A'} for ${vehicle || ''} ${model || ''} (Bank Case: ${isBankCase ? 'YES (' + (bankName || 'Bank') + ', Status: ' + targetBankCaseStatus + (assignedCaseNo ? ', Case #' + assignedCaseNo : '') + ')' : 'NO'})`
       }
     });
 
@@ -231,9 +244,9 @@ const updateBuyer = async (req, res) => {
     const {
       vehicle, model, year, color, mileage, budget,
       carCondition, zeroMeterType,
-      isBankCase, bankName, bankChecklist, processingFees, downpaymentPercent,
+      isBankCase, bankName, bankCaseStatus, bankChecklist, processingFees, downpaymentPercent,
       buyerName, buyerPhone, buyerCity,
-      leadSource, leadReference, assignedTo, leadStatus, comments
+      leadSource, leadReference, leadReferredBy, assignedTo, leadStatus, comments
     } = req.body;
 
     const updateData = {};
@@ -241,13 +254,14 @@ const updateBuyer = async (req, res) => {
     if (model !== undefined) updateData.model = model;
     if (year !== undefined) updateData.year = String(year);
     if (color !== undefined) updateData.color = color;
-    if (mileage !== undefined) updateData.mileage = parseInt(mileage);
+    if (mileage !== undefined) updateData.mileage = parseInt(mileage) || 0;
     if (carCondition !== undefined) updateData.carCondition = carCondition;
     if (zeroMeterType !== undefined) updateData.zeroMeterType = carCondition === 'Zero Meter' ? zeroMeterType : null;
     
+    const targetIsBankCase = isBankCase !== undefined ? Boolean(isBankCase) : existingBuyer.isBankCase;
+
     if (budget !== undefined || isBankCase !== undefined || downpaymentPercent !== undefined || processingFees !== undefined) {
-      const targetBudget = budget !== undefined ? parseFloat(budget) : existingBuyer.budget;
-      const targetIsBankCase = isBankCase !== undefined ? Boolean(isBankCase) : existingBuyer.isBankCase;
+      const targetBudget = budget !== undefined && budget !== '' ? parseFloat(budget) : (existingBuyer.budget || 0);
       const targetDownPercent = downpaymentPercent !== undefined ? parseFloat(downpaymentPercent) : (existingBuyer.downpaymentPercent || 0);
       const targetProcessingFees = processingFees !== undefined ? parseFloat(processingFees) : (existingBuyer.processingFees || 0);
 
@@ -263,13 +277,30 @@ const updateBuyer = async (req, res) => {
       updateData.dueAmount = computedDueAmount;
     }
 
+    // Handle Bank Case Status & Case # updates
+    if (bankCaseStatus !== undefined || isBankCase !== undefined) {
+      const statusToSet = targetIsBankCase ? (bankCaseStatus !== undefined ? bankCaseStatus : (existingBuyer.bankCaseStatus || 'Not Confirmed')) : 'Not Confirmed';
+      updateData.bankCaseStatus = statusToSet;
+
+      if (targetIsBankCase && statusToSet === 'Confirmed') {
+        // If not already assigned a case number, assign the next one
+        if (!existingBuyer.bankCaseNo) {
+          updateData.bankCaseNo = await getNextBankCaseNo();
+        }
+      } else {
+        // If not confirmed or not bank case, clear case number
+        updateData.bankCaseNo = null;
+      }
+    }
+
     if (bankName !== undefined) updateData.bankName = bankName || null;
     if (bankChecklist !== undefined) updateData.bankChecklist = bankChecklist;
     if (buyerName !== undefined) updateData.buyerName = buyerName;
-    if (buyerPhone !== undefined) updateData.buyerPhone = formatPakistaniPhone(buyerPhone);
+    if (buyerPhone !== undefined) updateData.buyerPhone = buyerPhone ? formatPakistaniPhone(buyerPhone) : '';
     if (buyerCity !== undefined) updateData.buyerCity = buyerCity;
     if (leadSource !== undefined) updateData.leadSource = leadSource;
     if (leadReference !== undefined) updateData.leadReference = leadReference;
+    if (leadReferredBy !== undefined) updateData.leadReferredBy = leadReferredBy;
     if (leadStatus !== undefined) updateData.leadStatus = leadStatus;
     if (comments !== undefined) updateData.comments = comments;
 
@@ -289,7 +320,7 @@ const updateBuyer = async (req, res) => {
       data: {
         userId: req.user.id,
         action: 'UPDATE_BUYER',
-        details: `Updated buyer lead ${updatedBuyer.buyerName} (${updatedBuyer.vehicle})`
+        details: `Updated buyer lead ${updatedBuyer.buyerName || 'N/A'} (${updatedBuyer.vehicle || ''})`
       }
     });
 

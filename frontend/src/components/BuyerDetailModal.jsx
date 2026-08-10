@@ -73,6 +73,12 @@ export default function BuyerDetailModal({ buyer, onClose, onEdit }) {
                   <span className="text-slate-400 font-mono">Lead Source:</span>
                   <span className="text-slate-300 font-mono">{buyer.leadSource}</span>
                 </div>
+                {buyer.leadReferredBy && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-400 font-mono">Referred By:</span>
+                    <span className="text-sky-400 font-mono font-bold">{buyer.leadReferredBy}</span>
+                  </div>
+                )}
                 {buyer.leadReference && (
                   <div className="flex justify-between">
                     <span className="text-slate-400 font-mono">Reference:</span>
@@ -90,8 +96,14 @@ export default function BuyerDetailModal({ buyer, onClose, onEdit }) {
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between">
                   <span className="text-slate-400 font-mono">Payment / Financing:</span>
-                  <span className={`font-mono font-bold ${buyer.isBankCase && isAdmin ? 'text-sky-400' : 'text-emerald-400'}`}>
-                    {buyer.isBankCase && isAdmin ? `BANK CASE (${buyer.bankName || 'Standard Bank'})` : 'DIRECT SALE'}
+                  <span className={`font-mono font-bold ${buyer.isBankCase ? (buyer.bankCaseStatus === 'Confirmed' ? 'text-emerald-400' : 'text-amber-300') : 'text-emerald-400'}`}>
+                    {buyer.isBankCase 
+                      ? (buyer.bankCaseStatus === 'Confirmed' && buyer.bankCaseNo 
+                          ? `BANK CASE #${buyer.bankCaseNo} (CONFIRMED - ${buyer.bankName || 'Bank'})` 
+                          : `BANK CASE (NOT CONFIRMED / HOLD - ${buyer.bankName || 'Bank'})`
+                        )
+                      : 'DIRECT SALE'
+                    }
                   </span>
                 </div>
                 <div className="flex justify-between">
