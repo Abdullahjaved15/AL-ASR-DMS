@@ -3,6 +3,16 @@ import { X, Users, Phone, MapPin, Calendar, Tag, UserCheck, Edit, DollarSign, Fi
 import StatusBadge from './StatusBadge';
 import { useAuth } from '../context/AuthContext';
 
+const formatDateStr = (dateVal) => {
+  if (!dateVal) return '-';
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return '-';
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const year = d.getUTCFullYear();
+  return `${day}/${month}/${year}`;
+};
+
 export default function BuyerDetailModal({ buyer, onClose, onEdit }) {
   const { isAdmin } = useAuth();
   if (!buyer) return null;
@@ -22,7 +32,7 @@ export default function BuyerDetailModal({ buyer, onClose, onEdit }) {
                 <StatusBadge status={buyer.leadStatus} />
               </div>
               <p className="text-xs text-slate-400 font-mono mt-0.5">
-                Buyer Lead ID: {buyer.id?.substring(0, 8)} • Registered: {new Date(buyer.createdAt).toLocaleDateString()}
+                Buyer Lead ID: {buyer.id?.substring(0, 8)} • Registration Date: {formatDateStr(buyer.registrationDate || buyer.createdAt)}
               </p>
             </div>
           </div>

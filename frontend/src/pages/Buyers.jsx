@@ -17,7 +17,7 @@ const formatDateStr = (dateVal) => {
   const day = String(d.getUTCDate()).padStart(2, '0');
   const month = String(d.getUTCMonth() + 1).padStart(2, '0');
   const year = d.getUTCFullYear();
-  return `${day}-${month}-${year}`;
+  return `${day}/${month}/${year}`;
 };
 
 export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scope = 'all' }) {
@@ -429,7 +429,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                         return `
                         <tr>
                           <td><strong>${globalIdx}</strong></td>
-                          <td style="color:#0284c7; font-family:monospace; font-weight:600;">${formatDateStr(b.createdAt)}</td>
+                          <td style="color:#0284c7; font-family:monospace; font-weight:600;">${formatDateStr(b.registrationDate || b.createdAt)}</td>
                           <td><strong>${b.buyerName}</strong><br/><span style="color:#64748b; font-size:7.5px;">${b.buyerPhone || ''} ${b.buyerCity ? '• ' + b.buyerCity : ''}</span></td>
                           <td><strong>${b.vehicle} ${b.model}</strong> (${b.year})<br/><span style="color:#64748b; font-size:7.5px;">${b.carCondition || 'Used'} ${b.carCondition === 'Zero Meter' ? `(${b.zeroMeterType || 'Cash'})` : ''}</span></td>
                           <td><strong style="color:#0f172a;">Rs. ${b.budget?.toLocaleString()}</strong></td>
@@ -517,7 +517,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-900/80 border-b border-white/10 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
-                <th className="py-3.5 px-4">Lead Assign Date</th>
+                <th className="py-3.5 px-4">Registration Date</th>
                 <th className="py-3.5 px-4">Buyer & Contact</th>
                 <th className="py-3.5 px-4">Desired Vehicle</th>
                 <th className="py-3.5 px-4">Condition</th>
@@ -550,7 +550,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                     className="hover:bg-cyan-500/5 cursor-pointer transition-colors group"
                   >
                     <td className="py-4 px-4 font-mono font-bold text-cyan-400 text-xs whitespace-nowrap">
-                      {formatDateStr(buyer.createdAt)}
+                      {formatDateStr(buyer.registrationDate || buyer.createdAt)}
                     </td>
                     <td className="py-4 px-4" onClick={() => openDetailModal(buyer)}>
                       <div className="font-bold text-white text-sm group-hover:text-cyan-400 transition-colors">{buyer.buyerName}</div>

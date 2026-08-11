@@ -18,7 +18,7 @@ const formatDateStr = (dateVal) => {
   const day = String(d.getUTCDate()).padStart(2, '0');
   const month = String(d.getUTCMonth() + 1).padStart(2, '0');
   const year = d.getUTCFullYear();
-  return `${day}-${month}-${year}`;
+  return `${day}/${month}/${year}`;
 };
 
 export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, scope = 'all' }) {
@@ -343,7 +343,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                         return `
                         <tr>
                           <td><strong>${globalIdx}</strong></td>
-                          <td style="color:#0284c7; font-family:monospace; font-weight:600;">${formatDateStr(s.createdAt)}</td>
+                          <td style="color:#0284c7; font-family:monospace; font-weight:600;">${formatDateStr(s.registrationDate || s.createdAt)}</td>
                           <td>
                             <strong>${s.vehicle || ''} ${s.model || ''}</strong> (${s.year || 'N/A'}) - ${s.color || 'N/A'}
                             ${s.numberPlate ? `<br/><span class="plate-tag">${s.numberPlate}</span>` : ''}
@@ -428,7 +428,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-900/80 border-b border-white/10 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
-                <th className="py-3.5 px-4">Lead Assign Date</th>
+                <th className="py-3.5 px-4">Registration Date</th>
                 <th className="py-3.5 px-4">Vehicle & Specs</th>
                 <th className="py-3.5 px-4">Seller Contact</th>
                 <th className="py-3.5 px-4">Demand Price</th>
@@ -446,7 +446,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                   className="hover:bg-cyan-500/5 cursor-pointer transition-colors group"
                 >
                   <td className="py-4 px-4 font-mono font-bold text-cyan-400 text-xs whitespace-nowrap">
-                    {formatDateStr(seller.createdAt)}
+                    {formatDateStr(seller.registrationDate || seller.createdAt)}
                   </td>
                   <td className="py-4 px-4">
                     <div className="flex items-center space-x-3">

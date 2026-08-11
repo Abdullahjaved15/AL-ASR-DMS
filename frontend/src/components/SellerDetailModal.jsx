@@ -5,6 +5,16 @@ import ImageDropzone from './ImageDropzone';
 
 const categories = ['All', 'Front', 'Back', 'Interior', 'Engine', 'Dashboard', 'Documents', 'Other'];
 
+const formatDateStr = (dateVal) => {
+  if (!dateVal) return '-';
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return '-';
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const year = d.getUTCFullYear();
+  return `${day}/${month}/${year}`;
+};
+
 export default function SellerDetailModal({ seller, onClose, onEdit, onImagesUpdated }) {
   const [activeTab, setActiveTab] = useState('details'); // 'details' | 'upload'
   const [activeCategory, setActiveCategory] = useState('All');
@@ -46,7 +56,7 @@ export default function SellerDetailModal({ seller, onClose, onEdit, onImagesUpd
                 <StatusBadge status={seller.leadStatus} />
               </div>
               <p className="text-xs text-slate-400 font-mono mt-0.5">
-                Stock ID: {seller.id?.substring(0, 8)} • Registered: {new Date(seller.createdAt).toLocaleDateString()}
+                Stock ID: {seller.id?.substring(0, 8)} • Registration Date: {formatDateStr(seller.registrationDate || seller.createdAt)}
               </p>
             </div>
           </div>
