@@ -162,6 +162,23 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
     });
   };
 
+  const handleFormKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON') {
+        return;
+      }
+      e.preventDefault();
+      const form = e.currentTarget;
+      const focusable = Array.from(
+        form.querySelectorAll('input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])')
+      );
+      const index = focusable.indexOf(e.target);
+      if (index > -1 && index < focusable.length - 1) {
+        focusable[index + 1].focus();
+      }
+    }
+  };
+
   const handleCreateSeller = async (e) => {
     e.preventDefault();
     try {
@@ -588,7 +605,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
               Enter vehicle parameters, seller contact info, and initial lead status.
             </p>
 
-            <form onSubmit={isEditModalOpen ? handleUpdateSeller : handleCreateSeller} className="space-y-4">
+            <form onSubmit={isEditModalOpen ? handleUpdateSeller : handleCreateSeller} onKeyDown={handleFormKeyDown} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">Seller Name</label>

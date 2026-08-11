@@ -179,6 +179,23 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
     });
   };
 
+  const handleFormKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON') {
+        return;
+      }
+      e.preventDefault();
+      const form = e.currentTarget;
+      const focusable = Array.from(
+        form.querySelectorAll('input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])')
+      );
+      const index = focusable.indexOf(e.target);
+      if (index > -1 && index < focusable.length - 1) {
+        focusable[index + 1].focus();
+      }
+    }
+  };
+
   const handleCreateBuyer = async (e) => {
     e.preventDefault();
     try {
@@ -675,7 +692,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
               </button>
             </div>
 
-            <form onSubmit={isEditModalOpen ? handleUpdateBuyer : handleCreateBuyer} className="p-6 overflow-y-auto space-y-4 max-h-[calc(90vh-85px)] custom-scrollbar">
+            <form onSubmit={isEditModalOpen ? handleUpdateBuyer : handleCreateBuyer} onKeyDown={handleFormKeyDown} className="p-6 overflow-y-auto space-y-4 max-h-[calc(90vh-85px)] custom-scrollbar">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">Buyer Name</label>
