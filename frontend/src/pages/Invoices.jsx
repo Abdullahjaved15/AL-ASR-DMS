@@ -187,6 +187,11 @@ export default function Invoices() {
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
 
+  const [receiptImageModalOpen, setReceiptImageModalOpen] = useState(false);
+  const [selectedReceiptForImages, setSelectedReceiptForImages] = useState(null);
+  const [uploadingReceiptImages, setUploadingReceiptImages] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(-1);
+
   const [formData, setFormData] = useState({
     category: 'SALES_RECEIPT',
     registrationNo: '',
@@ -257,6 +262,49 @@ export default function Invoices() {
       fetchInvoices();
     }
   }, [search, selectedCategory, isSuperAdmin]);
+
+  const openImageGalleryModal = (inv) => {
+    setSelectedReceiptForImages(inv);
+    setReceiptImageModalOpen(true);
+  };
+
+  const handleUploadReceiptImages = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !selectedReceiptForImages) return;
+
+    setUploadingReceiptImages(true);
+    try {
+      const res = await api.uploadInvoiceImages(selectedReceiptForImages.id, files);
+      if (res && res.images) {
+        const updatedImages = [...(selectedReceiptForImages.images || []), ...res.images];
+        const updatedReceipt = { ...selectedReceiptForImages, images: updatedImages };
+        setSelectedReceiptForImages(updatedReceipt);
+        setInvoices(prev => prev.map(inv => inv.id === selectedReceiptForImages.id ? updatedReceipt : inv));
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to upload signed receipt photos');
+    } finally {
+      setUploadingReceiptImages(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleDeleteReceiptImage = async (imageId) => {
+    if (!selectedReceiptForImages || !window.confirm('Are you sure you want to delete this signed receipt photo?')) return;
+
+    try {
+      await api.deleteInvoiceImage(selectedReceiptForImages.id, imageId);
+      const updatedImages = (selectedReceiptForImages.images || []).filter(img => img.id !== imageId);
+      const updatedReceipt = { ...selectedReceiptForImages, images: updatedImages };
+      setSelectedReceiptForImages(updatedReceipt);
+      setInvoices(prev => prev.map(inv => inv.id === selectedReceiptForImages.id ? updatedReceipt : inv));
+      if (lightboxIndex >= updatedImages.length) {
+        setLightboxIndex(updatedImages.length - 1);
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to delete photo');
+    }
+  };
 
   const fetchInvoices = async () => {
     setLoading(true);
@@ -345,6 +393,8 @@ export default function Invoices() {
       onAccount: inv.onAccount || '',
       accountOf: inv.accountOf || '',
       time: inv.time || '',
+      cashAmount: inv.cashAmount || '',
+      statusBoxNotes: inv.statusBoxNotes || '',
       isImported: Boolean(inv.isImported),
       billOfEntryNo: inv.billOfEntryNo || '',
       portName: inv.portName || '',
@@ -407,6 +457,8 @@ export default function Invoices() {
       onAccount: '',
       accountOf: '',
       time: '',
+      cashAmount: '',
+      statusBoxNotes: '',
       isImported: false,
       billOfEntryNo: '',
       portName: '',
@@ -1431,7 +1483,7 @@ export default function Invoices() {
                   <th className="p-3.5">Seller (فروخت کنندہ)</th>
                   <th className="p-3.5">Vehicle Details / Head</th>
                   <th className="p-3.5">Total Amount</th>
-                  <th className="p-3.5">Advance / Remaining</th>
+                  <th className="p-3.5">Signed Receipt</th>
                   <th className="p-3.5">Actions</th>
                 </tr>
               </thead>
@@ -1481,8 +1533,22 @@ export default function Invoices() {
                         PKR {Number(total).toLocaleString()}
                       </td>
                       <td className="p-3.5 font-mono text-xs">
-                        <div className="text-emerald-400">Adv: Rs. {Number(adv).toLocaleString()}</div>
-                        <div className="text-rose-400">Rem: Rs. {Number(remaining).toLocaleString()}</div>
+                        <button
+                          onClick={() => openImageGalleryModal(inv)}
+                          className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-bold flex items-center space-x-1.5 transition-all cursor-pointer ${
+                            inv.images && inv.images.length > 0
+                              ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 hover:bg-purple-500/30 shadow-sm'
+                              : 'bg-slate-900/60 text-slate-400 border-white/10 hover:text-white hover:bg-slate-800'
+                          }`}
+                          title="Upload & view signed paper receipts photos"
+                        >
+                          <Camera className="w-3.5 h-3.5 text-purple-400" />
+                          <span>
+                            {inv.images && inv.images.length > 0
+                              ? `${inv.images.length} Signed Photo(s)`
+                              : '+ Upload Photo'}
+                          </span>
+                        </button>
                       </td>
                       <td className="p-3.5">
                         <div className="flex items-center space-x-2">
@@ -2541,6 +2607,148 @@ export default function Invoices() {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* SIGNED RECEIPT PHOTOS GALLERY & UPLOAD MODAL */}
+      {receiptImageModalOpen && selectedReceiptForImages && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#0b192c] border border-purple-500/30 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-white/10 flex items-center justify-between bg-slate-900/80">
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 bg-purple-500/20 text-purple-400 rounded-xl border border-purple-500/30">
+                  <Camera className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    Signed Receipt Photos <span className="text-purple-400 font-mono">({selectedReceiptForImages.invoiceNumber})</span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Upload photos of the physical printed paper voucher signed by {selectedReceiptForImages.buyerName || 'Customer'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setReceiptImageModalOpen(false)}
+                className="text-slate-400 hover:text-white text-lg font-bold px-2 py-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              {/* Upload Area */}
+              <div className="bg-slate-900/60 p-5 rounded-2xl border border-dashed border-purple-500/40 text-center space-y-3">
+                <input
+                  type="file"
+                  id="receipt-photo-upload"
+                  multiple
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleUploadReceiptImages}
+                />
+                <label
+                  htmlFor="receipt-photo-upload"
+                  className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border border-purple-500/40 cursor-pointer text-xs font-bold transition-all shadow-lg"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>Select & Upload Signed Receipt Photos</span>
+                </label>
+                <p className="text-[11px] text-slate-400">
+                  Supports JPG, PNG, WEBP signed receipt copies (camera photos or scans).
+                </p>
+                {uploadingReceiptImages && (
+                  <div className="flex items-center justify-center space-x-2 text-xs text-purple-400 font-mono pt-1">
+                    <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
+                    <span>Uploading image(s) to secure cloud storage...</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Photos Grid */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">
+                  Uploaded Signed Receipts ({selectedReceiptForImages.images?.length || 0})
+                </h4>
+
+                {!selectedReceiptForImages.images || selectedReceiptForImages.images.length === 0 ? (
+                  <div className="p-8 text-center bg-slate-900/40 rounded-xl border border-white/5 text-slate-500 text-xs">
+                    No signed receipt photos uploaded yet. Use the upload button above to attach paper receipt scans/photos.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    {selectedReceiptForImages.images.map((img, idx) => (
+                      <div key={img.id} className="group relative bg-slate-900 rounded-xl border border-white/10 overflow-hidden shadow-md">
+                        <img
+                          src={img.imageUrl}
+                          alt="Signed Receipt"
+                          className="w-full h-36 object-cover cursor-pointer group-hover:scale-105 transition-transform duration-300"
+                          onClick={() => setLightboxIndex(idx)}
+                        />
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2">
+                          <button
+                            onClick={() => setLightboxIndex(idx)}
+                            className="p-2 rounded-lg bg-cyan-500/80 text-white hover:bg-cyan-500 shadow"
+                            title="View Fullscreen"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteReceiptImage(img.id)}
+                            className="p-2 rounded-lg bg-rose-500/80 text-white hover:bg-rose-500 shadow"
+                            title="Delete Photo"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LIGHTBOX FULLSCREEN MODAL */}
+      {lightboxIndex >= 0 && selectedReceiptForImages?.images?.[lightboxIndex] && (
+        <div className="fixed inset-0 bg-black/95 z-[60] flex items-center justify-center p-4">
+          <button
+            onClick={() => setLightboxIndex(-1)}
+            className="absolute top-4 right-4 text-white/70 hover:text-white text-2xl font-bold bg-white/10 p-2 rounded-full cursor-pointer"
+          >
+            ✕
+          </button>
+          
+          {lightboxIndex > 0 && (
+            <button
+              onClick={() => setLightboxIndex(lightboxIndex - 1)}
+              className="absolute left-4 text-white/80 hover:text-white p-3 bg-white/10 rounded-full text-xl cursor-pointer"
+            >
+              ◀
+            </button>
+          )}
+
+          <img
+            src={selectedReceiptForImages.images[lightboxIndex].imageUrl}
+            alt="Signed Receipt Large"
+            className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl border border-white/20"
+          />
+
+          {lightboxIndex < selectedReceiptForImages.images.length - 1 && (
+            <button
+              onClick={() => setLightboxIndex(lightboxIndex + 1)}
+              className="absolute right-4 text-white/80 hover:text-white p-3 bg-white/10 rounded-full text-xl cursor-pointer"
+            >
+              ▶
+            </button>
+          )}
+
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-slate-900/80 border border-white/20 px-4 py-2 rounded-full text-white text-xs font-mono">
+            Photo {lightboxIndex + 1} of {selectedReceiptForImages.images.length}
           </div>
         </div>
       )}

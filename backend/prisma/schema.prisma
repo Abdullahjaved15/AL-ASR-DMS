@@ -206,6 +206,8 @@ model Invoice {
   onAccount        String?
   accountOf        String?
   time             String?
+  cashAmount       String?
+  statusBoxNotes   String?
 
   // Imported Vehicle Details (برائے امپورٹڈ گاڑی)
   isImported       Boolean  @default(false)
@@ -242,6 +244,8 @@ model Invoice {
   witness2Name     String?
   witness2Cnic     String?
 
+  images           InvoiceImage[]
+
   createdBy        String
   createdByUser    User     @relation(fields: [createdBy], references: [id])
   createdAt        DateTime @default(now())
@@ -250,6 +254,15 @@ model Invoice {
   @@index([invoiceNumber])
   @@index([category])
   @@index([createdAt])
+}
+
+model InvoiceImage {
+  id                 String   @id @default(uuid())
+  invoiceId          String
+  invoice            Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  imageUrl           String
+  cloudinaryPublicId String?
+  uploadedAt         DateTime @default(now())
 }
 
 model Deal {

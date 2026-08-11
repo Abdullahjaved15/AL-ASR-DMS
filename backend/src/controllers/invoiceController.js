@@ -1,5 +1,7 @@
 const prisma = require('../config/db');
 const cloudinary = require('../config/cloudinary');
+const fs = require('fs');
+const path = require('path');
 
 // Helper to upload image to Cloudinary if it's a base64 string
 const handleCloudinaryUpload = async (photoStr, folderName) => {
@@ -66,7 +68,8 @@ const getInvoices = async (req, res) => {
         skip,
         take: limitNum,
         include: {
-          createdByUser: { select: { id: true, name: true, email: true } }
+          createdByUser: { select: { id: true, name: true, email: true } },
+          images: { orderBy: { uploadedAt: 'desc' } }
         }
       }),
       prisma.invoice.count({ where: whereClause }),
@@ -109,7 +112,8 @@ const getInvoiceById = async (req, res) => {
     const invoice = await prisma.invoice.findUnique({
       where: { id },
       include: {
-        createdByUser: { select: { id: true, name: true, email: true } }
+        createdByUser: { select: { id: true, name: true, email: true } },
+        images: { orderBy: { uploadedAt: 'desc' } }
       }
     });
 
@@ -168,6 +172,8 @@ const createInvoice = async (req, res) => {
       onAccount,
       accountOf,
       time,
+      cashAmount,
+      statusBoxNotes,
       // Imported Vehicle
       isImported,
       billOfEntryNo,
@@ -374,6 +380,8 @@ const updateInvoice = async (req, res) => {
       onAccount,
       accountOf,
       time,
+      cashAmount,
+      statusBoxNotes,
       totalPrice,
       advanceAmount,
       remainingAmount,
@@ -445,6 +453,8 @@ const updateInvoice = async (req, res) => {
         onAccount: onAccount !== undefined ? onAccount : existing.onAccount,
         accountOf: accountOf !== undefined ? accountOf : existing.accountOf,
         time: time !== undefined ? time : existing.time,
+        cashAmount: cashAmount !== undefined ? cashAmount : existing.cashAmount,
+        statusBoxNotes: statusBoxNotes !== undefined ? statusBoxNotes : existing.statusBoxNotes,
 
         totalPrice: numericTotalPrice,
         advanceAmount: numericAdvance,
@@ -498,10 +508,105 @@ const deleteInvoice = async (req, res) => {
   }
 };
 
+const uploadInvoiceImages = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const invoice = await prisma.invoice.findUnique({ where: { id } });
+    if (!invoice) {
+      return res.status(404).json({ message: 'Invoice / Receipt not found' });
+    }
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ message: 'No image files uploaded' });
+    }
+
+    const useCloudinary = Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY);
+    const createdImages = [];
+
+    for (const file of req.files) {
+      let imageUrl = `/uploads/${file.filename}`;
+      let cloudinaryPublicId = null;
+
+      if (useCloudinary) {
+        try {
+          const result = await cloudinary.uploader.upload(file.path, {
+            folder: 'velocity_dms/invoices',
+            tags: ['signed_receipt', invoice.invoiceNumber]
+          });
+          imageUrl = result.secure_url;
+          cloudinaryPublicId = result.public_id;
+
+          if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+          }
+        } catch (cloudErr) {
+          console.warn('Cloudinary upload fallback to local storage:', cloudErr.message);
+        }
+      }
+
+      const img = await prisma.invoiceImage.create({
+        data: {
+          invoiceId: id,
+          imageUrl: imageUrl,
+          cloudinaryPublicId: cloudinaryPublicId
+        }
+      });
+      createdImages.push(img);
+    }
+
+    await prisma.activityLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'UPLOAD_RECEIPT_IMAGE',
+        details: `Uploaded ${createdImages.length} signed receipt photo(s) for invoice ${invoice.invoiceNumber}`
+      }
+    });
+
+    return res.status(201).json({ message: 'Signed receipt images uploaded successfully', images: createdImages });
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to upload signed receipt images', error: error.message });
+  }
+};
+
+const deleteInvoiceImage = async (req, res) => {
+  try {
+    const { invoiceId, imageId } = req.params;
+
+    const image = await prisma.invoiceImage.findUnique({ where: { id: imageId } });
+    if (!image || image.invoiceId !== invoiceId) {
+      return res.status(404).json({ message: 'Receipt image not found' });
+    }
+
+    if (image.cloudinaryPublicId && process.env.CLOUDINARY_CLOUD_NAME) {
+      try {
+        await cloudinary.uploader.destroy(image.cloudinaryPublicId);
+      } catch (cloudErr) {
+        console.warn('Cloudinary image destroy error:', cloudErr.message);
+      }
+    }
+
+    await prisma.invoiceImage.delete({ where: { id: imageId } });
+
+    if (image.imageUrl && image.imageUrl.startsWith('/uploads/')) {
+      const filePath = path.join(__dirname, '../../public', image.imageUrl);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    return res.json({ message: 'Signed receipt image deleted successfully' });
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to delete receipt image', error: error.message });
+  }
+};
+
 module.exports = {
   getInvoices,
   getInvoiceById,
   createInvoice,
   updateInvoice,
-  deleteInvoice
+  deleteInvoice,
+  uploadInvoiceImages,
+  deleteInvoiceImage
 };

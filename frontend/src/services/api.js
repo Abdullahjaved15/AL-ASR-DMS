@@ -332,6 +332,26 @@ export const api = {
     return handleResponse(res);
   },
 
+  uploadInvoiceImages: async (invoiceId, files) => {
+    const formData = new FormData();
+    Array.from(files).forEach((file) => formData.append('images', file));
+
+    const res = await fetch(`${API_BASE}/invoices/${invoiceId}/images`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: formData
+    });
+    return handleResponse(res);
+  },
+
+  deleteInvoiceImage: async (invoiceId, imageId) => {
+    const res = await fetch(`${API_BASE}/invoices/${invoiceId}/images/${imageId}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
   // Receiving Letters API (Accessible by ALL staff)
   getReceivingLetters: async (params = {}) => {
     const query = cleanParams(params);
