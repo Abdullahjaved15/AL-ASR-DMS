@@ -44,7 +44,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
 
   // UI Pagination State
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 25;
+  const [pageSize, setPageSize] = useState(25);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -668,6 +668,58 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
             </tbody>
           </table>
         </div>
+
+        {/* Table Pagination Footer */}
+        {displayBuyers.length > 0 && (
+          <div className="p-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-4 font-mono text-xs text-slate-400 bg-slate-900/40">
+            <div className="flex items-center space-x-3">
+              <div>
+                Showing <strong className="text-cyan-400">{(currentPage - 1) * pageSize + 1}</strong> to{' '}
+                <strong className="text-cyan-400">{Math.min(currentPage * pageSize, displayBuyers.length)}</strong> of{' '}
+                <strong className="text-white">{displayBuyers.length}</strong> buyer entries
+              </div>
+              <div className="flex items-center space-x-1.5 ml-4">
+                <span>Per page:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="bg-slate-800 border border-white/10 text-cyan-400 rounded-lg px-2 py-1 focus:outline-none text-xs"
+                >
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={500}>500</option>
+                  <option value={10000}>All</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 border border-white/10 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition-all"
+              >
+                Previous
+              </button>
+
+              <span className="px-3 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-cyan-400 font-bold">
+                Page {currentPage} of {Math.ceil(displayBuyers.length / pageSize) || 1}
+              </span>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(displayBuyers.length / pageSize) || 1))}
+                disabled={currentPage >= (Math.ceil(displayBuyers.length / pageSize) || 1)}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 border border-white/10 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition-all"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* CREATE / EDIT BUYER MODAL */}
