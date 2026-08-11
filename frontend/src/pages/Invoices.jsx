@@ -674,65 +674,86 @@ export default function Invoices() {
         </div>
       `;
     } else if (category === 'BOOKING_RECEIPT') {
+      const statusLines = (inv.statusBoxNotes || '').split('\n').filter(Boolean);
       innerHTMLBody = `
-        <div class="receipt-card">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 14px;">
+        <div class="receipt-card" style="border: 2px solid #002b66; padding: 22px; font-family: 'Segoe UI', Arial, sans-serif; color: #002b66; background: #ffffff; width: 100%; box-sizing: border-box;">
+          <!-- Receipt Top Header -->
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #002b66; padding-bottom: 8px; margin-bottom: 12px;">
             <div style="display: flex; align-items: center; gap: 12px;">
               <img src="${logoBase64}" style="height: 52px;" />
               <div>
-                <h1 style="font-size: 22px; font-weight: 900; margin: 0; color: #0f172a;">AL-ASR MOTORS</h1>
-                <p style="font-size: 9.5px; color: #475569; margin: 2px 0 0 0;">450 - A/B, Lahore Road, Sahiwal.</p>
-                <p style="font-size: 9px; color: #475569; margin: 0;">Tel: 040-4403799, 4403899, Fax: 040-4462087</p>
+                <h1 style="font-size: 24px; font-weight: 900; margin: 0; color: #002b66; letter-spacing: 0.5px;">AL-ASR MOTORS</h1>
+                <p style="font-size: 9.5px; color: #002b66; margin: 2px 0 0 0; font-weight: 600;">450 - A/B, Lahore Road, Sahiwal.</p>
+                <p style="font-size: 9px; color: #002b66; margin: 0;">Tel: 040-4403799, 4403899, Fax: 040-4462087</p>
+                <p style="font-size: 9px; color: #002b66; margin: 0;">E-mail: al.asr.motors@live.com</p>
               </div>
             </div>
             <div style="text-align: right;">
-              <span style="font-size: 18px; font-weight: 900; background: #0f172a; color: white; padding: 4px 14px; border-radius: 4px;">Receipt</span>
-              <div style="font-size: 13px; margin-top: 5px; font-weight: 800; font-family: monospace; color: #dc2626;">No. ${receiptNo}</div>
-              <div style="font-size: 10px; margin-top: 2px; font-weight: bold;">Date: <span style="font-family: monospace;">${createdDate}</span></div>
+              <span style="font-size: 16px; font-weight: 900; background: #002b66; color: white; padding: 4px 16px; border-radius: 3px; display: inline-block;">Receipt</span>
+              <div style="font-size: 14px; margin-top: 6px; font-weight: 800; font-family: monospace; color: #dc2626;">No.: <span style="text-decoration: underline;">${receiptNo}</span></div>
             </div>
           </div>
 
-          <table class="grid-tbl" style="margin-bottom: 14px;">
-            <tr>
-              <td class="lbl">Name:</td><td class="val">${buyerName}</td>
-              <td class="lbl">Tel:</td><td class="val">${buyerPhone}</td>
-            </tr>
-            <tr>
-              <td class="lbl">Vehicle No.:</td><td class="val">${regNo}</td>
-              <td class="lbl">Engine No.:</td><td class="val">${engineNo}</td>
-            </tr>
-            <tr>
-              <td class="lbl">Chassis No.:</td><td class="val">${chassisNo}</td>
-              <td class="lbl">Colour:</td><td class="val">${inv.color || 'N/A'}</td>
-            </tr>
-            <tr>
-              <td class="lbl">Total Deal:</td><td class="val" style="font-family: monospace; font-weight: 900; font-size: 11px;">PKR ${Number(totalPrice).toLocaleString()}</td>
-              <td class="lbl">Advance:</td><td class="val" style="font-family: monospace; color: #16a34a; font-weight: 900; font-size: 11px;">PKR ${Number(advanceAmount).toLocaleString()}</td>
-            </tr>
-            <tr>
-              <td class="lbl">In Words:</td><td class="val" colspan="3" style="font-style: italic;">${agreedWords || 'Rupees Only'}</td>
-            </tr>
-            <tr>
-              <td class="lbl">Balance:</td><td class="val" style="font-family: monospace; color: #dc2626; font-weight: 900; font-size: 11px;">PKR ${Number(remainingAmount).toLocaleString()}</td>
-              <td class="lbl">Bank Status:</td><td class="val">${inv.bankStatus || 'N/A'}</td>
-            </tr>
-            <tr>
-              <td class="lbl">Cash:</td><td class="val">${advanceAmount ? `PKR ${Number(advanceAmount).toLocaleString()}` : 'N/A'}</td>
-              <td class="lbl">Cheque #/DD #:</td><td class="val">${inv.chequeNo || 'N/A'}</td>
-            </tr>
-            <tr>
-              <td class="lbl">Due Date:</td><td class="val">${inv.dueDate || 'N/A'}</td>
-              <td class="lbl">on Account:</td><td class="val">${inv.onAccount || 'N/A'}</td>
-            </tr>
-            <tr>
-              <td class="lbl">Status:</td><td class="val" colspan="3" style="font-weight: bold; color: #0284c7;">${inv.paymentStatus || 'PAID'}</td>
-            </tr>
-          </table>
+          <!-- Top Details Form Fields -->
+          <div style="font-size: 11px; line-height: 2.1; color: #002b66;">
+            <div style="margin-bottom: 2px;">
+              <strong>Date:</strong> <span style="border-bottom: 1px dotted #002b66; padding: 0 10px; font-family: monospace; font-weight: bold;">${createdDate}</span>
+            </div>
+            <div style="display: flex; gap: 15px;">
+              <div style="flex: 2;"><strong>Name:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 55px); font-weight: bold;">${buyerName}</span></div>
+              <div style="flex: 1;"><strong>Tel.:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 40px); font-family: monospace; font-weight: bold;">${buyerPhone}</span></div>
+            </div>
+            <div style="display: flex; gap: 15px;">
+              <div style="flex: 1.2;"><strong>Vehicle No.:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 85px); font-family: monospace; font-weight: bold;">${regNo}</span></div>
+              <div style="flex: 1;"><strong>Engine No.:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 80px); font-family: monospace; font-weight: bold;">${engineNo}</span></div>
+            </div>
+            <div style="display: flex; gap: 15px;">
+              <div style="flex: 1.2;"><strong>Chases No.:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 85px); font-family: monospace; font-weight: bold;">${chassisNo}</span></div>
+              <div style="flex: 1;"><strong>Colour:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 55px); font-weight: bold;">${inv.color || ''}</span></div>
+            </div>
+            <div>
+              <strong>Total Deal:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 75px); font-family: monospace; font-weight: bold;">${totalPrice ? 'PKR ' + Number(totalPrice).toLocaleString() : ''}</span>
+            </div>
+            <div style="display: flex; gap: 15px;">
+              <div style="flex: 1;"><strong>Advance:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 65px); font-family: monospace; font-weight: bold;">${advanceAmount ? 'PKR ' + Number(advanceAmount).toLocaleString() : ''}</span></div>
+              <div style="flex: 1.5;"><strong>In words:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 65px); font-style: italic;">${agreedWords || ''}</span></div>
+            </div>
+            <div>
+              <strong>Balance:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 65px); font-family: monospace; font-weight: bold; color: #dc2626;">${remainingAmount ? 'PKR ' + Number(remainingAmount).toLocaleString() : ''}</span>
+            </div>
+          </div>
 
-          <div style="display: flex; justify-content: space-between; margin-top: 55px; text-align: center;">
-            <div style="border-top: 1.5px solid #0f172a; width: 28%; padding-top: 4px; font-size: 10px; font-weight: bold;">Issued By</div>
-            <div style="border-top: 1.5px solid #0f172a; width: 28%; padding-top: 4px; font-size: 10px; font-weight: bold;">Customer's Signature</div>
-            <div style="border-top: 1.5px solid #0f172a; width: 28%; padding-top: 4px; font-size: 10px; font-weight: bold;">For AL-ASR Motors</div>
+          <!-- Bottom Section: Bank Status & Blank Lined Status Box -->
+          <div style="display: flex; gap: 20px; margin-top: 15px; align-items: flex-start;">
+            <!-- Left: Bank Status Details -->
+            <div style="flex: 1.1; font-size: 11px; line-height: 2.1; color: #002b66;">
+              <div style="font-size: 13px; font-weight: 900; font-style: italic; border-bottom: 2px solid #002b66; margin-bottom: 6px;">Bank Status</div>
+              <div><strong>Cash:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 45px); font-family: monospace;">${inv.cashAmount ? 'PKR ' + Number(inv.cashAmount).toLocaleString() : (advanceAmount ? 'PKR ' + Number(advanceAmount).toLocaleString() : '')}</span></div>
+              <div><strong>Cheque # ./DD # .On line:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 170px); font-family: monospace;">${inv.chequeNo || ''}</span></div>
+              <div><strong>Due Date:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 65px); font-family: monospace;">${inv.dueDate ? formatDateStr(inv.dueDate) : ''}</span></div>
+              <div><strong>on Account:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 80px);">${inv.onAccount || ''}</span></div>
+              <div><strong>Status:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 55px); font-weight: bold;">${inv.bankStatus || inv.paymentStatus || ''}</span></div>
+            </div>
+
+            <!-- Right: Lined Blank Space Box for Status -->
+            <div style="flex: 1; text-align: center; color: #002b66;">
+              <div style="font-size: 13px; font-weight: 900; font-style: italic; margin-bottom: 4px;">Status</div>
+              <div style="border: 2px solid #002b66; border-radius: 18px; padding: 8px 12px; min-height: 165px; display: flex; flex-direction: column; justify-content: space-around; background: #ffffff;">
+                <div style="border-bottom: 1px solid #cbd5e1; height: 24px; text-align: left; font-size: 10px; font-weight: 600;">${statusLines[0] || ''}</div>
+                <div style="border-bottom: 1px solid #cbd5e1; height: 24px; text-align: left; font-size: 10px; font-weight: 600;">${statusLines[1] || ''}</div>
+                <div style="border-bottom: 1px solid #cbd5e1; height: 24px; text-align: left; font-size: 10px; font-weight: 600;">${statusLines[2] || ''}</div>
+                <div style="border-bottom: 1px solid #cbd5e1; height: 24px; text-align: left; font-size: 10px; font-weight: 600;">${statusLines[3] || ''}</div>
+                <div style="border-bottom: 1px solid #cbd5e1; height: 24px; text-align: left; font-size: 10px; font-weight: 600;">${statusLines[4] || ''}</div>
+                <div style="height: 24px; text-align: left; font-size: 10px; font-weight: 600;">${statusLines[5] || ''}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Footer Signatures -->
+          <div style="display: flex; justify-content: space-between; margin-top: 50px; text-align: center; font-size: 10.5px; font-weight: bold; color: #002b66;">
+            <div style="border-top: 1.5px solid #002b66; width: 28%; padding-top: 4px;">Issued By</div>
+            <div style="border-top: 1.5px solid #002b66; width: 32%; padding-top: 4px;">Customer's Signature</div>
+            <div style="border-top: 1.5px solid #002b66; width: 28%; padding-top: 4px;">For AL-ASR Motors</div>
           </div>
         </div>
       `;
@@ -1584,150 +1605,337 @@ export default function Invoices() {
                     </div>
                   </div>
 
-                  <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Basic Metadata & Registration</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Date (تاریخ) <span className="text-rose-400">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        value={formData.dated}
-                        onChange={(e) => handleInputChange('dated', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Registration No. (رجسٹریشن نمبر)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. LEA-22-4589 or Unregistered"
-                        value={formData.registrationNo}
-                        onChange={(e) => handleInputChange('registrationNo', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Time (وقت)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 03:30 PM"
-                        value={formData.time || formData.agreementTime}
-                        onChange={(e) => handleInputChange('time', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Category Specific Fields in General Tab */}
-                  {formData.category === 'PAYMENT_VOUCHER' && (
-                    <div className="p-4 bg-slate-900/80 rounded-xl border border-amber-500/30 space-y-4">
-                      <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">Payment Voucher (P.V.) Details</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {formData.category === 'BOOKING_RECEIPT' ? (
+                    <div className="space-y-6 pt-2">
+                      <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-between">
                         <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">Payee's Name (نام پانے والا)</label>
-                          <input
-                            type="text"
-                            placeholder="Name of person receiving payment"
-                            value={formData.payeeName}
-                            onChange={(e) => handleInputChange('payeeName', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-amber-500"
-                          />
+                          <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">🧾 Official AL-ASR Motors Booking Voucher Entry</h4>
+                          <p className="text-[11px] text-slate-400 font-mono mt-0.5">Fills exact fields matching the physical printed receipt book pad.</p>
                         </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">Head of Account (کھاتہ)</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Vehicle Purchase / Expense"
-                            value={formData.headOfAccount}
-                            onChange={(e) => handleInputChange('headOfAccount', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-amber-500"
-                          />
+                        <span className="text-xs font-mono font-bold text-emerald-300 bg-emerald-500/20 px-3 py-1 rounded-full border border-emerald-500/40">
+                          Voucher # {formData.invoiceNumber || selectedInvoice?.receiptNo || '2620'}
+                        </span>
+                      </div>
+
+                      {/* 1. Date & Customer Info */}
+                      <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
+                        <h5 className="text-xs font-bold text-cyan-400 uppercase tracking-wider border-b border-white/10 pb-2">1. Date & Customer Details</h5>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">Date (تاریخ) <span className="text-rose-400">*</span></label>
+                            <input
+                              type="date"
+                              value={formData.dated}
+                              onChange={(e) => handleInputChange('dated', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">Customer / Buyer Name (نام) <span className="text-rose-400">*</span></label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Mian Sarfraz"
+                              value={formData.buyerName}
+                              onChange={(e) => handleInputChange('buyerName', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">Tel / Phone (فون) <span className="text-rose-400">*</span></label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 0300-1234567"
+                              value={formData.buyerPhone}
+                              onChange={(e) => handleInputChange('buyerPhone', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                              required
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
 
-                  {formData.category === 'DELIVERY_LETTER' && (
-                    <div className="p-4 bg-slate-900/80 rounded-xl border border-blue-500/30 space-y-4">
-                      <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider">Delivery Letter Specific Details</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">Account Of</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Self / Company Account"
-                            value={formData.accountOf}
-                            onChange={(e) => handleInputChange('accountOf', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">Vehicle Color (رنگ)</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. White / Super White"
-                            value={formData.color}
-                            onChange={(e) => handleInputChange('color', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500"
-                          />
+                      {/* 2. Vehicle Specs */}
+                      <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
+                        <h5 className="text-xs font-bold text-cyan-400 uppercase tracking-wider border-b border-white/10 pb-2">2. Vehicle Specifications</h5>
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">Vehicle No. (گاڑی نمبر)</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. LEA-22-4589 or Unregistered"
+                              value={formData.registrationNo}
+                              onChange={(e) => handleInputChange('registrationNo', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">Engine No. (انجن نمبر)</label>
+                            <input
+                              type="text"
+                              placeholder="Engine number"
+                              value={formData.engineNumber}
+                              onChange={(e) => handleInputChange('engineNumber', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">Chases No. (چیسس نمبر)</label>
+                            <input
+                              type="text"
+                              placeholder="Chassis number"
+                              value={formData.chassisNumber}
+                              onChange={(e) => handleInputChange('chassisNumber', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">Colour (رنگ)</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. White / Silver"
+                              value={formData.color}
+                              onChange={(e) => handleInputChange('color', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
 
-                  {formData.category === 'BOOKING_RECEIPT' && (
-                    <div className="p-4 bg-slate-900/80 rounded-xl border border-emerald-500/30 space-y-4">
-                      <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Booking Receipt Banking Details</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">Bank Status</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Cleared / Pending / Cash"
-                            value={formData.bankStatus}
-                            onChange={(e) => handleInputChange('bankStatus', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500"
-                          />
+                      {/* 3. Financial Deal Details */}
+                      <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
+                        <h5 className="text-xs font-bold text-cyan-400 uppercase tracking-wider border-b border-white/10 pb-2">3. Deal Amounts & Calculations</h5>
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">Total Deal (Rs.) <span className="text-rose-400">*</span></label>
+                            <input
+                              type="number"
+                              placeholder="e.g. 5000000"
+                              value={formData.totalPrice}
+                              onChange={(e) => {
+                                const tot = parseFloat(e.target.value) || 0;
+                                const adv = parseFloat(formData.advanceAmount) || 0;
+                                handleInputChange('totalPrice', e.target.value);
+                                handleInputChange('remainingAmount', Math.max(0, tot - adv));
+                              }}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">Advance (Rs.) <span className="text-rose-400">*</span></label>
+                            <input
+                              type="number"
+                              placeholder="e.g. 500000"
+                              value={formData.advanceAmount}
+                              onChange={(e) => {
+                                const adv = parseFloat(e.target.value) || 0;
+                                const tot = parseFloat(formData.totalPrice) || 0;
+                                handleInputChange('advanceAmount', e.target.value);
+                                handleInputChange('remainingAmount', Math.max(0, tot - adv));
+                              }}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">Balance (Rs.) (بقایا)</label>
+                            <input
+                              type="number"
+                              readOnly
+                              value={formData.totalPrice && formData.advanceAmount ? Math.max(0, (parseFloat(formData.totalPrice) || 0) - (parseFloat(formData.advanceAmount) || 0)) : (formData.remainingAmount || '')}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-rose-400 text-xs font-bold font-mono cursor-not-allowed"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">In Words (الفاظ میں)</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Five Lac Rupees Only"
+                              value={formData.agreedAmountWords || formData.inWords}
+                              onChange={(e) => {
+                                handleInputChange('agreedAmountWords', e.target.value);
+                                handleInputChange('inWords', e.target.value);
+                              }}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 italic"
+                            />
+                          </div>
                         </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">Cheque # / DD # / Online Reference</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. CHQ-9842104"
-                            value={formData.chequeNo}
-                            onChange={(e) => handleInputChange('chequeNo', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500"
-                          />
+                      </div>
+
+                      {/* 4. Bank Status */}
+                      <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
+                        <h5 className="text-xs font-bold text-emerald-400 uppercase tracking-wider border-b border-white/10 pb-2">4. Bank Status & Payment Details</h5>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">Cash (نقد / تفصیل)</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Cash / Bank Transfer"
+                              value={formData.cashAmount || ''}
+                              onChange={(e) => handleInputChange('cashAmount', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">Cheque # / DD # / On Line</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. CHQ-9842104"
+                              value={formData.chequeNo}
+                              onChange={(e) => handleInputChange('chequeNo', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500 font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">Due Date (معیاد)</label>
+                            <input
+                              type="date"
+                              value={formData.dueDate}
+                              onChange={(e) => handleInputChange('dueDate', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">on Account</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Advance Booking"
+                              value={formData.onAccount}
+                              onChange={(e) => handleInputChange('onAccount', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500"
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">Status (بینک اسٹیٹس)</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Cleared / Pending / Cash Paid"
+                              value={formData.bankStatus}
+                              onChange={(e) => handleInputChange('bankStatus', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500"
+                            />
+                          </div>
                         </div>
+                      </div>
+
+                      {/* 5. Status Box Notes */}
+                      <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                          <h5 className="text-xs font-bold text-sky-400 uppercase tracking-wider">5. Status Box Remarks (Right Lined Blank Space)</h5>
+                          <span className="text-[10px] font-mono font-bold text-emerald-400">Leave blank for empty lined space like physical receipt book!</span>
+                        </div>
+                        <textarea
+                          rows="3"
+                          placeholder="Enter status notes line-by-line (or leave blank to print empty lined space box just like the picture)..."
+                          value={formData.statusBoxNotes || ''}
+                          onChange={(e) => handleInputChange('statusBoxNotes', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-sky-500 custom-scrollbar"
+                        ></textarea>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Basic Metadata & Registration</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">Due Date (معیاد)</label>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Date (تاریخ) <span className="text-rose-400">*</span>
+                          </label>
                           <input
                             type="date"
-                            value={formData.dueDate}
-                            onChange={(e) => handleInputChange('dueDate', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500"
+                            value={formData.dated}
+                            onChange={(e) => handleInputChange('dated', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            required
                           />
                         </div>
+
                         <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">on Account</label>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Registration No. (رجسٹریشن نمبر)
+                          </label>
                           <input
                             type="text"
-                            placeholder="e.g. Advance Booking"
-                            value={formData.onAccount}
-                            onChange={(e) => handleInputChange('onAccount', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500"
+                            placeholder="e.g. LEA-22-4589 or Unregistered"
+                            value={formData.registrationNo}
+                            onChange={(e) => handleInputChange('registrationNo', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Time (وقت)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 03:30 PM"
+                            value={formData.time || formData.agreementTime}
+                            onChange={(e) => handleInputChange('time', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
                           />
                         </div>
                       </div>
-                    </div>
+
+                      {/* Category Specific Fields in General Tab */}
+                      {formData.category === 'PAYMENT_VOUCHER' && (
+                        <div className="p-4 bg-slate-900/80 rounded-xl border border-amber-500/30 space-y-4">
+                          <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">Payment Voucher (P.V.) Details</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">Payee's Name (نام پانے والا)</label>
+                              <input
+                                type="text"
+                                placeholder="Name of person receiving payment"
+                                value={formData.payeeName}
+                                onChange={(e) => handleInputChange('payeeName', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">Head of Account (کھاتہ)</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Vehicle Purchase / Expense"
+                                value={formData.headOfAccount}
+                                onChange={(e) => handleInputChange('headOfAccount', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-amber-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {formData.category === 'DELIVERY_LETTER' && (
+                        <div className="p-4 bg-slate-900/80 rounded-xl border border-blue-500/30 space-y-4">
+                          <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider">Delivery Letter Specific Details</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">Account Of</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Self / Company Account"
+                                value={formData.accountOf}
+                                onChange={(e) => handleInputChange('accountOf', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">Vehicle Color (رنگ)</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. White / Super White"
+                                value={formData.color}
+                                onChange={(e) => handleInputChange('color', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
