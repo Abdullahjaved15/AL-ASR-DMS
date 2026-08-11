@@ -12,6 +12,7 @@ const invalidateSellersCache = () => {
   sellersCache = null;
   sellersCacheTime = 0;
 };
+invalidateSellersCache();
 
 const getSellers = async (req, res) => {
   try {
@@ -121,7 +122,10 @@ const getSellers = async (req, res) => {
           select: { images: true, deals: true }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: [
+        { registrationDate: 'desc' },
+        { createdAt: 'desc' }
+      ]
     });
 
     if (!hasFilters && (req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN')) {

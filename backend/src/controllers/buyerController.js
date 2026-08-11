@@ -100,7 +100,10 @@ const getBuyers = async (req, res) => {
         createdByUser: { select: { id: true, name: true, email: true } },
         assignedUser: { select: { id: true, name: true, email: true } }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: [
+        { registrationDate: 'desc' },
+        { createdAt: 'desc' }
+      ]
     });
 
     return res.json(buyers);
