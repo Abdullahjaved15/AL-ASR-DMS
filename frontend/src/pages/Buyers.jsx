@@ -781,7 +781,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">
                     {formData.isBankCase ? 'Total Amount (PKR / Rs.)' : 'Target Budget (PKR / Rs.)'}
@@ -802,6 +802,17 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                     placeholder="e.g. 2022 or 2022/23"
                     value={formData.year}
                     onChange={(e) => setFormData({ ...formData, year: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Preferred Color</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. White, Black, Any"
+                    value={formData.color}
+                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
                   />
                 </div>

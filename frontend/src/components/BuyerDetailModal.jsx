@@ -136,7 +136,11 @@ export default function BuyerDetailModal({ buyer, onClose, onEdit }) {
                 )}
                 <div className="flex justify-between pt-1 border-t border-white/5">
                   <span className="text-slate-400 font-mono">Desired Vehicle:</span>
-                  <span className="font-bold text-white">{buyer.vehicle} {buyer.model}</span>
+                  <span className="font-bold text-white">{buyer.vehicle} {buyer.model} ({buyer.year || 'N/A'})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-mono">Preferred Color:</span>
+                  <span className="font-mono text-white font-semibold">{buyer.color || 'Any'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400 font-mono">Condition:</span>
