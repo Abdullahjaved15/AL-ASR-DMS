@@ -661,67 +661,83 @@ export default function Invoices() {
         </div>
       `;
     } else if (category === 'PAYMENT_VOUCHER') {
+      const payee = inv.payeeName || (inv.buyerName && inv.buyerName !== 'N/A' ? inv.buyerName : '') || (inv.sellerName && inv.sellerName !== 'N/A' ? inv.sellerName : '') || (inv.customerName && inv.customerName !== 'N/A' ? inv.customerName : '') || '';
+      const headAccount = inv.headOfAccount || '';
+      const desc = inv.remarks || '';
+      const amountStr = totalPrice ? Number(totalPrice).toLocaleString() + ' /-' : '';
+
       innerHTMLBody = `
-        <div class="receipt-card">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 14px;">
-            <div style="display: flex; align-items: center; gap: 12px;">
+        <div class="receipt-card" style="border: 2px solid #0f172a; padding: 20px; font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; background: #ffffff;">
+          <!-- Top Header Strip -->
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 14px;">
+            <div style="display: flex; align-items: center; gap: 14px;">
               <img src="${logoBase64}" style="height: 54px;" />
               <div>
-                <h1 style="font-size: 24px; font-weight: 900; margin: 0; color: #0f172a;">AL-ASR MOTORS</h1>
-                <p style="font-size: 10px; color: #475569; margin: 2px 0 0 0;">450 - A/B, Lahore Road, Sahiwal.</p>
-                <p style="font-size: 9.5px; color: #475569; margin: 0;">Tel.: 040-4403799, 4403899, Fax: 040-4462087</p>
+                <h1 style="font-size: 24px; font-weight: 900; margin: 0; color: #0f172a; letter-spacing: 0.5px;">AL-ASR MOTORS</h1>
+                <p style="font-size: 10px; color: #334155; margin: 2px 0 0 0; font-weight: 600;">450 - A/B, Lahore Road, Sahiwal.</p>
+                <p style="font-size: 9.5px; color: #334155; margin: 0;">Tel.: 040-4403799, 4403899, Fax: 040-4462087</p>
               </div>
             </div>
             <div style="text-align: right;">
-              <span style="font-size: 22px; font-weight: 900; border: 2px solid #0f172a; padding: 2px 14px; border-radius: 4px; display: inline-block;">P. V.</span>
-              <div style="font-size: 11px; margin-top: 6px; font-weight: bold;">Date: <span style="font-family: monospace;">${createdDate}</span></div>
+              <span style="font-size: 20px; font-weight: 900; background: #0f172a; color: white; padding: 3px 18px; border-radius: 3px; display: inline-block; letter-spacing: 1px;">P. V.</span>
+              <div style="font-size: 12px; margin-top: 8px; font-weight: bold; color: #0f172a;">Date: <span style="font-family: monospace; border-bottom: 1px dotted #0f172a; padding: 0 10px;">${createdDate}</span></div>
             </div>
           </div>
 
-          <table class="grid-tbl" style="margin-bottom: 14px;">
-            <tr>
-              <td class="lbl" style="width: 25%;">Payee's Name:</td>
-              <td class="val" style="width: 75%; font-size: 12px;">${inv.payeeName || sellerName || buyerName || 'N/A'}</td>
-            </tr>
-            <tr>
-              <td class="lbl">Head of Account:</td>
-              <td class="val" style="font-size: 11px;">${inv.headOfAccount || 'Vehicle Expense / Deal Settlement'}</td>
-            </tr>
-          </table>
+          <!-- Payee's Name Line -->
+          <div style="font-size: 12px; margin-bottom: 14px; color: #0f172a;">
+            <strong>Payee's Name</strong> <span style="border-bottom: 1.5px solid #0f172a; display: inline-block; width: calc(100% - 110px); padding-left: 8px; font-weight: 800; font-size: 13px;">${payee}</span>
+          </div>
 
-          <table class="grid-tbl" style="margin-bottom: 14px;">
+          <!-- Main Head of Account & Rupees Table -->
+          <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #0f172a; margin-bottom: 14px; font-size: 11px;">
             <thead>
-              <tr style="background: #f1f5f9; text-align: center; font-weight: bold; font-size: 10px;">
-                <td style="width: 75%;">Particulars / Description</td>
-                <td style="width: 25%;">Rupees</td>
+              <tr style="border-bottom: 1.5px solid #0f172a; background: #f8fafc; font-weight: 900; font-size: 11px; text-align: center;">
+                <td style="padding: 6px 10px; border-right: 1.5px solid #0f172a; text-align: left; width: 75%;">Head of Account</td>
+                <td style="padding: 6px 10px; width: 25%;">Rupees</td>
               </tr>
             </thead>
             <tbody>
-              <tr style="height: 160px; vertical-align: top;">
-                <td style="padding: 12px; font-size: 11px; line-height: 1.6;">
-                  ${inv.remarks || `Payment voucher issued for ${vehicleMaker} ${vehicleModel} (${regNo}).`}
+              <tr style="height: 140px; vertical-align: top;">
+                <td style="padding: 10px; border-right: 1.5px solid #0f172a; line-height: 1.8;">
+                  <div style="font-weight: 800; font-size: 12px; color: #0f172a; text-decoration: underline; margin-bottom: 6px;">${headAccount}</div>
+                  <div style="font-size: 11px; color: #334155;">${desc}</div>
                 </td>
-                <td style="text-align: right; padding: 12px; font-family: monospace; font-size: 14px; font-weight: 900;">
-                  ${Number(totalPrice).toLocaleString()} /-
+                <td style="padding: 10px; text-align: right; font-family: monospace; font-size: 14px; font-weight: 900; color: #0f172a;">
+                  ${amountStr}
                 </td>
               </tr>
-              <tr>
-                <td class="lbl" style="text-align: right;">In Words:</td>
-                <td class="val" style="font-style: italic;">${agreedWords || 'Rupees Only'}</td>
-              </tr>
-              <tr style="font-weight: 900; background: #f8fafc; font-size: 13px;">
-                <td style="text-align: right;">Grand Total:</td>
-                <td style="text-align: right; font-family: monospace; color: #0284c7;">PKR ${Number(totalPrice).toLocaleString()}</td>
+              <tr style="border-top: 1.5px solid #0f172a; font-weight: 900; background: #f8fafc; font-size: 12px;">
+                <td style="padding: 8px 12px; text-align: right; border-right: 1.5px solid #0f172a;">Grand Total</td>
+                <td style="padding: 8px 12px; text-align: right; font-family: monospace; font-size: 14px; color: #0284c7;">
+                  ${totalPrice ? 'PKR ' + Number(totalPrice).toLocaleString() : ''}
+                </td>
               </tr>
             </tbody>
           </table>
 
-          <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 55px; text-align: center;">
-            <div style="border-top: 1.5px solid #0f172a; padding-top: 4px; font-size: 9px; font-weight: bold;">Received By</div>
-            <div style="border-top: 1.5px solid #0f172a; padding-top: 4px; font-size: 9px; font-weight: bold;">Paid By</div>
-            <div style="border-top: 1.5px solid #0f172a; padding-top: 4px; font-size: 9px; font-weight: bold;">Prepared By</div>
-            <div style="border-top: 1.5px solid #0f172a; padding-top: 4px; font-size: 9px; font-weight: bold;">Checked By</div>
-            <div style="border-top: 1.5px solid #0f172a; padding-top: 4px; font-size: 9px; font-weight: bold;">Approved By</div>
+          <!-- In Words Line -->
+          <div style="font-size: 11.5px; margin-bottom: 30px; color: #0f172a;">
+            <strong>In Words</strong> <span style="border-bottom: 1.5px solid #0f172a; display: inline-block; width: calc(100% - 75px); padding-left: 8px; font-style: italic; font-weight: 600;">${agreedWords || 'Rupees Only'}</span>
+          </div>
+
+          <!-- Bottom 5 Signature Boxes Grid -->
+          <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; border: 1.5px solid #0f172a; text-align: center;">
+            <div style="border-right: 1px solid #0f172a; padding: 6px 2px; height: 50px; display: flex; flex-direction: column; justify-content: flex-end;">
+              <span style="font-size: 10px; font-weight: 800; border-top: 1px solid #0f172a; padding-top: 3px;">Received By</span>
+            </div>
+            <div style="border-right: 1px solid #0f172a; padding: 6px 2px; height: 50px; display: flex; flex-direction: column; justify-content: flex-end;">
+              <span style="font-size: 10px; font-weight: 800; border-top: 1px solid #0f172a; padding-top: 3px;">Paid By</span>
+            </div>
+            <div style="border-right: 1px solid #0f172a; padding: 6px 2px; height: 50px; display: flex; flex-direction: column; justify-content: flex-end;">
+              <span style="font-size: 10px; font-weight: 800; border-top: 1px solid #0f172a; padding-top: 3px;">Prepared By</span>
+            </div>
+            <div style="border-right: 1px solid #0f172a; padding: 6px 2px; height: 50px; display: flex; flex-direction: column; justify-content: flex-end;">
+              <span style="font-size: 10px; font-weight: 800; border-top: 1px solid #0f172a; padding-top: 3px;">Checked By</span>
+            </div>
+            <div style="padding: 6px 2px; height: 50px; display: flex; flex-direction: column; justify-content: flex-end;">
+              <span style="font-size: 10px; font-weight: 800; border-top: 1px solid #0f172a; padding-top: 3px;">Approved By</span>
+            </div>
           </div>
         </div>
       `;
@@ -1586,7 +1602,7 @@ export default function Invoices() {
         )}
       </div>
 
-      {/* CREATE / EDIT SALES RECEIPT (سیل رسید) BILINGUAL MODAL */}
+      {/* CREATE / EDIT SALES RECEIPT & VOUCHERS MODAL */}
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-[#0b192c] border border-cyan-500/30 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
@@ -1598,311 +1614,731 @@ export default function Invoices() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                    {selectedInvoice ? 'Edit Sales Receipt' : 'Create Sales Receipt'} <span className="text-cyan-400 font-normal text-sm font-mono">(سیل رسید)</span>
+                    {selectedInvoice ? 'Edit' : 'Create'}{' '}
+                    {formData.category === 'DELIVERY_LETTER' ? 'Delivery Letter' :
+                     formData.category === 'BOOKING_RECEIPT' ? 'Booking Receipt' :
+                     formData.category === 'PAYMENT_VOUCHER' ? 'Payment Voucher' :
+                     'Sales Receipt'}
+                    <span className="text-cyan-400 font-normal text-sm font-mono">
+                      {formData.category === 'DELIVERY_LETTER' ? '(ڈیلیوری لیٹر)' :
+                       formData.category === 'BOOKING_RECEIPT' ? '(رسید)' :
+                       formData.category === 'PAYMENT_VOUCHER' ? '(ادائیگی واؤچر)' :
+                       '(سیل رسید)'}
+                    </span>
                   </h2>
-                  <p className="text-xs text-slate-400">Fill in seller, buyer, vehicle, and transaction agreement details</p>
+                  <p className="text-xs text-slate-400">
+                    {formData.category === 'DELIVERY_LETTER' ? 'Vehicle handover declaration form for physical paper pad printing' :
+                     formData.category === 'BOOKING_RECEIPT' ? 'Booking voucher and advance receipt matching physical pad' :
+                     formData.category === 'PAYMENT_VOUCHER' ? 'Payment voucher (P.V.) receipt entry' :
+                     'Fill in seller, buyer, vehicle, and transaction agreement details'}
+                  </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsAddModalOpen(false)}
-                className="text-slate-400 hover:text-white text-lg font-bold px-2 py-1"
+                className="text-slate-400 hover:text-white text-lg font-bold px-2 py-1 cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            {/* Modal Navigation Tabs */}
-            <div className="flex overflow-x-auto border-b border-white/10 bg-slate-900/40 p-2 gap-1 text-xs">
-              {[
-                { id: 'general', label: '📌 Voucher Category & General' },
-                { id: 'seller', label: '👤 Seller Details (فروخت کنندہ)' },
-                { id: 'buyer', label: '👤 Buyer Details (خریدار)' },
-                { id: 'vehicle', label: '🚗 Vehicle Specs (گاڑی)' },
-                { id: 'agreement', label: '📜 Agreement (معاہدہ)' },
-                { id: 'financials', label: '💰 Balances & Financials' },
-                { id: 'witnesses', label: '🖋️ Witnesses (گواہان)' }
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-3 py-2 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    activeTab === tab.id
-                      ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                      : 'text-slate-400 hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+            {/* Modal Navigation Tabs - ONLY SHOWN FOR FULL SALES RECEIPT */}
+            {formData.category === 'SALES_RECEIPT' && (
+              <div className="flex overflow-x-auto border-b border-white/10 bg-slate-900/40 p-2 gap-1 text-xs">
+                {[
+                  { id: 'general', label: '📌 General Meta' },
+                  { id: 'seller', label: '👤 Seller Details (فروخت کنندہ)' },
+                  { id: 'buyer', label: '👤 Buyer Details (خریدار)' },
+                  { id: 'vehicle', label: '🚗 Vehicle Specs (گاڑی)' },
+                  { id: 'agreement', label: '📜 Agreement (معاہدہ)' },
+                  { id: 'financials', label: '💰 Balances & Financials' },
+                  { id: 'witnesses', label: '🖋️ Witnesses (گواہان)' }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`px-3 py-2 rounded-lg font-medium whitespace-nowrap transition-all cursor-pointer ${
+                      activeTab === tab.id
+                        ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Modal Form Content */}
             <form onSubmit={handleSaveInvoice} className="p-6 overflow-y-auto flex-1 space-y-6">
-              
-              {/* TAB 1: GENERAL DETAILS */}
-              {activeTab === 'general' && (
-                <div className="space-y-5">
-                  <div>
-                    <label className="block text-xs font-bold text-cyan-400 mb-2 uppercase tracking-wider">
-                      Voucher / Invoice Category (اقسام واؤچر) <span className="text-rose-400">*</span>
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
-                      {[
-                        { id: 'SALES_RECEIPT', title: 'Sales Receipt', sub: 'سیل رسید (Dual Language)' },
-                        { id: 'DELIVERY_LETTER', title: 'Delivery Letter', sub: 'ڈیلیوری لیٹر (Handover)' },
-                        { id: 'PAYMENT_VOUCHER', title: 'Payment Voucher', sub: 'P.V. (ادائیگی واؤچر)' },
-                        { id: 'BOOKING_RECEIPT', title: 'Booking Receipt', sub: 'رسید (Payment Receipt)' }
-                      ].map(cat => (
-                        <button
-                          key={cat.id}
-                          type="button"
-                          onClick={() => handleInputChange('category', cat.id)}
-                          className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                            formData.category === cat.id
-                              ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400 shadow-md font-bold'
-                              : 'bg-slate-900/60 border-white/10 text-slate-400 hover:text-white hover:bg-slate-800'
-                          }`}
-                        >
-                          <div className="text-xs font-bold">{cat.title}</div>
-                          <div className="text-[10px] font-mono opacity-80 mt-0.5">{cat.sub}</div>
-                        </button>
-                      ))}
+              {/* CATEGORY SWITCHER CARDS */}
+              <div>
+                <label className="block text-xs font-bold text-cyan-400 mb-2 uppercase tracking-wider">
+                  Voucher / Invoice Category (اقسام واؤچر) <span className="text-rose-400">*</span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                  {[
+                    { id: 'SALES_RECEIPT', title: 'Sales Receipt', sub: 'سیل رسید (Dual Language)' },
+                    { id: 'DELIVERY_LETTER', title: 'Delivery Letter', sub: 'ڈیلیوری لیٹر (Handover)' },
+                    { id: 'PAYMENT_VOUCHER', title: 'Payment Voucher', sub: 'P.V. (ادائیگی واؤچر)' },
+                    { id: 'BOOKING_RECEIPT', title: 'Booking Receipt', sub: 'رسید (Payment Receipt)' }
+                  ].map(cat => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => handleInputChange('category', cat.id)}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                        formData.category === cat.id
+                          ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400 shadow-md font-bold'
+                          : 'bg-slate-900/60 border-white/10 text-slate-400 hover:text-white hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="text-xs font-bold">{cat.title}</div>
+                      <div className="text-[10px] font-mono opacity-80 mt-0.5">{cat.sub}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* ------------------------------------------------------------- */}
+              {/* CATEGORY 1: DELIVERY LETTER (ڈیلیوری لیٹر) - SINGLE PAGE FORM */}
+              {/* ------------------------------------------------------------- */}
+              {formData.category === 'DELIVERY_LETTER' && (
+                <div className="space-y-6 pt-2">
+                  <div className="p-3.5 bg-blue-500/10 border border-blue-500/30 rounded-2xl flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2">
+                        📄 Official AL-ASR Motors Delivery Letter Entry (ڈیلیوری لیٹر)
+                      </h4>
+                      <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                        Contains ONLY the fields required for Delivery Letter matching the physical paper pad.
+                      </p>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-blue-300 bg-blue-500/20 px-3 py-1 rounded-full border border-blue-500/40">
+                      Letter # {formData.invoiceNumber || selectedInvoice?.receiptNo || 'DL-PAD'}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 bg-slate-900/90 border border-white/10 rounded-xl text-xs text-slate-300 italic leading-relaxed">
+                    <span className="font-bold text-cyan-400 not-italic">Paper Pad Text Preview: </span>
+                    "I, the undersigned, here declare that I have thoroughly checked the machine as and whatever it is and the relevant documents of Motor Car..."
+                  </div>
+
+                  {/* 1. Date & General Info */}
+                  <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
+                    <h5 className="text-xs font-bold text-blue-400 uppercase tracking-wider border-b border-white/10 pb-2">
+                      1. Date & Delivery Info
+                    </h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Date (تاریخ) <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={formData.dated}
+                          onChange={(e) => handleInputChange('dated', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Time (وقت)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 03:30 PM"
+                          value={formData.time || formData.agreementTime || ''}
+                          onChange={(e) => handleInputChange('time', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          From (فروخت کنندہ مقام)
+                        </label>
+                        <input
+                          type="text"
+                          readOnly
+                          value="AL-ASR MOTORS SAHIWAL"
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-cyan-400 text-xs font-bold font-mono cursor-not-allowed"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Account Of (کھاتہ نام)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Self / Company Account"
+                          value={formData.accountOf || ''}
+                          onChange={(e) => handleInputChange('accountOf', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500"
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  {formData.category === 'BOOKING_RECEIPT' ? (
-                    <div className="space-y-6 pt-2">
-                      <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-between">
-                        <div>
-                          <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">🧾 Official AL-ASR Motors Booking Voucher Entry</h4>
-                          <p className="text-[11px] text-slate-400 font-mono mt-0.5">Fills exact fields matching the physical printed receipt book pad.</p>
-                        </div>
-                        <span className="text-xs font-mono font-bold text-emerald-300 bg-emerald-500/20 px-3 py-1 rounded-full border border-emerald-500/40">
-                          Voucher # {formData.invoiceNumber || selectedInvoice?.receiptNo || '2620'}
-                        </span>
+                  {/* 2. Vehicle Specifications */}
+                  <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
+                    <h5 className="text-xs font-bold text-blue-400 uppercase tracking-wider border-b border-white/10 pb-2">
+                      2. Vehicle Specifications (گاڑی کی تفصیلات)
+                    </h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Make (میکر) <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Toyota / Honda / Suzuki"
+                          value={formData.vehicleMaker}
+                          onChange={(e) => handleInputChange('vehicleMaker', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500"
+                          required
+                        />
                       </div>
-
-                      {/* 1. Date & Customer Info */}
-                      <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
-                        <h5 className="text-xs font-bold text-cyan-400 uppercase tracking-wider border-b border-white/10 pb-2">1. Date & Customer Details</h5>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">Date (تاریخ) <span className="text-rose-400">*</span></label>
-                            <input
-                              type="date"
-                              value={formData.dated}
-                              onChange={(e) => handleInputChange('dated', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                              required
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">Customer / Buyer Name (نام) <span className="text-rose-400">*</span></label>
-                            <input
-                              type="text"
-                              placeholder="e.g. Mian Sarfraz"
-                              value={formData.buyerName}
-                              onChange={(e) => handleInputChange('buyerName', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                              required
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">Tel / Phone (فون) <span className="text-rose-400">*</span></label>
-                            <input
-                              type="text"
-                              placeholder="e.g. 0300-1234567"
-                              value={formData.buyerPhone}
-                              onChange={(e) => handleInputChange('buyerPhone', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
-                              required
-                            />
-                          </div>
-                        </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Model & Year (ماڈل) <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Corolla Altis 2022"
+                          value={formData.vehicleModel}
+                          onChange={(e) => handleInputChange('vehicleModel', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500"
+                          required
+                        />
                       </div>
-
-                      {/* 2. Vehicle Specs */}
-                      <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
-                        <h5 className="text-xs font-bold text-cyan-400 uppercase tracking-wider border-b border-white/10 pb-2">2. Vehicle Specifications</h5>
-                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">Vehicle No. (گاڑی نمبر)</label>
-                            <input
-                              type="text"
-                              placeholder="e.g. LEA-22-4589 or Unregistered"
-                              value={formData.registrationNo}
-                              onChange={(e) => handleInputChange('registrationNo', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">Engine No. (انجن نمبر)</label>
-                            <input
-                              type="text"
-                              placeholder="Engine number"
-                              value={formData.engineNumber}
-                              onChange={(e) => handleInputChange('engineNumber', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">Chases No. (چیسس نمبر)</label>
-                            <input
-                              type="text"
-                              placeholder="Chassis number"
-                              value={formData.chassisNumber}
-                              onChange={(e) => handleInputChange('chassisNumber', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">Colour (رنگ)</label>
-                            <input
-                              type="text"
-                              placeholder="e.g. White / Silver"
-                              value={formData.color}
-                              onChange={(e) => handleInputChange('color', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                            />
-                          </div>
-                        </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Power / Capacity (پاور)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 1800 cc"
+                          value={formData.powerCapacity || ''}
+                          onChange={(e) => handleInputChange('powerCapacity', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500"
+                        />
                       </div>
-
-                      {/* 3. Financial Deal Details */}
-                      <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
-                        <h5 className="text-xs font-bold text-cyan-400 uppercase tracking-wider border-b border-white/10 pb-2">3. Deal Amounts & Calculations</h5>
-                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">Total Deal (Rs.) <span className="text-rose-400">*</span></label>
-                            <input
-                              type="number"
-                              placeholder="e.g. 5000000"
-                              value={formData.totalPrice}
-                              onChange={(e) => {
-                                const tot = parseFloat(e.target.value) || 0;
-                                const adv = parseFloat(formData.advanceAmount) || 0;
-                                handleInputChange('totalPrice', e.target.value);
-                                handleInputChange('remainingAmount', Math.max(0, tot - adv));
-                              }}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
-                              required
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">Advance (Rs.) <span className="text-rose-400">*</span></label>
-                            <input
-                              type="number"
-                              placeholder="e.g. 500000"
-                              value={formData.advanceAmount}
-                              onChange={(e) => {
-                                const adv = parseFloat(e.target.value) || 0;
-                                const tot = parseFloat(formData.totalPrice) || 0;
-                                handleInputChange('advanceAmount', e.target.value);
-                                handleInputChange('remainingAmount', Math.max(0, tot - adv));
-                              }}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
-                              required
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">Balance (Rs.) (بقایا)</label>
-                            <input
-                              type="number"
-                              readOnly
-                              value={formData.totalPrice && formData.advanceAmount ? Math.max(0, (parseFloat(formData.totalPrice) || 0) - (parseFloat(formData.advanceAmount) || 0)) : (formData.remainingAmount || '')}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-rose-400 text-xs font-bold font-mono cursor-not-allowed"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">In Words (الفاظ میں)</label>
-                            <input
-                              type="text"
-                              placeholder="e.g. Five Lac Rupees Only"
-                              value={formData.agreedAmountWords || formData.inWords}
-                              onChange={(e) => {
-                                handleInputChange('agreedAmountWords', e.target.value);
-                                handleInputChange('inWords', e.target.value);
-                              }}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 italic"
-                            />
-                          </div>
-                        </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Chassis No. (چیسس نمبر)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. NZE140-123456"
+                          value={formData.chassisNumber || ''}
+                          onChange={(e) => handleInputChange('chassisNumber', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500 font-mono"
+                        />
                       </div>
-
-                      {/* 4. Bank Status */}
-                      <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
-                        <h5 className="text-xs font-bold text-emerald-400 uppercase tracking-wider border-b border-white/10 pb-2">4. Bank Status & Payment Details</h5>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">Cash (نقد / تفصیل)</label>
-                            <input
-                              type="text"
-                              placeholder="e.g. Cash / Bank Transfer"
-                              value={formData.cashAmount || ''}
-                              onChange={(e) => handleInputChange('cashAmount', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">Cheque # / DD # / On Line</label>
-                            <input
-                              type="text"
-                              placeholder="e.g. CHQ-9842104"
-                              value={formData.chequeNo}
-                              onChange={(e) => handleInputChange('chequeNo', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500 font-mono"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">Due Date (معیاد)</label>
-                            <input
-                              type="date"
-                              value={formData.dueDate}
-                              onChange={(e) => handleInputChange('dueDate', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">on Account</label>
-                            <input
-                              type="text"
-                              placeholder="e.g. Advance Booking"
-                              value={formData.onAccount}
-                              onChange={(e) => handleInputChange('onAccount', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500"
-                            />
-                          </div>
-                          <div className="sm:col-span-2">
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">Status (بینک اسٹیٹس)</label>
-                            <input
-                              type="text"
-                              placeholder="e.g. Cleared / Pending / Cash Paid"
-                              value={formData.bankStatus}
-                              onChange={(e) => handleInputChange('bankStatus', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500"
-                            />
-                          </div>
-                        </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Engine No. (انجن نمبر)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 1ZZ-987654"
+                          value={formData.engineNumber || ''}
+                          onChange={(e) => handleInputChange('engineNumber', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500 font-mono"
+                        />
                       </div>
-
-                      {/* 5. Status Box Notes */}
-                      <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
-                        <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                          <h5 className="text-xs font-bold text-sky-400 uppercase tracking-wider">5. Status Box Remarks (Right Lined Blank Space)</h5>
-                          <span className="text-[10px] font-mono font-bold text-emerald-400">Leave blank for empty lined space like physical receipt book!</span>
-                        </div>
-                        <textarea
-                          rows="3"
-                          placeholder="Enter status notes line-by-line (or leave blank to print empty lined space box just like the picture)..."
-                          value={formData.statusBoxNotes || ''}
-                          onChange={(e) => handleInputChange('statusBoxNotes', e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-sky-500 custom-scrollbar"
-                        ></textarea>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Color (رنگ)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Super White / Silver"
+                          value={formData.color || ''}
+                          onChange={(e) => handleInputChange('color', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500"
+                        />
                       </div>
                     </div>
-                  ) : (
-                    <>
+                  </div>
+
+                  {/* 3. Buyer / Customer Information */}
+                  <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
+                    <h5 className="text-xs font-bold text-blue-400 uppercase tracking-wider border-b border-white/10 pb-2">
+                      3. Buyer / Recipient Details (خریدار کی تفصیلات)
+                    </h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Buyer's Name (خریدار کا نام) <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Full name of buyer taking delivery"
+                          value={formData.buyerName}
+                          onChange={(e) => handleInputChange('buyerName', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          S/o / Father's Name (ولدیت)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Buyer's father name"
+                          value={formData.buyerFatherName || ''}
+                          onChange={(e) => handleInputChange('buyerFatherName', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Address (مکمل پتہ)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Residential or business address"
+                          value={formData.buyerAddress || ''}
+                          onChange={(e) => handleInputChange('buyerAddress', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          N.I.C. No (شناختی کارڈ نمبر)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="35501-1234567-1"
+                          value={formData.buyerCnic || ''}
+                          onChange={(e) => handleInputChange('buyerCnic', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Contact / Phone (رابطہ نمبر)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="0300-1234567"
+                          value={formData.buyerPhone || ''}
+                          onChange={(e) => handleInputChange('buyerPhone', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500 font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 4. Witness Information */}
+                  <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
+                    <h5 className="text-xs font-bold text-blue-400 uppercase tracking-wider border-b border-white/10 pb-2">
+                      4. Witness Details (گواہان)
+                    </h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="p-3 bg-slate-900/60 rounded-lg border border-white/5 space-y-3">
+                        <h6 className="text-xs font-bold text-slate-300">Witness No. 1 (گواہ نمبر 1)</h6>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Witness Name</label>
+                          <input
+                            type="text"
+                            placeholder="Full name of witness 1"
+                            value={formData.witness1Name || ''}
+                            onChange={(e) => handleInputChange('witness1Name', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">N.I.C. No.</label>
+                          <input
+                            type="text"
+                            placeholder="35501-0000000-1"
+                            value={formData.witness1Cnic || ''}
+                            onChange={(e) => handleInputChange('witness1Cnic', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500 font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-slate-900/60 rounded-lg border border-white/5 space-y-3">
+                        <h6 className="text-xs font-bold text-slate-300">Witness No. 2 (گواہ نمبر 2)</h6>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Witness Name</label>
+                          <input
+                            type="text"
+                            placeholder="Full name of witness 2"
+                            value={formData.witness2Name || ''}
+                            onChange={(e) => handleInputChange('witness2Name', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">N.I.C. No.</label>
+                          <input
+                            type="text"
+                            placeholder="35501-0000000-2"
+                            value={formData.witness2Cnic || ''}
+                            onChange={(e) => handleInputChange('witness2Cnic', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500 font-mono"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ------------------------------------------------------------- */}
+              {/* CATEGORY 2: BOOKING RECEIPT (رسید) - SINGLE PAGE FORM          */}
+              {/* ------------------------------------------------------------- */}
+              {formData.category === 'BOOKING_RECEIPT' && (
+                <div className="space-y-6 pt-2">
+                  <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">🧾 Official AL-ASR Motors Booking Voucher Entry</h4>
+                      <p className="text-[11px] text-slate-400 font-mono mt-0.5">Fills exact fields matching the physical printed receipt book pad.</p>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-emerald-300 bg-emerald-500/20 px-3 py-1 rounded-full border border-emerald-500/40">
+                      Voucher # {formData.invoiceNumber || selectedInvoice?.receiptNo || 'BK-PAD'}
+                    </span>
+                  </div>
+
+                  {/* 1. Date & Customer Info */}
+                  <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
+                    <h5 className="text-xs font-bold text-cyan-400 uppercase tracking-wider border-b border-white/10 pb-2">1. Date & Customer Details</h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">Date (تاریخ) <span className="text-rose-400">*</span></label>
+                        <input
+                          type="date"
+                          value={formData.dated}
+                          onChange={(e) => handleInputChange('dated', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">Customer / Buyer Name (نام) <span className="text-rose-400">*</span></label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Mian Sarfraz"
+                          value={formData.buyerName}
+                          onChange={(e) => handleInputChange('buyerName', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">Tel / Phone (فون) <span className="text-rose-400">*</span></label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 0300-1234567"
+                          value={formData.buyerPhone}
+                          onChange={(e) => handleInputChange('buyerPhone', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Vehicle Specs */}
+                  <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
+                    <h5 className="text-xs font-bold text-cyan-400 uppercase tracking-wider border-b border-white/10 pb-2">2. Vehicle Specifications</h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">Vehicle No. (گاڑی نمبر)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. LEA-22-4589 or Unregistered"
+                          value={formData.registrationNo}
+                          onChange={(e) => handleInputChange('registrationNo', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">Engine No. (انجن نمبر)</label>
+                        <input
+                          type="text"
+                          placeholder="Engine number"
+                          value={formData.engineNumber}
+                          onChange={(e) => handleInputChange('engineNumber', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">Chases No. (چیسس نمبر)</label>
+                        <input
+                          type="text"
+                          placeholder="Chassis number"
+                          value={formData.chassisNumber}
+                          onChange={(e) => handleInputChange('chassisNumber', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">Colour (رنگ)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. White / Silver"
+                          value={formData.color}
+                          onChange={(e) => handleInputChange('color', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. Financial Deal Details */}
+                  <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
+                    <h5 className="text-xs font-bold text-cyan-400 uppercase tracking-wider border-b border-white/10 pb-2">3. Deal Amounts & Calculations</h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">Total Deal (Rs.) <span className="text-rose-400">*</span></label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 5000000"
+                          value={formData.totalPrice}
+                          onChange={(e) => {
+                            const tot = parseFloat(e.target.value) || 0;
+                            const adv = parseFloat(formData.advanceAmount) || 0;
+                            handleInputChange('totalPrice', e.target.value);
+                            handleInputChange('remainingAmount', Math.max(0, tot - adv));
+                          }}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">Advance (Rs.) <span className="text-rose-400">*</span></label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 500000"
+                          value={formData.advanceAmount}
+                          onChange={(e) => {
+                            const adv = parseFloat(e.target.value) || 0;
+                            const tot = parseFloat(formData.totalPrice) || 0;
+                            handleInputChange('advanceAmount', e.target.value);
+                            handleInputChange('remainingAmount', Math.max(0, tot - adv));
+                          }}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">Balance (Rs.) (بقایا)</label>
+                        <input
+                          type="number"
+                          readOnly
+                          value={formData.totalPrice && formData.advanceAmount ? Math.max(0, (parseFloat(formData.totalPrice) || 0) - (parseFloat(formData.advanceAmount) || 0)) : (formData.remainingAmount || '')}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-rose-400 text-xs font-bold font-mono cursor-not-allowed"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">In Words (الفاظ میں)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Five Lac Rupees Only"
+                          value={formData.agreedAmountWords || formData.inWords}
+                          onChange={(e) => {
+                            handleInputChange('agreedAmountWords', e.target.value);
+                            handleInputChange('inWords', e.target.value);
+                          }}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 italic"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 4. Bank Status */}
+                  <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
+                    <h5 className="text-xs font-bold text-emerald-400 uppercase tracking-wider border-b border-white/10 pb-2">4. Bank Status & Payment Details</h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">Cash (نقد / تفصیل)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Cash / Bank Transfer"
+                          value={formData.cashAmount || ''}
+                          onChange={(e) => handleInputChange('cashAmount', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">Cheque # / DD # / On Line</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. CHQ-9842104"
+                          value={formData.chequeNo}
+                          onChange={(e) => handleInputChange('chequeNo', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">Due Date (معیاد)</label>
+                        <input
+                          type="date"
+                          value={formData.dueDate}
+                          onChange={(e) => handleInputChange('dueDate', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">on Account</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Advance Booking"
+                          value={formData.onAccount}
+                          onChange={(e) => handleInputChange('onAccount', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">Status (بینک اسٹیٹس)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Cleared / Pending / Cash Paid"
+                          value={formData.bankStatus}
+                          onChange={(e) => handleInputChange('bankStatus', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 5. Status Box Notes */}
+                  <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <h5 className="text-xs font-bold text-sky-400 uppercase tracking-wider">5. Status Box Remarks (Right Lined Blank Space)</h5>
+                      <span className="text-[10px] font-mono font-bold text-emerald-400">Leave blank for empty lined space like physical receipt book!</span>
+                    </div>
+                    <textarea
+                      rows="3"
+                      placeholder="Enter status notes line-by-line (or leave blank to print empty lined space box just like the picture)..."
+                      value={formData.statusBoxNotes || ''}
+                      onChange={(e) => handleInputChange('statusBoxNotes', e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-sky-500 custom-scrollbar"
+                    ></textarea>
+                  </div>
+                </div>
+              )}
+
+              {/* ------------------------------------------------------------- */}
+              {/* CATEGORY 3: PAYMENT VOUCHER (P.V.) - SINGLE PAGE FORM          */}
+              {/* ------------------------------------------------------------- */}
+              {formData.category === 'PAYMENT_VOUCHER' && (
+                <div className="space-y-6 pt-2">
+                  <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                        💵 Official AL-ASR Motors Payment Voucher Entry (P.V.)
+                      </h4>
+                      <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                        Fills exact fields matching the physical payment voucher pad.
+                      </p>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-amber-300 bg-amber-500/20 px-3 py-1 rounded-full border border-amber-500/40">
+                      P.V. # {formData.invoiceNumber || selectedInvoice?.receiptNo || 'PV-PAD'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-4 bg-slate-900/80 p-5 rounded-xl border border-white/10">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Date (تاریخ) <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={formData.dated}
+                          onChange={(e) => handleInputChange('dated', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-amber-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Payee's Name (نام پانے والا) <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Name of person or entity receiving payment"
+                          value={formData.payeeName || formData.buyerName || ''}
+                          onChange={(e) => {
+                            handleInputChange('payeeName', e.target.value);
+                            handleInputChange('buyerName', e.target.value);
+                          }}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-amber-500"
+                          required
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Head of Account (کھاتہ) <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Vehicle Purchase / Office Expense / Settlement"
+                          value={formData.headOfAccount || ''}
+                          onChange={(e) => handleInputChange('headOfAccount', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-amber-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Amount (Rs. / روپے) <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 250000"
+                          value={formData.totalPrice || ''}
+                          onChange={(e) => handleInputChange('totalPrice', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-amber-500 font-mono"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          In Words (الفاظ میں)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Two Lac Fifty Thousand Rupees Only"
+                          value={formData.inWords || ''}
+                          onChange={(e) => handleInputChange('inWords', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-amber-500 italic"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Particulars / Description (تفصیل)
+                        </label>
+                        <textarea
+                          rows="3"
+                          placeholder="Description of payment voucher..."
+                          value={formData.remarks || ''}
+                          onChange={(e) => handleInputChange('remarks', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-amber-500 custom-scrollbar"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ------------------------------------------------------------- */}
+              {/* CATEGORY 4: SALES RECEIPT (سیل رسید) - TABBED MULTI-SECTION  */}
+              {/* ------------------------------------------------------------- */}
+              {formData.category === 'SALES_RECEIPT' && (
+                <>
+                  {/* TAB 1: GENERAL DETAILS */}
+                  {activeTab === 'general' && (
+                    <div className="space-y-4">
                       <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Basic Metadata & Registration</h3>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
@@ -1938,643 +2374,513 @@ export default function Invoices() {
                           <input
                             type="text"
                             placeholder="e.g. 03:30 PM"
-                            value={formData.time || formData.agreementTime}
+                            value={formData.time || formData.agreementTime || ''}
                             onChange={(e) => handleInputChange('time', e.target.value)}
                             className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
                           />
                         </div>
                       </div>
-
-                      {/* Category Specific Fields in General Tab */}
-                      {formData.category === 'PAYMENT_VOUCHER' && (
-                        <div className="p-4 bg-slate-900/80 rounded-xl border border-amber-500/30 space-y-4">
-                          <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">Payment Voucher (P.V.) Details</h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs font-semibold text-slate-300 mb-1">Payee's Name (نام پانے والا)</label>
-                              <input
-                                type="text"
-                                placeholder="Name of person receiving payment"
-                                value={formData.payeeName}
-                                onChange={(e) => handleInputChange('payeeName', e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-amber-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-semibold text-slate-300 mb-1">Head of Account (کھاتہ)</label>
-                              <input
-                                type="text"
-                                placeholder="e.g. Vehicle Purchase / Expense"
-                                value={formData.headOfAccount}
-                                onChange={(e) => handleInputChange('headOfAccount', e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-amber-500"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {formData.category === 'DELIVERY_LETTER' && (
-                        <div className="p-4 bg-slate-900/80 rounded-xl border border-blue-500/30 space-y-4">
-                          <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider">Delivery Letter Specific Details</h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs font-semibold text-slate-300 mb-1">Account Of</label>
-                              <input
-                                type="text"
-                                placeholder="e.g. Self / Company Account"
-                                value={formData.accountOf}
-                                onChange={(e) => handleInputChange('accountOf', e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-semibold text-slate-300 mb-1">Vehicle Color (رنگ)</label>
-                              <input
-                                type="text"
-                                placeholder="e.g. White / Super White"
-                                value={formData.color}
-                                onChange={(e) => handleInputChange('color', e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-blue-500"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </>
+                    </div>
                   )}
-                </div>
-              )}
 
-              {/* TAB 2: SELLER DETAILS */}
-              {activeTab === 'seller' && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Seller Details (فروخت کنندہ)</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Seller Name (فروخت کنندہ) <span className="text-rose-400">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Full name of seller"
-                        value={formData.sellerName}
-                        onChange={(e) => handleInputChange('sellerName', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                        required
-                      />
-                    </div>
+                  {/* TAB 2: SELLER DETAILS */}
+                  {activeTab === 'seller' && (
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Seller Details (فروخت کنندہ)</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Seller Name (فروخت کنندہ) <span className="text-rose-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Full name of seller"
+                            value={formData.sellerName}
+                            onChange={(e) => handleInputChange('sellerName', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            required
+                          />
+                        </div>
 
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Son of / Father's Name (ولدیت)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Father's name"
-                        value={formData.sellerFatherName}
-                        onChange={(e) => handleInputChange('sellerFatherName', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Son of / Father's Name (ولدیت)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Father's name"
+                            value={formData.sellerFatherName}
+                            onChange={(e) => handleInputChange('sellerFatherName', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
 
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        CNIC No. (شناختی کارڈ نمبر)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="35501-1234567-1"
-                        value={formData.sellerCnic || ''}
-                        onChange={(e) => handleInputChange('sellerCnic', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
-                      />
-                    </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            CNIC No. (شناختی کارڈ نمبر)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="35501-1234567-1"
+                            value={formData.sellerCnic || ''}
+                            onChange={(e) => handleInputChange('sellerCnic', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                          />
+                        </div>
 
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Phone No. (فون نمبر)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="0300-0000000"
-                        value={formData.sellerPhone}
-                        onChange={(e) => handleInputChange('sellerPhone', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Phone No. (فون نمبر)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="0300-0000000"
+                            value={formData.sellerPhone}
+                            onChange={(e) => handleInputChange('sellerPhone', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
 
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Address (پتہ)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Complete residential address"
-                        value={formData.sellerAddress}
-                        onChange={(e) => handleInputChange('sellerAddress', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Address (پتہ)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Complete residential address"
+                            value={formData.sellerAddress}
+                            onChange={(e) => handleInputChange('sellerAddress', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
 
-                    <div className="sm:col-span-2">
-                      <CameraCaptureWidget
-                        label="Seller Live Photo (تصویر فروخت کنندہ)"
-                        currentPhoto={formData.sellerPhoto}
-                        onPhotoCaptured={(dataUrl) => handleInputChange('sellerPhoto', dataUrl)}
-                        onPhotoRemoved={() => handleInputChange('sellerPhoto', '')}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 3: BUYER DETAILS */}
-              {activeTab === 'buyer' && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Buyer Details (خریدار)</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Buyer Name (خریدار) <span className="text-rose-400">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Full name of buyer"
-                        value={formData.buyerName}
-                        onChange={(e) => handleInputChange('buyerName', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Son of / Father's Name (ولدیت)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Buyer father's name"
-                        value={formData.buyerFatherName}
-                        onChange={(e) => handleInputChange('buyerFatherName', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        CNIC No. (شناختی کارڈ نمبر)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="35501-1234567-1"
-                        value={formData.buyerCnic || ''}
-                        onChange={(e) => handleInputChange('buyerCnic', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Phone No. (فون نمبر)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="0300-0000000"
-                        value={formData.buyerPhone}
-                        onChange={(e) => handleInputChange('buyerPhone', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Address (پتہ)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Buyer's address / city"
-                        value={formData.buyerAddress}
-                        onChange={(e) => handleInputChange('buyerAddress', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
-
-                    <div className="sm:col-span-2">
-                      <CameraCaptureWidget
-                        label="Buyer Live Photo (تصویر خریدار)"
-                        currentPhoto={formData.buyerPhoto}
-                        onPhotoCaptured={(dataUrl) => handleInputChange('buyerPhoto', dataUrl)}
-                        onPhotoRemoved={() => handleInputChange('buyerPhoto', '')}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 4: VEHICLE DETAILS */}
-              {activeTab === 'vehicle' && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Vehicle Specifications (گاڑی کی تفصیلات)</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Maker (میکر) <span className="text-rose-400">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Toyota / Honda"
-                        value={formData.vehicleMaker}
-                        onChange={(e) => handleInputChange('vehicleMaker', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Model (ماڈل) <span className="text-rose-400">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Civic Oriel 2022"
-                        value={formData.vehicleModel}
-                        onChange={(e) => handleInputChange('vehicleModel', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Power / Engine Capacity (پاور)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 1800 cc"
-                        value={formData.powerCapacity}
-                        onChange={(e) => handleInputChange('powerCapacity', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Engine No. (انجن نمبر)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Engine serial number"
-                        value={formData.engineNumber}
-                        onChange={(e) => handleInputChange('engineNumber', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Chassis No. (چیسز نمبر)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Chassis serial number"
-                        value={formData.chassisNumber}
-                        onChange={(e) => handleInputChange('chassisNumber', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Post Office (ڈاک خانہ)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Post office location"
-                        value={formData.postOffice}
-                        onChange={(e) => handleInputChange('postOffice', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Last Token (آخری ٹوکن)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Paid up to June 2026"
-                        value={formData.lastToken}
-                        onChange={(e) => handleInputChange('lastToken', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Registration Name (رجسٹریشن نام)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Name on smartcard / papers"
-                        value={formData.regName}
-                        onChange={(e) => handleInputChange('regName', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Reg Owner Father (ولدیت)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Registered owner father name"
-                        value={formData.regFatherName}
-                        onChange={(e) => handleInputChange('regFatherName', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 5: TRANSACTION AGREEMENT */}
-              {activeTab === 'agreement' && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Transaction Agreement (اقرار نامہ و معاہدہ)</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        All docs & rights sum of (جملہ کاغذات و دیگر حقوق بعوض مبلغ) (PKR) <span className="text-rose-400">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        placeholder="e.g. 4500000"
-                        value={formData.agreedAmount}
-                        onChange={(e) => handleInputChange('agreedAmount', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Rupees, half of which (روپے جن کے نصف) (PKR)
-                      </label>
-                      <input
-                        type="number"
-                        placeholder="Half sum"
-                        value={formData.agreedAmountHalf}
-                        onChange={(e) => handleInputChange('agreedAmountHalf', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
-
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Rupees amounts to in words (روپے بنتے ہیں)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Forty Five Lakh Rupees Only / پینتالیس لاکھ روپے"
-                        value={formData.agreedAmountWords}
-                        onChange={(e) => handleInputChange('agreedAmountWords', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        At time (بوقت)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 03:30 PM"
-                        value={formData.agreementTime}
-                        onChange={(e) => handleInputChange('agreementTime', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        On day (بروز)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Saturday / ہفتہ"
-                        value={formData.agreementDay}
-                        onChange={(e) => handleInputChange('agreementDay', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 6: IMPORTED VEHICLE */}
-              {activeTab === 'imported' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between border-b border-cyan-500/20 pb-2">
-                    <h3 className="text-sm font-bold text-cyan-400">For Imported Vehicle (برائے امپورٹڈ گاڑی)</h3>
-                    <label className="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.isImported}
-                        onChange={(e) => handleInputChange('isImported', e.target.checked)}
-                        className="rounded border-white/10 bg-slate-900 text-cyan-500 focus:ring-cyan-500"
-                      />
-                      <span>Is Imported Vehicle?</span>
-                    </label>
-                  </div>
-
-                  {formData.isImported && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-300 mb-1">
-                          Bill of Entry No. (بل آف انٹری نمبر)
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Bill of entry number"
-                          value={formData.billOfEntryNo}
-                          onChange={(e) => handleInputChange('billOfEntryNo', e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-300 mb-1">
-                          Port Name (نام پورٹ)
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Port of entry (e.g. Karachi Port)"
-                          value={formData.portName}
-                          onChange={(e) => handleInputChange('portName', e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-300 mb-1">
-                          Clearance Date (تاریخ کلیرنس)
-                        </label>
-                        <input
-                          type="date"
-                          value={formData.clearanceDate}
-                          onChange={(e) => handleInputChange('clearanceDate', e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-300 mb-1">
-                          Importer Name (امپورٹر نام)
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Importer company or individual name"
-                          value={formData.importerName}
-                          onChange={(e) => handleInputChange('importerName', e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                        />
+                        <div className="sm:col-span-2">
+                          <CameraCaptureWidget
+                            label="Seller Live Photo (تصویر فروخت کنندہ)"
+                            currentPhoto={formData.sellerPhoto}
+                            onPhotoCaptured={(dataUrl) => handleInputChange('sellerPhoto', dataUrl)}
+                            onPhotoRemoved={() => handleInputChange('sellerPhoto', '')}
+                          />
+                        </div>
                       </div>
                     </div>
                   )}
-                </div>
-              )}
 
-              {/* TAB 7: FINANCIALS */}
-              {activeTab === 'financials' && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Financial Balances & Duration</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Total Price of Vehicle (کل قیمت گاڑی) (PKR) <span className="text-rose-400">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        placeholder="e.g. 4500000"
-                        value={formData.totalPrice}
-                        onChange={(e) => handleInputChange('totalPrice', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                        required
-                      />
-                    </div>
+                  {/* TAB 3: BUYER DETAILS */}
+                  {activeTab === 'buyer' && (
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Buyer Details (خریدار)</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Buyer Name (خریدار) <span className="text-rose-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Full name of buyer"
+                            value={formData.buyerName}
+                            onChange={(e) => handleInputChange('buyerName', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            required
+                          />
+                        </div>
 
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Advance / Earnest Money (بیعانہ رقم) (PKR)
-                      </label>
-                      <input
-                        type="number"
-                        placeholder="e.g. 500000"
-                        value={formData.advanceAmount}
-                        onChange={(e) => handleInputChange('advanceAmount', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Son of / Father's Name (ولدیت)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Buyer father's name"
+                            value={formData.buyerFatherName}
+                            onChange={(e) => handleInputChange('buyerFatherName', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
 
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Remaining Amount (بقایا رقم) (PKR)
-                      </label>
-                      <input
-                        type="number"
-                        placeholder="Auto-calculated"
-                        value={formData.remainingAmount}
-                        onChange={(e) => handleInputChange('remainingAmount', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            CNIC No. (شناختی کارڈ نمبر)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="35501-1234567-1"
+                            value={formData.buyerCnic || ''}
+                            onChange={(e) => handleInputChange('buyerCnic', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                          />
+                        </div>
 
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Time / Duration (ٹائم)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 15 Days / 1 Month"
-                        value={formData.paymentDuration}
-                        onChange={(e) => handleInputChange('paymentDuration', e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Phone No. (فون نمبر)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="0300-0000000"
+                            value={formData.buyerPhone}
+                            onChange={(e) => handleInputChange('buyerPhone', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
 
-              {/* TAB 8: WITNESSES */}
-              {activeTab === 'witnesses' && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Witness Information (گواہان)</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="p-4 bg-slate-900/60 rounded-xl border border-white/5 space-y-3">
-                      <h4 className="text-xs font-bold text-slate-300">Witness No. 1 (گواہ نمبر 1)</h4>
-                      <div>
-                        <label className="block text-[11px] text-slate-400 mb-1">Name</label>
-                        <input
-                          type="text"
-                          placeholder="Witness 1 full name"
-                          value={formData.witness1Name}
-                          onChange={(e) => handleInputChange('witness1Name', e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] text-slate-400 mb-1">CNIC / Phone</label>
-                        <input
-                          type="text"
-                          placeholder="CNIC / Phone number"
-                          value={formData.witness1Cnic}
-                          onChange={(e) => handleInputChange('witness1Cnic', e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                        />
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Address (پتہ)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Buyer's address / city"
+                            value={formData.buyerAddress}
+                            onChange={(e) => handleInputChange('buyerAddress', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <CameraCaptureWidget
+                            label="Buyer Live Photo (تصویر خریدار)"
+                            currentPhoto={formData.buyerPhoto}
+                            onPhotoCaptured={(dataUrl) => handleInputChange('buyerPhoto', dataUrl)}
+                            onPhotoRemoved={() => handleInputChange('buyerPhoto', '')}
+                          />
+                        </div>
                       </div>
                     </div>
+                  )}
 
-                    <div className="p-4 bg-slate-900/60 rounded-xl border border-white/5 space-y-3">
-                      <h4 className="text-xs font-bold text-slate-300">Witness No. 2 (گواہ نمبر 2)</h4>
-                      <div>
-                        <label className="block text-[11px] text-slate-400 mb-1">Name</label>
-                        <input
-                          type="text"
-                          placeholder="Witness 2 full name"
-                          value={formData.witness2Name}
-                          onChange={(e) => handleInputChange('witness2Name', e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] text-slate-400 mb-1">CNIC / Phone</label>
-                        <input
-                          type="text"
-                          placeholder="CNIC / Phone number"
-                          value={formData.witness2Cnic}
-                          onChange={(e) => handleInputChange('witness2Cnic', e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                        />
+                  {/* TAB 4: VEHICLE DETAILS */}
+                  {activeTab === 'vehicle' && (
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Vehicle Specifications (گاڑی کی تفصیلات)</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Maker (میکر) <span className="text-rose-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Toyota / Honda"
+                            value={formData.vehicleMaker}
+                            onChange={(e) => handleInputChange('vehicleMaker', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Model (ماڈل) <span className="text-rose-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Civic Oriel 2022"
+                            value={formData.vehicleModel}
+                            onChange={(e) => handleInputChange('vehicleModel', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Power / Engine Capacity (پاور)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 1800 cc"
+                            value={formData.powerCapacity}
+                            onChange={(e) => handleInputChange('powerCapacity', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Engine No. (انجن نمبر)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Engine serial number"
+                            value={formData.engineNumber}
+                            onChange={(e) => handleInputChange('engineNumber', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Chassis No. (چیسز نمبر)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Chassis serial number"
+                            value={formData.chassisNumber}
+                            onChange={(e) => handleInputChange('chassisNumber', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Post Office (ڈاک خانہ)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Post office location"
+                            value={formData.postOffice}
+                            onChange={(e) => handleInputChange('postOffice', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Last Token (آخری ٹوکن)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Paid up to June 2026"
+                            value={formData.lastToken}
+                            onChange={(e) => handleInputChange('lastToken', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Registration Name (رجسٹریشن نام)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Name on smartcard / papers"
+                            value={formData.regName}
+                            onChange={(e) => handleInputChange('regName', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Reg Owner Father (ولدیت)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Registered owner father name"
+                            value={formData.regFatherName}
+                            onChange={(e) => handleInputChange('regFatherName', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
+                  )}
+
+                  {/* TAB 5: TRANSACTION AGREEMENT */}
+                  {activeTab === 'agreement' && (
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Transaction Agreement (اقرار نامہ و معاہدہ)</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            All docs & rights sum of (جملہ کاغذات و دیگر حقوق بعوض مبلغ) (PKR) <span className="text-rose-400">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="e.g. 4500000"
+                            value={formData.agreedAmount}
+                            onChange={(e) => handleInputChange('agreedAmount', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Rupees, half of which (روپے جن کے نصف) (PKR)
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="Half sum"
+                            value={formData.agreedAmountHalf}
+                            onChange={(e) => handleInputChange('agreedAmountHalf', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Rupees amounts to in words (روپے بنتے ہیں)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Forty Five Lakh Rupees Only / پینتالیس لاکھ روپے"
+                            value={formData.agreedAmountWords}
+                            onChange={(e) => handleInputChange('agreedAmountWords', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            At time (بوقت)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 03:30 PM"
+                            value={formData.agreementTime}
+                            onChange={(e) => handleInputChange('agreementTime', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            On day (بروز)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Saturday / ہفتہ"
+                            value={formData.agreementDay}
+                            onChange={(e) => handleInputChange('agreementDay', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 6: FINANCIALS */}
+                  {activeTab === 'financials' && (
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Financial Balances & Duration</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Total Price of Vehicle (کل قیمت گاڑی) (PKR) <span className="text-rose-400">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="e.g. 4500000"
+                            value={formData.totalPrice}
+                            onChange={(e) => handleInputChange('totalPrice', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Advance / Earnest Money (بیعانہ رقم) (PKR)
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="e.g. 500000"
+                            value={formData.advanceAmount}
+                            onChange={(e) => handleInputChange('advanceAmount', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Remaining Amount (بقایا رقم) (PKR)
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="Auto-calculated"
+                            value={formData.remainingAmount}
+                            onChange={(e) => handleInputChange('remainingAmount', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Time / Duration (ٹائم)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 15 Days / 1 Month"
+                            value={formData.paymentDuration}
+                            onChange={(e) => handleInputChange('paymentDuration', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 7: WITNESSES */}
+                  {activeTab === 'witnesses' && (
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Witness Information (گواہان)</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="p-4 bg-slate-900/60 rounded-xl border border-white/5 space-y-3">
+                          <h4 className="text-xs font-bold text-slate-300">Witness No. 1 (گواہ نمبر 1)</h4>
+                          <div>
+                            <label className="block text-[11px] text-slate-400 mb-1">Name</label>
+                            <input
+                              type="text"
+                              placeholder="Witness 1 full name"
+                              value={formData.witness1Name}
+                              onChange={(e) => handleInputChange('witness1Name', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] text-slate-400 mb-1">CNIC / Phone</label>
+                            <input
+                              type="text"
+                              placeholder="CNIC / Phone number"
+                              value={formData.witness1Cnic}
+                              onChange={(e) => handleInputChange('witness1Cnic', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="p-4 bg-slate-900/60 rounded-xl border border-white/5 space-y-3">
+                          <h4 className="text-xs font-bold text-slate-300">Witness No. 2 (گواہ نمبر 2)</h4>
+                          <div>
+                            <label className="block text-[11px] text-slate-400 mb-1">Name</label>
+                            <input
+                              type="text"
+                              placeholder="Witness 2 full name"
+                              value={formData.witness2Name}
+                              onChange={(e) => handleInputChange('witness2Name', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] text-slate-400 mb-1">CNIC / Phone</label>
+                            <input
+                              type="text"
+                              placeholder="CNIC / Phone number"
+                              value={formData.witness2Cnic}
+                              onChange={(e) => handleInputChange('witness2Cnic', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* Modal Footer Controls */}
               <div className="pt-4 border-t border-white/10 flex items-center justify-between bg-slate-900/40 p-4 -mx-6 -mb-6">
                 <div className="flex space-x-2">
-                  {activeTab !== 'general' && (
+                  {formData.category === 'SALES_RECEIPT' && activeTab !== 'general' && (
                     <button
                       type="button"
                       onClick={() => {
-                        const tabs = ['general', 'seller', 'buyer', 'vehicle', 'agreement', 'imported', 'financials', 'witnesses'];
+                        const tabs = ['general', 'seller', 'buyer', 'vehicle', 'agreement', 'financials', 'witnesses'];
                         const idx = tabs.indexOf(activeTab);
                         if (idx > 0) setActiveTab(tabs[idx - 1]);
                       }}
-                      className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold"
+                      className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer"
                     >
                       ← Previous Section
                     </button>

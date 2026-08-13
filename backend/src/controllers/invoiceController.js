@@ -268,6 +268,19 @@ const createInvoice = async (req, res) => {
         regFatherName: regFatherName || null,
         regAddress: regAddress || null,
 
+        // Additional Voucher Specific Fields
+        payeeName: payeeName || buyerName || customerName || null,
+        headOfAccount: headOfAccount || null,
+        inWords: inWords || agreedAmountWords || null,
+        bankStatus: bankStatus || null,
+        chequeNo: chequeNo || null,
+        dueDate: dueDate || null,
+        onAccount: onAccount || null,
+        accountOf: accountOf || null,
+        time: time || agreementTime || null,
+        cashAmount: cashAmount || null,
+        statusBoxNotes: statusBoxNotes || null,
+
         // Transaction Agreement
         agreedAmount: parseFloat(agreedAmount) || numericTotalPrice,
         agreedAmountHalf: parseFloat(agreedAmountHalf) || (numericTotalPrice / 2),
