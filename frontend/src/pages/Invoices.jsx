@@ -257,11 +257,13 @@ export default function Invoices() {
     witness2Cnic: ''
   });
 
+  const canAccessInvoices = isSuperAdmin || isAdmin || user?.role === 'ACCOUNTS_HEAD' || user?.role === 'ACCOUNTS_STAFF' || user?.role === 'SALES_HEAD';
+
   useEffect(() => {
-    if (isSuperAdmin) {
+    if (canAccessInvoices) {
       fetchInvoices();
     }
-  }, [search, selectedCategory, isSuperAdmin]);
+  }, [search, selectedCategory, canAccessInvoices]);
 
   const openImageGalleryModal = (inv) => {
     setSelectedReceiptForImages(inv);
@@ -1336,8 +1338,6 @@ export default function Invoices() {
     printWindow.document.write(htmlContent);
     printWindow.document.close();
   };
-
-  const canAccessInvoices = isSuperAdmin || isAdmin || user?.role === 'ACCOUNTS_HEAD' || user?.role === 'ACCOUNTS_STAFF' || user?.role === 'SALES_HEAD';
 
   // If user is not authorized, show security gate
   if (!canAccessInvoices) {
