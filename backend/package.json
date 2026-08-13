@@ -5,13 +5,13 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "build": "prisma generate --schema=prisma/schema.prisma",
-    "postinstall": "prisma generate --schema=prisma/schema.prisma || true",
+    "build": "node build.js",
+    "postinstall": "node build.js",
     "dev": "nodemon src/server.js",
-    "prisma:generate": "prisma generate --schema=prisma/schema.prisma",
+    "prisma:generate": "node build.js",
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:seed": "node prisma/seed.js",
-    "db:setup": "prisma generate && prisma db push && node prisma/seed.js",
+    "db:setup": "node build.js && prisma db push && node prisma/seed.js",
     "db:import-all": "node prisma/reimportAndAssignAllLeads.js"
   },
   "dependencies": {
