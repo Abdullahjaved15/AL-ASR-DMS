@@ -175,7 +175,7 @@ const CameraCaptureWidget = ({ label, currentPhoto, onPhotoCaptured, onPhotoRemo
 };
 
 export default function Invoices() {
-  const { isSuperAdmin, isAdmin, user } = useAuth();
+  const { isSuperAdmin } = useAuth();
   const [invoices, setInvoices] = useState([]);
   const [stats, setStats] = useState({ totalInvoices: 0, totalSalesVolume: 0, totalCommissionEarned: 0, grandTotalValue: 0 });
   const [loading, setLoading] = useState(true);
@@ -257,13 +257,11 @@ export default function Invoices() {
     witness2Cnic: ''
   });
 
-  const canAccessInvoices = isSuperAdmin || isAdmin || user?.role === 'ACCOUNTS_HEAD' || user?.role === 'ACCOUNTS_STAFF' || user?.role === 'SALES_HEAD';
-
   useEffect(() => {
-    if (canAccessInvoices) {
+    if (isSuperAdmin) {
       fetchInvoices();
     }
-  }, [search, selectedCategory, canAccessInvoices]);
+  }, [search, selectedCategory, isSuperAdmin]);
 
   const openImageGalleryModal = (inv) => {
     setSelectedReceiptForImages(inv);
@@ -1339,8 +1337,8 @@ export default function Invoices() {
     printWindow.document.close();
   };
 
-  // If user is not authorized, show security gate
-  if (!canAccessInvoices) {
+  // If user is not Super Admin, show unauthorized security gate
+  if (!isSuperAdmin) {
     return (
       <div className="p-8 max-w-4xl mx-auto text-center">
         <div className="glass-card rounded-2xl p-10 border border-rose-500/30 bg-rose-500/5 shadow-2xl">

@@ -14,13 +14,6 @@ const collaborationRoutes = require('./routes/collaborationRoutes');
 const stockRoutes = require('./routes/stockRoutes');
 const invoiceRoutes = require('./routes/invoiceRoutes');
 const receivingLetterRoutes = require('./routes/receivingLetterRoutes');
-const vaultRoutes = require('./routes/vaultRoutes');
-const customerRoutes = require('./routes/customerRoutes');
-const installmentRoutes = require('./routes/installmentRoutes');
-const financialStatementsRoutes = require('./routes/financialStatementsRoutes');
-const securityChequeRoutes = require('./routes/securityChequeRoutes');
-const vehicleDocumentRoutes = require('./routes/vehicleDocumentRoutes');
-const chartOfAccountsRoutes = require('./routes/chartOfAccountsRoutes');
 
 const app = express();
 
@@ -50,13 +43,6 @@ app.use('/api/collaborations', collaborationRoutes);
 app.use('/api/stock', stockRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/receiving-letters', receivingLetterRoutes);
-app.use('/api/vault', vaultRoutes);
-app.use('/api/customers', customerRoutes);
-app.use('/api/installments', installmentRoutes);
-app.use('/api/financial-statements', financialStatementsRoutes);
-app.use('/api/security-cheques', securityChequeRoutes);
-app.use('/api/vehicle-documents', vehicleDocumentRoutes);
-app.use('/api/chart-of-accounts', chartOfAccountsRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {

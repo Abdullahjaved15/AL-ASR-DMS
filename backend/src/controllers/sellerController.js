@@ -158,7 +158,7 @@ const getSellerById = async (req, res) => {
     }
 
     // RBAC check
-    if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN' && req.user.role !== 'SALES_HEAD' && seller.assignedTo !== req.user.id && seller.createdBy !== req.user.id) {
+    if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN' && seller.assignedTo !== req.user.id && seller.createdBy !== req.user.id) {
       return res.status(403).json({ message: 'Access denied to this seller lead' });
     }
 
@@ -255,7 +255,7 @@ const updateSeller = async (req, res) => {
       return res.status(404).json({ message: 'Seller not found' });
     }
 
-    const isAdminUser = req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN' || req.user.role === 'SALES_HEAD';
+    const isAdminUser = req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN';
     if (!isAdminUser && existingSeller.assignedTo !== req.user.id && existingSeller.createdBy !== req.user.id) {
       return res.status(403).json({ message: 'Access denied: You can only edit your own leads' });
     }
@@ -318,36 +318,11 @@ const updateSeller = async (req, res) => {
       }
     });
 
-    // Auto-create Deal record if status is set to 'Deal Closed' and no deal exists yet
-    if (updatedSeller.leadStatus === 'Deal Closed') {
-      const existingDeal = await prisma.deal.findFirst({
-        where: { sellerId: id }
-      });
-      if (!existingDeal) {
-        const demandPrice = updatedSeller.demandPrice || 0;
-        const finalDealPrice = req.body.dealPrice ? parseFloat(req.body.dealPrice) : demandPrice;
-        const calculatedProfit = finalDealPrice - demandPrice;
-        const salesmanToCredit = updatedSeller.assignedTo || updatedSeller.createdBy || req.user.id;
-
-        await prisma.deal.create({
-          data: {
-            sellerId: id,
-            buyerId: req.body.buyerId || null,
-            salesmanId: salesmanToCredit,
-            dealPrice: finalDealPrice,
-            profit: calculatedProfit,
-            closingDate: new Date(),
-            remarks: req.body.remarks || `Deal closed from seller lead status update`
-          }
-        });
-      }
-    }
-
     await prisma.activityLog.create({
       data: {
         userId: req.user.id,
         action: 'UPDATE_SELLER',
-        details: `Updated seller lead ${updatedSeller.sellerName} (${updatedSeller.vehicle} ${updatedSeller.model}) - Status: ${updatedSeller.leadStatus}`
+        details: `Updated seller lead ${updatedSeller.sellerName} (${updatedSeller.vehicle} ${updatedSeller.model})`
       }
     });
 
@@ -367,7 +342,7 @@ const deleteSeller = async (req, res) => {
       return res.status(404).json({ message: 'Seller not found' });
     }
 
-    if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN' && req.user.role !== 'SALES_HEAD' && existingSeller.assignedTo !== req.user.id && existingSeller.createdBy !== req.user.id) {
+    if (req.user.role !== 'ADMIN' && existingSeller.assignedTo !== req.user.id && existingSeller.createdBy !== req.user.id) {
       return res.status(403).json({ message: 'Access denied: You can only delete your own seller leads' });
     }
 

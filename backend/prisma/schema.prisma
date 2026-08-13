@@ -62,17 +62,9 @@ model Seller {
   leadStatus       String        @default("New Lead") // New Lead, Contacted, Follow Up, Interested, Negotiation, Deal Closed, Lost, Cancelled, Incomplete
   comments         String?
 
-  variant          String?       @default("")
-  transmission     String?       @default("Automatic") // Automatic, Manual
-  engineCC         Int?          @default(1300)
-  stockStatus      String?       @default("Available") // Available, Reserved, Sold
-
   images           SellerImage[]
   deals            Deal[]
   collaborations   Collaboration[]
-  documents        VehicleDocument[]
-  costDetails      UsedCarCostDetail[]
-  installmentPlans InstallmentPlan[]
 
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
@@ -275,10 +267,10 @@ model InvoiceImage {
 
 model Deal {
   id          String   @id @default(uuid())
-  buyerId     String?
-  buyer       Buyer?   @relation(fields: [buyerId], references: [id], onDelete: SetNull)
+  buyerId     String
+  buyer       Buyer    @relation(fields: [buyerId], references: [id])
   sellerId    String
-  seller      Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  seller      Seller   @relation(fields: [sellerId], references: [id])
   salesmanId  String
   salesman    User     @relation("UserDeals", fields: [salesmanId], references: [id])
 
@@ -371,168 +363,5 @@ model ReceivingLetter {
   updatedAt         DateTime @updatedAt
 
   @@index([letterNumber])
-  @@index([createdAt])
-}
-
-model CentralVault {
-  id             String             @id @default(uuid())
-  accountName    String             @default("Main Company Vault")
-  accountNumber  String             @default("VAULT-001")
-  balance        Float              @default(0)
-  totalInflow    Float              @default(0)
-  totalOutflow   Float              @default(0)
-  transactions   VaultTransaction[]
-  updatedAt      DateTime           @updatedAt
-}
-
-model VaultTransaction {
-  id             String        @id @default(uuid())
-  vaultId        String?
-  vault          CentralVault? @relation(fields: [vaultId], references: [id])
-  type           String        // INFLOW, OUTFLOW
-  amount         Float
-  category       String        // SALE, INSTALLMENT, EXPENSE, REFURBISHMENT, PAYOUT, OTHER
-  description    String
-  referenceNo    String?
-  createdById    String?
-  createdAt      DateTime      @default(now())
-
-  @@index([type])
-  @@index([createdAt])
-}
-
-model Customer {
-  id               String            @id @default(uuid())
-  customerName     String
-  cnic             String?
-  phone            String?
-  address          String?
-  city             String?
-  totalPurchases   Int               @default(0)
-  totalSpent       Float             @default(0)
-  balanceDue       Float             @default(0)
-  installmentPlans InstallmentPlan[]
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-
-  @@index([customerName])
-  @@index([cnic])
-}
-
-model InstallmentPlan {
-  id                 String                @id @default(uuid())
-  planNumber         String                @unique
-  customerId         String
-  customer           Customer              @relation(fields: [customerId], references: [id])
-  sellerId           String?
-  seller             Seller?               @relation(fields: [sellerId], references: [id], onDelete: SetNull)
-  vehicleDetails     String
-  totalAmount        Float
-  downPayment        Float
-  financedAmount     Float
-  monthlyInstallment Float
-  totalInstallments  Int
-  paidInstallments   Int                   @default(0)
-  status             String                @default("ACTIVE") // ACTIVE, COMPLETED, DEFAULTER
-  schedules          InstallmentSchedule[]
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
-
-  @@index([planNumber])
-  @@index([status])
-}
-
-model InstallmentSchedule {
-  id            String          @id @default(uuid())
-  planId        String
-  plan          InstallmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
-  installmentNo Int
-  dueDate       DateTime
-  amount        Float
-  paidAmount    Float           @default(0)
-  paidDate      DateTime?
-  status        String          @default("PENDING") // PENDING, PAID, OVERDUE
-  remarks       String?
-
-  @@index([dueDate])
-  @@index([status])
-}
-
-model SecurityCheque {
-  id            String   @id @default(uuid())
-  chequeNumber  String
-  bankName      String
-  accountHolder String
-  type          String   @default("RECEIVED") // RECEIVED, ISSUED
-  amount        Float
-  issueDate     DateTime @default(now())
-  dueDate       DateTime
-  status        String   @default("ISSUED") // ISSUED, CLEARED, BOUNCED, RETURNED
-  chequeImage   String?
-  notes         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([chequeNumber])
-  @@index([status])
-  @@index([dueDate])
-}
-
-model VehicleDocument {
-  id           String   @id @default(uuid())
-  sellerId     String
-  seller       Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
-  documentType String // Registration Book, Excise File, NOC, Transfer Form, Custom Clearance, Other
-  documentName String
-  fileUrl      String
-  cloudinaryId String?
-  uploadedAt   DateTime @default(now())
-}
-
-model UsedCarCostDetail {
-  id                 String   @id @default(uuid())
-  sellerId           String
-  seller             Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
-  previousOwnerName  String?
-  previousOwnerPhone String?
-  purchasePrice      Float    @default(0)
-  refurbishmentCost  Float    @default(0)
-  mechanicalRepair   Float    @default(0)
-  detailingCost      Float    @default(0)
-  otherExpenses      Float    @default(0)
-  totalLandedCost    Float    @default(0)
-  notes              String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-}
-
-model AccountHead {
-  id              String               @id @default(uuid())
-  accountCode     String               @unique
-  accountName     String
-  accountType     String               // ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE
-  description     String?
-  currentBalance  Float                @default(0)
-  isSystemAccount Boolean              @default(false)
-  transactions    AccountTransaction[]
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-
-  @@index([accountType])
-  @@index([accountCode])
-}
-
-model AccountTransaction {
-  id            String      @id @default(uuid())
-  accountHeadId String
-  accountHead   AccountHead @relation(fields: [accountHeadId], references: [id], onDelete: Cascade)
-  type          String      // INWARD, OUTWARD
-  amount        Float
-  description   String
-  referenceNo   String?
-  createdById   String?
-  createdAt     DateTime    @default(now())
-
-  @@index([type])
   @@index([createdAt])
 }

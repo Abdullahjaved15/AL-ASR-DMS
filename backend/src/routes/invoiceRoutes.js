@@ -5,8 +5,8 @@ const { authenticateToken } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
 const upload = require('../middleware/upload');
 
-// Invoice routes accessible by SUPER_ADMIN, ADMIN, ACCOUNTS_HEAD, SALES_HEAD, ACCOUNTS_STAFF
-router.use(authenticateToken, requireRole('SUPER_ADMIN', 'ADMIN', 'ACCOUNTS_HEAD', 'SALES_HEAD', 'ACCOUNTS_STAFF'));
+// All invoice routes require SUPER_ADMIN role
+router.use(authenticateToken, requireRole('SUPER_ADMIN'));
 
 router.get('/', invoiceController.getInvoices);
 router.get('/:id', invoiceController.getInvoiceById);
