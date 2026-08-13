@@ -5,7 +5,7 @@ const requireRole = (...allowedRoles) => {
     }
 
     const hasPermission = allowedRoles.includes(req.user.role) ||
-      (allowedRoles.includes('ADMIN') && req.user.role === 'SUPER_ADMIN');
+      (allowedRoles.includes('ADMIN') && (req.user.role === 'SUPER_ADMIN' || req.user.role === 'SALES_HEAD'));
 
     if (!hasPermission) {
       return res.status(403).json({ message: 'Forbidden: Insufficient permissions' });

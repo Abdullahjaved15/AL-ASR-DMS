@@ -16,6 +16,13 @@ import CurrentStock from './pages/CurrentStock';
 import Invoices from './pages/Invoices';
 import ReceivingLetter from './pages/ReceivingLetter';
 import Settings from './pages/Settings';
+import AccountsDashboard from './pages/AccountsDashboard';
+import CentralVaultLedger from './pages/CentralVaultLedger';
+import CustomerManagement from './pages/CustomerManagement';
+import InstallmentManagement from './pages/InstallmentManagement';
+import SecurityChequeManager from './pages/SecurityChequeManager';
+import FinancialStatements from './pages/FinancialStatements';
+import ChartOfAccounts from './pages/ChartOfAccounts';
 
 function MainLayout() {
   const { user, isAdmin, loading } = useAuth();
@@ -159,6 +166,34 @@ function MainLayout() {
 
           <div className={currentTab === 'reports' ? 'block' : 'hidden'}>
             <Reports />
+          </div>
+
+          <div className={currentTab === 'accounts_dashboard' ? 'block' : 'hidden'}>
+            <AccountsDashboard setCurrentTab={setCurrentTab} />
+          </div>
+
+          <div className={currentTab === 'chart_of_accounts' ? 'block' : 'hidden'}>
+            <ChartOfAccounts />
+          </div>
+
+          <div className={currentTab === 'central_vault' ? 'block' : 'hidden'}>
+            <CentralVaultLedger />
+          </div>
+
+          <div className={currentTab === 'customer_management' ? 'block' : 'hidden'}>
+            <CustomerManagement />
+          </div>
+
+          <div className={currentTab === 'installment_management' ? 'block' : 'hidden'}>
+            <InstallmentManagement />
+          </div>
+
+          <div className={currentTab === 'security_cheques' ? 'block' : 'hidden'}>
+            <SecurityChequeManager />
+          </div>
+
+          <div className={currentTab === 'financial_statements' ? 'block' : 'hidden'}>
+            <FinancialStatements />
           </div>
 
           <div className={currentTab === 'settings' ? 'block' : 'hidden'}>

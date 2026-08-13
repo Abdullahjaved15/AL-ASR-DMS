@@ -211,6 +211,14 @@ export const api = {
     return handleResponse(res);
   },
 
+  deleteDeal: async (id) => {
+    const res = await fetch(`${API_BASE}/deals/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
   // Dashboard Stats API
   getDashboardStats: async () => {
     const res = await fetch(`${API_BASE}/dashboard/stats`, { headers: getHeaders() });
@@ -377,6 +385,183 @@ export const api = {
     const res = await fetch(`${API_BASE}/receiving-letters/${id}`, {
       method: 'DELETE',
       headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  // Central Company Vault API
+  getVaultSummary: async () => {
+    const res = await fetch(`${API_BASE}/vault`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  recordVaultTransaction: async (data) => {
+    const res = await fetch(`${API_BASE}/vault/transaction`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  // Customers API
+  getCustomers: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/customers?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  getCustomerById: async (id) => {
+    const res = await fetch(`${API_BASE}/customers/${id}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  createCustomer: async (data) => {
+    const res = await fetch(`${API_BASE}/customers`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  updateCustomer: async (id, data) => {
+    const res = await fetch(`${API_BASE}/customers/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  deleteCustomer: async (id) => {
+    const res = await fetch(`${API_BASE}/customers/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  // Installments API
+  getInstallmentPlans: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/installments?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  createInstallmentPlan: async (data) => {
+    const res = await fetch(`${API_BASE}/installments/plan`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  payInstallment: async (data) => {
+    const res = await fetch(`${API_BASE}/installments/pay`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  getDefaulterAlerts: async () => {
+    const res = await fetch(`${API_BASE}/installments/defaulters`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  // Financial Statements API
+  getBalanceSheet: async () => {
+    const res = await fetch(`${API_BASE}/financial-statements/balance-sheet`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  getIncomeStatement: async () => {
+    const res = await fetch(`${API_BASE}/financial-statements/income-statement`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  getTrialBalance: async () => {
+    const res = await fetch(`${API_BASE}/financial-statements/trial-balance`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  // Security Cheques API
+  getSecurityCheques: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/security-cheques?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  createSecurityCheque: async (data) => {
+    const res = await fetch(`${API_BASE}/security-cheques`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  updateChequeStatus: async (id, status, notes) => {
+    const res = await fetch(`${API_BASE}/security-cheques/${id}/status`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify({ status, notes })
+    });
+    return handleResponse(res);
+  },
+
+  // Vehicle Documents API
+  getVehicleDocuments: async (sellerId) => {
+    const res = await fetch(`${API_BASE}/vehicle-documents/seller/${sellerId}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  addVehicleDocument: async (data) => {
+    const res = await fetch(`${API_BASE}/vehicle-documents`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  deleteVehicleDocument: async (id) => {
+    const res = await fetch(`${API_BASE}/vehicle-documents/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  // Chart of Accounts API
+  getChartOfAccounts: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/chart-of-accounts?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  getAccountLedger: async (id) => {
+    const res = await fetch(`${API_BASE}/chart-of-accounts/${id}/ledger`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  createAccountHead: async (data) => {
+    const res = await fetch(`${API_BASE}/chart-of-accounts/head`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  recordAccountTransaction: async (data) => {
+    const res = await fetch(`${API_BASE}/chart-of-accounts/transaction`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
     });
     return handleResponse(res);
   }

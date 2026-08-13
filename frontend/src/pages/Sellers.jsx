@@ -110,15 +110,19 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
         ...activeFilters
       });
       let filteredData = data;
+      if (!activeFilters.leadStatus) {
+        filteredData = filteredData.filter(s => s.leadStatus !== 'Deal Closed');
+      }
+
       if (scope === 'mine' && user?.id) {
         const cleanUserName = user?.name ? user.name.replace(/^(mr\.|ma'am|mrs\.)\s+/i, '').toLowerCase().trim() : '';
-        const mine = data.filter(s => 
+        const mine = filteredData.filter(s => 
           s.assignedTo === user.id || 
           s.createdBy === user.id || 
           (cleanUserName && s.leadReference?.toLowerCase().includes(cleanUserName)) ||
           (cleanUserName && s.leadReferredBy?.toLowerCase().includes(cleanUserName))
         );
-        filteredData = mine.length > 0 ? mine : data;
+        filteredData = mine;
       }
       setSellers(filteredData);
     } catch (err) {

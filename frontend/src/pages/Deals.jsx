@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Handshake, Plus, DollarSign, TrendingUp, Calendar, UserCheck, CheckCircle, Image as ImageIcon } from 'lucide-react';
+import { Handshake, Plus, DollarSign, TrendingUp, Calendar, UserCheck, CheckCircle, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import ImageViewerModal from '../components/ImageViewerModal';
@@ -77,6 +77,19 @@ export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
     }
   };
 
+  const handleDeleteDeal = async (deal) => {
+    const vehicleName = `${deal.seller?.vehicle || ''} ${deal.seller?.model || ''}`.trim();
+    if (!window.confirm(`Are you sure you want to delete the closed deal for "${vehicleName}"? This will return the vehicle to active showroom inventory.`)) return;
+
+    try {
+      await api.deleteDeal(deal.id);
+      fetchDeals();
+      fetchOptions();
+    } catch (err) {
+      alert(err.message || 'Failed to delete deal');
+    }
+  };
+
   // Profit calculation helper for live preview in modal
   const selectedSeller = sellersList.find(s => s.id === selectedSellerId);
   const calculatedProfit = selectedSeller && dealPrice ? parseFloat(dealPrice) - selectedSeller.demandPrice : null;
@@ -147,6 +160,7 @@ export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
                 <th className="py-3.5 px-4">Salesman</th>
                 <th className="py-3.5 px-4">Photos</th>
                 <th className="py-3.5 px-4">Closing Date</th>
+                <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-xs">
@@ -162,8 +176,8 @@ export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
                   </td>
 
                   <td className="py-4 px-4">
-                    <p className="font-semibold text-white">{deal.buyer?.buyerName}</p>
-                    <p className="text-[11px] text-slate-400 font-mono">{deal.buyer?.buyerPhone}</p>
+                    <p className="font-semibold text-white">{deal.buyer?.buyerName || deal.seller?.sellerName || 'Direct Customer'}</p>
+                    <p className="text-[11px] text-slate-400 font-mono">{deal.buyer?.buyerPhone || deal.seller?.sellerPhone || 'N/A'}</p>
                   </td>
 
                   <td className="py-4 px-4 font-mono text-slate-400">
@@ -197,6 +211,18 @@ export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
 
                   <td className="py-4 px-4 font-mono text-slate-400">
                     {new Date(deal.closingDate).toLocaleDateString()}
+                  </td>
+
+                  <td className="py-4 px-4 text-right">
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleDeleteDeal(deal)}
+                        className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/30 transition-all"
+                        title="Delete Closed Deal & Restore to Stock"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

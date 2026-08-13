@@ -6,7 +6,9 @@ const getDeals = async (req, res) => {
 
     const where = {};
 
-    if (req.user.role !== 'ADMIN') {
+    const isManagerRole = ['SUPER_ADMIN', 'ADMIN', 'SALES_HEAD', 'ACCOUNTS_HEAD', 'ACCOUNTS_STAFF'].includes(req.user.role);
+
+    if (!isManagerRole) {
       where.salesmanId = req.user.id;
     } else if (salesmanId) {
       where.salesmanId = salesmanId;
@@ -31,9 +33,35 @@ const getDeals = async (req, res) => {
         { buyer: { buyerName: { contains: search, mode: 'insensitive' } } },
         { seller: { sellerName: { contains: search, mode: 'insensitive' } } },
         { seller: { vehicle: { contains: search, mode: 'insensitive' } } },
-        { seller: { model: { contains: search, mode: 'insensitive' } } },
-        { remarks: { contains: search, mode: 'insensitive' } }
+        { seller: { model: { contains: search, mode: 'insensitive' } } }
       ];
+    }
+
+    // Auto-sync: backfill Deal entries for any sellers marked 'Deal Closed' that don't have a Deal entry yet
+    try {
+      const orphanClosedSellers = await prisma.seller.findMany({
+        where: {
+          leadStatus: 'Deal Closed',
+          deals: { none: {} }
+        }
+      });
+
+      if (orphanClosedSellers.length > 0) {
+        for (const seller of orphanClosedSellers) {
+          await prisma.deal.create({
+            data: {
+              sellerId: seller.id,
+              salesmanId: seller.assignedTo || seller.createdBy || req.user.id,
+              dealPrice: seller.demandPrice || 0,
+              profit: 0,
+              closingDate: seller.updatedAt || new Date(),
+              remarks: 'Deal closed from seller lead status update'
+            }
+          });
+        }
+      }
+    } catch (syncErr) {
+      console.warn('Auto-sync closed deals warning:', syncErr.message);
     }
 
     const deals = await prisma.deal.findMany({
@@ -122,4 +150,47 @@ const createDeal = async (req, res) => {
   }
 };
 
-module.exports = { getDeals, createDeal };
+const deleteDeal = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const isManagerRole = ['SUPER_ADMIN', 'ADMIN', 'SALES_HEAD', 'ACCOUNTS_HEAD'].includes(req.user.role);
+    if (!isManagerRole) {
+      return res.status(403).json({ message: 'Access denied: Only Administrators & Managers can delete deals.' });
+    }
+
+    const deal = await prisma.deal.findUnique({
+      where: { id },
+      include: { seller: true, buyer: true }
+    });
+
+    if (!deal) {
+      return res.status(404).json({ message: 'Deal record not found' });
+    }
+
+    // Revert seller leadStatus back to 'New Lead' so vehicle returns to active stock
+    if (deal.sellerId) {
+      await prisma.seller.update({
+        where: { id: deal.sellerId },
+        data: { leadStatus: 'New Lead' }
+      }).catch(() => null);
+    }
+
+    // Delete deal record
+    await prisma.deal.delete({ where: { id } });
+
+    await prisma.activityLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'DELETE_DEAL',
+        details: `Deleted closed deal ID ${id} for seller vehicle ${deal.seller?.vehicle || 'N/A'}`
+      }
+    });
+
+    return res.json({ message: 'Closed deal record deleted successfully' });
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to delete deal record', error: error.message });
+  }
+};
+
+module.exports = { getDeals, createDeal, deleteDeal };
