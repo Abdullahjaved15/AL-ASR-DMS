@@ -149,6 +149,64 @@ export default function AttendancePage() {
     });
   };
 
+  const getCurrentTimeString = () => {
+    return new Date().toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  const handleToggleCheckIn = async (empId) => {
+    const currentLog = dailyLogsMap[empId] || { checkIn: '', checkOut: '', status: 'PRESENT', notes: '' };
+    const isChecked = !!(currentLog.checkIn && currentLog.checkIn.trim() !== '');
+
+    const newCheckIn = isChecked ? '' : getCurrentTimeString();
+    const newStatus = !isChecked && currentLog.status === 'ABSENT' ? 'PRESENT' : currentLog.status;
+
+    handleDailyFieldChange(empId, 'checkIn', newCheckIn);
+    if (newStatus !== currentLog.status) {
+      handleDailyFieldChange(empId, 'status', newStatus);
+    }
+
+    try {
+      await api.saveAttendance({
+        employeeId: empId,
+        date: selectedDate,
+        checkIn: newCheckIn,
+        checkOut: currentLog.checkOut || '',
+        status: newStatus,
+        notes: currentLog.notes || ''
+      });
+      fetchDailyAttendance();
+    } catch (err) {
+      console.error('Failed to auto-save check-in:', err);
+    }
+  };
+
+  const handleToggleCheckOut = async (empId) => {
+    const currentLog = dailyLogsMap[empId] || { checkIn: '', checkOut: '', status: 'PRESENT', notes: '' };
+    const isChecked = !!(currentLog.checkOut && currentLog.checkOut.trim() !== '');
+
+    const newCheckOut = isChecked ? '' : getCurrentTimeString();
+
+    handleDailyFieldChange(empId, 'checkOut', newCheckOut);
+
+    try {
+      await api.saveAttendance({
+        employeeId: empId,
+        date: selectedDate,
+        checkIn: currentLog.checkIn || '',
+        checkOut: newCheckOut,
+        status: currentLog.status,
+        notes: currentLog.notes || ''
+      });
+      fetchDailyAttendance();
+    } catch (err) {
+      console.error('Failed to auto-save check-out:', err);
+    }
+  };
+
   const handleSaveSingleDaily = async (empId) => {
     const log = dailyLogsMap[empId] || { checkIn: '09:00 AM', checkOut: '06:00 PM', status: 'PRESENT', notes: '' };
     try {
@@ -452,8 +510,8 @@ export default function AttendancePage() {
                     <th className="py-3.5 px-4">Employee Name</th>
                     <th className="py-3.5 px-4">Designation / Dept</th>
                     <th className="py-3.5 px-4">Attendance Status</th>
-                    <th className="py-3.5 px-4">Check-In Time</th>
-                    <th className="py-3.5 px-4">Check-Out Time</th>
+                    <th className="py-3.5 px-4">Check-In Checklist</th>
+                    <th className="py-3.5 px-4">Check-Out Checklist</th>
                     <th className="py-3.5 px-4">Notes / Remarks</th>
                     <th className="py-3.5 px-4 text-right">Action</th>
                   </tr>
@@ -461,8 +519,8 @@ export default function AttendancePage() {
                 <tbody className="divide-y divide-white/5 text-xs">
                   {employees.map((emp) => {
                     const log = dailyLogsMap[emp.id] || {
-                      checkIn: '09:00 AM',
-                      checkOut: '06:00 PM',
+                      checkIn: '',
+                      checkOut: '',
                       status: 'PRESENT',
                       notes: ''
                     };
@@ -501,25 +559,55 @@ export default function AttendancePage() {
                         </td>
 
                         <td className="py-3.5 px-4">
-                          <input
-                            type="text"
-                            placeholder="09:00 AM"
-                            value={log.checkIn}
-                            disabled={log.status === 'ABSENT' || log.status === 'LEAVE'}
-                            onChange={(e) => handleDailyFieldChange(emp.id, 'checkIn', e.target.value)}
-                            className="bg-slate-900 border border-white/10 rounded-xl px-2.5 py-1 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono w-28 disabled:opacity-40"
-                          />
+                          <div className="flex items-center space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleCheckIn(emp.id)}
+                              className={`px-2.5 py-1 rounded-xl text-xs font-mono font-bold border transition-all flex items-center space-x-1 ${
+                                log.checkIn && log.checkIn.trim() !== ''
+                                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-sm shadow-emerald-500/10'
+                                  : 'bg-slate-900 hover:bg-slate-800 text-slate-400 border-white/10'
+                              }`}
+                              title="Click to checklist check-in and auto-record current time"
+                            >
+                              <CheckCircle2 className={`w-3.5 h-3.5 ${log.checkIn ? 'text-emerald-400' : 'text-slate-500'}`} />
+                              <span>{log.checkIn ? 'Checked In' : 'Check In'}</span>
+                            </button>
+                            <input
+                              type="text"
+                              placeholder="09:00 AM"
+                              value={log.checkIn || ''}
+                              disabled={log.status === 'ABSENT' || log.status === 'LEAVE'}
+                              onChange={(e) => handleDailyFieldChange(emp.id, 'checkIn', e.target.value)}
+                              className="bg-slate-900 border border-white/10 rounded-xl px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono w-24 disabled:opacity-40"
+                            />
+                          </div>
                         </td>
 
                         <td className="py-3.5 px-4">
-                          <input
-                            type="text"
-                            placeholder="06:00 PM"
-                            value={log.checkOut}
-                            disabled={log.status === 'ABSENT' || log.status === 'LEAVE'}
-                            onChange={(e) => handleDailyFieldChange(emp.id, 'checkOut', e.target.value)}
-                            className="bg-slate-900 border border-white/10 rounded-xl px-2.5 py-1 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono w-28 disabled:opacity-40"
-                          />
+                          <div className="flex items-center space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleCheckOut(emp.id)}
+                              className={`px-2.5 py-1 rounded-xl text-xs font-mono font-bold border transition-all flex items-center space-x-1 ${
+                                log.checkOut && log.checkOut.trim() !== ''
+                                  ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40 shadow-sm shadow-cyan-500/10'
+                                  : 'bg-slate-900 hover:bg-slate-800 text-slate-400 border-white/10'
+                              }`}
+                              title="Click to checklist check-out and auto-record current time"
+                            >
+                              <CheckCircle2 className={`w-3.5 h-3.5 ${log.checkOut ? 'text-cyan-400' : 'text-slate-500'}`} />
+                              <span>{log.checkOut ? 'Checked Out' : 'Check Out'}</span>
+                            </button>
+                            <input
+                              type="text"
+                              placeholder="06:00 PM"
+                              value={log.checkOut || ''}
+                              disabled={log.status === 'ABSENT' || log.status === 'LEAVE'}
+                              onChange={(e) => handleDailyFieldChange(emp.id, 'checkOut', e.target.value)}
+                              className="bg-slate-900 border border-white/10 rounded-xl px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono w-24 disabled:opacity-40"
+                            />
+                          </div>
                         </td>
 
                         <td className="py-3.5 px-4">
