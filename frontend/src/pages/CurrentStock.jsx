@@ -52,11 +52,18 @@ export default function CurrentStock() {
     }
   };
 
+  const cleanStockPayload = (data) => ({
+    ...data,
+    askingPrice: data.askingPrice ? parseFloat(data.askingPrice) || 0 : 0,
+    purchasePrice: data.purchasePrice ? parseFloat(data.purchasePrice) || null : null,
+    mileage: data.mileage ? parseInt(data.mileage, 10) || 0 : 0
+  });
+
   const handleCreate = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await api.createStockItem(formData);
+      await api.createStockItem(cleanStockPayload(formData));
       setIsAddModalOpen(false);
       resetForm();
       fetchStock();
@@ -72,7 +79,7 @@ export default function CurrentStock() {
     if (!selectedStock) return;
     setSubmitting(true);
     try {
-      await api.updateStockItem(selectedStock.id, formData);
+      await api.updateStockItem(selectedStock.id, cleanStockPayload(formData));
       setIsEditModalOpen(false);
       setSelectedStock(null);
       resetForm();

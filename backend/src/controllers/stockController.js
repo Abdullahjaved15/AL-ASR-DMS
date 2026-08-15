@@ -1,5 +1,17 @@
 const prisma = require('../config/db');
 
+const safeFloat = (val, fallback = 0) => {
+  if (val === undefined || val === null || val === '') return fallback;
+  const parsed = parseFloat(val);
+  return isNaN(parsed) ? fallback : parsed;
+};
+
+const safeInt = (val, fallback = 0) => {
+  if (val === undefined || val === null || val === '') return fallback;
+  const parsed = parseInt(val, 10);
+  return isNaN(parsed) ? fallback : parsed;
+};
+
 const checkAdmin = (req, res) => {
   if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN') {
     res.status(403).json({ message: 'Access denied: Showroom Current Stock is restricted exclusively to Administrators.' });
@@ -61,13 +73,13 @@ const createStockItem = async (req, res) => {
 
     const newStock = await prisma.currentStock.create({
       data: {
-        vehicle: (vehicle && vehicle.trim()) ? vehicle.trim() : 'Vehicle',
-        model: (model && model.trim()) ? model.trim() : 'Car',
+        vehicle: (vehicle && String(vehicle).trim()) ? String(vehicle).trim() : 'Vehicle',
+        model: (model && String(model).trim()) ? String(model).trim() : 'Car',
         year: year ? String(year) : String(new Date().getFullYear()),
         color: color || 'White',
-        mileage: parseInt(mileage) || 0,
-        askingPrice: parseFloat(askingPrice) || 0,
-        purchasePrice: purchasePrice ? parseFloat(purchasePrice) : null,
+        mileage: safeInt(mileage, 0),
+        askingPrice: safeFloat(askingPrice, 0),
+        purchasePrice: purchasePrice ? safeFloat(purchasePrice, null) : null,
         status: status || 'AVAILABLE',
         location: location || 'Main Showroom',
         notes: notes || null,
@@ -80,7 +92,7 @@ const createStockItem = async (req, res) => {
       data: {
         userId: req.user.id,
         action: 'CREATE_CURRENT_STOCK',
-        details: `Added Showroom Stock: ${year} ${vehicle} ${model} (Rs. ${askingPrice})`
+        details: `Added Showroom Stock: ${year} ${vehicle || 'Vehicle'} ${model || 'Car'} (Rs. ${askingPrice || 0})`
       }
     });
 
@@ -106,13 +118,13 @@ const updateStockItem = async (req, res) => {
     const updated = await prisma.currentStock.update({
       where: { id },
       data: {
-        vehicle: vehicle !== undefined ? vehicle : existing.vehicle,
-        model: model !== undefined ? model : existing.model,
+        vehicle: (vehicle !== undefined && vehicle !== null && String(vehicle).trim()) ? String(vehicle).trim() : existing.vehicle,
+        model: (model !== undefined && model !== null && String(model).trim()) ? String(model).trim() : existing.model,
         year: year !== undefined ? String(year) : existing.year,
-        color: color !== undefined ? color : existing.color,
-        mileage: mileage !== undefined ? parseInt(mileage) : existing.mileage,
-        askingPrice: askingPrice !== undefined ? parseFloat(askingPrice) : existing.askingPrice,
-        purchasePrice: purchasePrice !== undefined ? (purchasePrice ? parseFloat(purchasePrice) : null) : existing.purchasePrice,
+        color: color !== undefined ? String(color) : existing.color,
+        mileage: mileage !== undefined ? safeInt(mileage, existing.mileage) : existing.mileage,
+        askingPrice: askingPrice !== undefined ? safeFloat(askingPrice, existing.askingPrice) : existing.askingPrice,
+        purchasePrice: purchasePrice !== undefined ? (purchasePrice ? safeFloat(purchasePrice, null) : null) : existing.purchasePrice,
         status: status !== undefined ? status : existing.status,
         location: location !== undefined ? location : existing.location,
         notes: notes !== undefined ? notes : existing.notes,
@@ -131,6 +143,7 @@ const updateStockItem = async (req, res) => {
 
     return res.json(updated);
   } catch (error) {
+    console.error('Error updating stock entry:', error);
     return res.status(500).json({ message: 'Failed to update stock entry', error: error.message });
   }
 };
