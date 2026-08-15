@@ -56,6 +56,42 @@ const createReceivingLetter = async (req, res) => {
       }
     });
 
+    // Automatically add received vehicle into Showroom Current Stock
+    try {
+      let vehicleMake = vehicleName;
+      let modelName = '';
+      let yearStr = new Date().getFullYear().toString();
+
+      const yearMatch = vehicleName.match(/\b(19\d\d|20\d\d)\b/);
+      if (yearMatch) {
+        yearStr = yearMatch[0];
+      }
+
+      const nameParts = vehicleName.trim().split(' ');
+      if (nameParts.length > 1) {
+        vehicleMake = nameParts[0];
+        modelName = nameParts.slice(1).join(' ').replace(yearStr, '').trim();
+      }
+      if (!modelName) modelName = vehicleName;
+
+      await prisma.currentStock.create({
+        data: {
+          vehicle: vehicleMake,
+          model: modelName,
+          year: yearStr,
+          color: color || 'White',
+          regNumber: regNumber || null,
+          careOf: receiverName, // Receiver Name mapped to Care Of Name
+          askingPrice: 0,
+          status: 'AVAILABLE',
+          location: 'Main Showroom',
+          notes: `Auto-added from Receiving Letter Ref: ${letterNumber}. Owner: ${ownerName}.${notes ? ' Notes: ' + notes : ''}`
+        }
+      });
+    } catch (stockErr) {
+      console.error('Failed to auto-create CurrentStock entry from Receiving Letter:', stockErr);
+    }
+
     res.status(201).json(newLetter);
   } catch (error) {
     console.error('Error creating receiving letter:', error);
