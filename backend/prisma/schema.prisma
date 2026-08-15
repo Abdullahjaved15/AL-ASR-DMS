@@ -360,11 +360,21 @@ model ReceivingLetter {
   notes             String?  // Notes / detail section in the end
   createdBy         String
   createdByUser     User     @relation(fields: [createdBy], references: [id])
+  images            ReceivingLetterImage[]
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   @@index([letterNumber])
   @@index([createdAt])
+}
+
+model ReceivingLetterImage {
+  id                 String          @id @default(uuid())
+  receivingLetterId  String
+  receivingLetter    ReceivingLetter @relation(fields: [receivingLetterId], references: [id], onDelete: Cascade)
+  imageUrl           String
+  cloudinaryPublicId String?
+  uploadedAt         DateTime        @default(now())
 }
 
 model Employee {

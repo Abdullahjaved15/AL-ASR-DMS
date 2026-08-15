@@ -1,5 +1,8 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const fs = require('fs');
+const path = require('path');
+const cloudinary = require('../config/cloudinary');
 
 // Helper to generate unique letter number (e.g. RL-20260807-4819)
 const generateLetterNumber = () => {
@@ -52,7 +55,8 @@ const createReceivingLetter = async (req, res) => {
       include: {
         createdByUser: {
           select: { id: true, name: true, email: true }
-        }
+        },
+        images: true
       }
     });
 
@@ -122,7 +126,8 @@ const getReceivingLetters = async (req, res) => {
       include: {
         createdByUser: {
           select: { id: true, name: true, email: true }
-        }
+        },
+        images: true
       }
     });
 
@@ -142,7 +147,8 @@ const getReceivingLetterById = async (req, res) => {
       include: {
         createdByUser: {
           select: { id: true, name: true, email: true }
-        }
+        },
+        images: true
       }
     });
 
@@ -199,7 +205,8 @@ const updateReceivingLetter = async (req, res) => {
       include: {
         createdByUser: {
           select: { id: true, name: true, email: true }
-        }
+        },
+        images: true
       }
     });
 
@@ -224,11 +231,101 @@ const deleteReceivingLetter = async (req, res) => {
   }
 };
 
+// Upload photos / documents for Receiving Letter
+const uploadReceivingLetterImages = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const letter = await prisma.receivingLetter.findUnique({ where: { id } });
+    if (!letter) {
+      return res.status(404).json({ error: 'Receiving Letter not found' });
+    }
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No image files uploaded' });
+    }
+
+    const useCloudinary = Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY);
+    const createdImages = [];
+
+    for (const file of req.files) {
+      let imageUrl = `/uploads/${file.filename}`;
+      let cloudinaryPublicId = null;
+
+      if (useCloudinary) {
+        try {
+          const result = await cloudinary.uploader.upload(file.path, {
+            folder: 'velocity_dms/receiving_letters',
+            tags: ['receiving_letter', letter.letterNumber]
+          });
+          imageUrl = result.secure_url;
+          cloudinaryPublicId = result.public_id;
+
+          if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+          }
+        } catch (cloudErr) {
+          console.warn('Cloudinary upload fallback to local storage:', cloudErr.message);
+        }
+      }
+
+      const img = await prisma.receivingLetterImage.create({
+        data: {
+          receivingLetterId: id,
+          imageUrl: imageUrl,
+          cloudinaryPublicId: cloudinaryPublicId
+        }
+      });
+      createdImages.push(img);
+    }
+
+    return res.status(201).json({ message: 'Images uploaded successfully', images: createdImages });
+  } catch (error) {
+    console.error('Error uploading receiving letter images:', error);
+    return res.status(500).json({ error: 'Failed to upload receiving letter images', details: error.message });
+  }
+};
+
+// Delete photo from Receiving Letter
+const deleteReceivingLetterImage = async (req, res) => {
+  try {
+    const { letterId, imageId } = req.params;
+
+    const image = await prisma.receivingLetterImage.findUnique({ where: { id: imageId } });
+    if (!image || image.receivingLetterId !== letterId) {
+      return res.status(404).json({ error: 'Receiving letter image not found' });
+    }
+
+    if (image.cloudinaryPublicId && process.env.CLOUDINARY_CLOUD_NAME) {
+      try {
+        await cloudinary.uploader.destroy(image.cloudinaryPublicId);
+      } catch (cloudErr) {
+        console.warn('Cloudinary image destroy error:', cloudErr.message);
+      }
+    }
+
+    await prisma.receivingLetterImage.delete({ where: { id: imageId } });
+
+    if (image.imageUrl && image.imageUrl.startsWith('/uploads/')) {
+      const filePath = path.join(__dirname, '../../public', image.imageUrl);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    return res.json({ message: 'Receiving letter image deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting receiving letter image:', error);
+    return res.status(500).json({ error: 'Failed to delete receiving letter image' });
+  }
+};
+
 module.exports = {
   createReceivingLetter,
   getReceivingLetters,
   getReceivingLetterById,
   updateReceivingLetter,
-  deleteReceivingLetter
+  deleteReceivingLetter,
+  uploadReceivingLetterImages,
+  deleteReceivingLetterImage
 };
-

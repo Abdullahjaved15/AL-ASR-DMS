@@ -390,6 +390,26 @@ export const api = {
     return handleResponse(res);
   },
 
+  uploadReceivingLetterImages: async (letterId, files) => {
+    const formData = new FormData();
+    Array.from(files).forEach((file) => formData.append('images', file));
+
+    const res = await fetch(`${API_BASE}/receiving-letters/${letterId}/images`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: formData
+    });
+    return handleResponse(res);
+  },
+
+  deleteReceivingLetterImage: async (letterId, imageId) => {
+    const res = await fetch(`${API_BASE}/receiving-letters/${letterId}/images/${imageId}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
   // Attendance Module API (Super Admin)
   getEmployees: async (params = {}) => {
     const query = cleanParams(params);

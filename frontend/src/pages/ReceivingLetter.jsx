@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileCheck, Plus, Search, Printer, Edit, Trash2, Car, User, Calendar, FileText, CheckCircle2 } from 'lucide-react';
+import { FileCheck, Plus, Search, Printer, Edit, Trash2, Car, User, Calendar, FileText, CheckCircle2, Camera, Image as ImageIcon, Upload, Eye, X, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { logoBase64 } from '../utils/logoBase64';
@@ -13,6 +13,15 @@ export default function ReceivingLetterPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingLetter, setEditingLetter] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Image Upload & Gallery Modal States
+  const [selectedFilesForUpload, setSelectedFilesForUpload] = useState([]);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [selectedLetterForMedia, setSelectedLetterForMedia] = useState(null);
+  const [mediaActiveTab, setMediaActiveTab] = useState('gallery'); // 'gallery' | 'upload'
+  const [directUploadFiles, setDirectUploadFiles] = useState([]);
+  const [uploadingDirectImages, setUploadingDirectImages] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(null);
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().slice(0, 10),
@@ -71,6 +80,7 @@ export default function ReceivingLetterPage() {
 
   const resetForm = () => {
     setEditingLetter(null);
+    setSelectedFilesForUpload([]);
     setFormData({
       date: new Date().toISOString().slice(0, 10),
       vehicleName: '',
@@ -89,6 +99,7 @@ export default function ReceivingLetterPage() {
 
   const handleEditClick = (rl) => {
     setEditingLetter(rl);
+    setSelectedFilesForUpload([]);
     setFormData({
       date: rl.date ? new Date(rl.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
       vehicleName: rl.vehicleName || '',
@@ -106,21 +117,39 @@ export default function ReceivingLetterPage() {
     setIsAddModalOpen(true);
   };
 
+  const handleFileSelection = (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setSelectedFilesForUpload(prev => [...prev, ...Array.from(e.target.files)]);
+    }
+  };
+
+  const removeSelectedFile = (index) => {
+    setSelectedFilesForUpload(prev => prev.filter((_, idx) => idx !== index));
+  };
+
   const handleSaveLetter = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     try {
+      let savedLetter = null;
       if (editingLetter) {
-        await api.updateReceivingLetter(editingLetter.id, formData);
-        setIsAddModalOpen(false);
-        resetForm();
-        fetchLetters();
+        savedLetter = await api.updateReceivingLetter(editingLetter.id, formData);
+        if (selectedFilesForUpload.length > 0) {
+          await api.uploadReceivingLetterImages(editingLetter.id, selectedFilesForUpload);
+        }
       } else {
-        const newLetter = await api.createReceivingLetter(formData);
-        setIsAddModalOpen(false);
-        resetForm();
-        fetchLetters();
-        exportReceivingLetterPDF(newLetter);
+        savedLetter = await api.createReceivingLetter(formData);
+        if (selectedFilesForUpload.length > 0 && savedLetter?.id) {
+          await api.uploadReceivingLetterImages(savedLetter.id, selectedFilesForUpload);
+        }
+      }
+
+      setIsAddModalOpen(false);
+      resetForm();
+      fetchLetters();
+
+      if (!editingLetter && savedLetter) {
+        exportReceivingLetterPDF(savedLetter);
       }
     } catch (err) {
       alert(err.message || 'Failed to save receiving letter');
@@ -129,8 +158,8 @@ export default function ReceivingLetterPage() {
     }
   };
 
-  const handleDeleteLetter = async (id, num) => {
-    if (!window.confirm(`Are you sure you want to delete Receiving Letter ${num}?`)) return;
+  const handleDeleteLetter = async (id, refNum) => {
+    if (!window.confirm(`Are you sure you want to delete Receiving Letter (${refNum})?`)) return;
     try {
       await api.deleteReceivingLetter(id);
       fetchLetters();
@@ -139,133 +168,181 @@ export default function ReceivingLetterPage() {
     }
   };
 
-  const exportReceivingLetterPDF = (rl) => {
+  // Open Media Gallery Modal
+  const openMediaModal = (letter) => {
+    setSelectedLetterForMedia(letter);
+    setMediaActiveTab('gallery');
+    setDirectUploadFiles([]);
+    setLightboxIndex(null);
+    setIsImageModalOpen(true);
+  };
+
+  const handleDirectUploadImages = async () => {
+    if (!selectedLetterForMedia || directUploadFiles.length === 0) return;
+    setUploadingDirectImages(true);
+    try {
+      await api.uploadReceivingLetterImages(selectedLetterForMedia.id, directUploadFiles);
+      setDirectUploadFiles([]);
+      setMediaActiveTab('gallery');
+      // Refresh single letter details & full list
+      const refreshed = await api.getReceivingLetterById(selectedLetterForMedia.id);
+      setSelectedLetterForMedia(refreshed);
+      fetchLetters();
+    } catch (err) {
+      alert(err.message || 'Failed to upload pictures');
+    } finally {
+      setUploadingDirectImages(false);
+    }
+  };
+
+  const handleDeletePicture = async (imageId) => {
+    if (!selectedLetterForMedia) return;
+    if (!window.confirm('Delete this picture from receiving letter?')) return;
+    try {
+      await api.deleteReceivingLetterImage(selectedLetterForMedia.id, imageId);
+      const refreshed = await api.getReceivingLetterById(selectedLetterForMedia.id);
+      setSelectedLetterForMedia(refreshed);
+      fetchLetters();
+    } catch (err) {
+      alert(err.message || 'Failed to delete picture');
+    }
+  };
+
+  // Official Printable Receiving Letter PDF Document
+  const exportReceivingLetterPDF = (letter) => {
     const printWindow = window.open('', '_blank');
-    const letterDate = new Date(rl.date || rl.createdAt).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+    const todayStr = new Date(letter.date || letter.createdAt).toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
 
     const htmlContent = `
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Receiving Letter – Al-Asr Motors (${rl.letterNumber || ''})</title>
+          <title>AL ASR MOTORS — Receiving Letter (${letter.letterNumber})</title>
           <style>
-            @page { size: A4; margin: 15mm; }
-            body { font-family: Arial, sans-serif; padding: 20px; color: #000000; background: #ffffff; line-height: 1.4; }
-            
-            .header-box { border: 2px solid #333333; border-radius: 40px; padding: 12px 25px; margin-bottom: 25px; display: flex; align-items: center; justify-content: space-between; }
-            .logo-wrap { display: flex; align-items: center; gap: 15px; }
-            .company-name { font-size: 28px; font-weight: 900; letter-spacing: 1px; color: #000; }
-            .company-sub { font-size: 11px; font-style: italic; color: #333; margin-top: 2px; }
-
-            .doc-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #000; text-decoration: underline; }
-
-            table.rec-table { width: 100%; border-collapse: collapse; margin-bottom: 25px; border: 1.5px solid #000; }
-            table.rec-table td { padding: 8px 12px; border: 1px solid #000; font-size: 13px; vertical-align: middle; }
-            table.rec-table tr td:first-child { font-weight: bold; width: 35%; background-color: #f9f9f9; }
-
-            .notes-box { border: 1.5px solid #000; border-radius: 6px; padding: 12px 15px; margin-bottom: 40px; background: #fafafa; }
-            .notes-title { font-size: 12px; font-weight: bold; text-transform: uppercase; margin-bottom: 6px; text-decoration: underline; }
-            .notes-content { font-size: 12px; white-space: pre-wrap; word-wrap: break-word; color: #111; min-height: 40px; }
-
-            .sig-section { display: flex; justify-content: space-between; margin-top: 60px; padding: 0 30px; }
-            .sig-line { width: 180px; border-top: 1px solid #000; text-align: left; padding-top: 5px; font-size: 13px; font-weight: bold; }
-
-            .footer { margin-top: 50px; text-align: center; font-size: 10px; color: #666; border-top: 1px solid #ddd; padding-top: 8px; }
+            @page { size: portrait; margin: 8mm 10mm; }
+            * { box-sizing: border-box; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 0; margin: 0; color: #0f172a; background: #ffffff; font-size: 11px; line-height: 1.4; }
+            .container { padding: 15px; border: 2px solid #0f172a; border-radius: 8px; position: relative; }
+            .header-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; border-bottom: 2px solid #0f172a; padding-bottom: 8px; }
+            .logo-cell { width: 180px; vertical-align: middle; }
+            .title-cell { text-align: center; vertical-align: middle; }
+            .ref-cell { width: 180px; text-align: right; vertical-align: middle; font-family: monospace; font-size: 11px; }
+            .company-name { font-size: 22px; font-weight: 900; color: #0f172a; letter-spacing: 1px; }
+            .company-sub { font-size: 11px; font-weight: 700; color: #0284c7; text-transform: uppercase; margin-top: 2px; }
+            .doc-title { text-align: center; font-size: 16px; font-weight: 900; background: #0f172a; color: #ffffff; padding: 6px; border-radius: 4px; margin: 12px 0 15px 0; text-transform: uppercase; letter-spacing: 1px; }
+            .grid-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+            .grid-table td { padding: 8px 10px; border: 1px solid #cbd5e1; vertical-align: top; }
+            .label { font-weight: 700; color: #475569; font-size: 10px; text-transform: uppercase; margin-bottom: 2px; }
+            .val { font-size: 12px; font-weight: 700; color: #0f172a; }
+            .notes-box { border: 1.5px solid #0f172a; border-radius: 6px; padding: 10px; margin-top: 15px; background: #f8fafc; min-height: 80px; }
+            .signatures { margin-top: 45px; display: flex; justify-content: space-between; align-items: flex-end; }
+            .sig-box { width: 220px; text-align: center; border-top: 1.5px solid #0f172a; padding-top: 5px; font-weight: 700; font-size: 11px; }
+            .footer-text { margin-top: 30px; text-align: center; font-size: 9px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 5px; }
           </style>
         </head>
         <body>
-          <div class="header-box" style="border: 2px solid #0f172a; border-radius: 16px; padding: 15px 25px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; background: linear-gradient(to right, #f8fafc, #ffffff);">
-            <div class="logo-wrap" style="display: flex; align-items: center; gap: 18px;">
-              <img src="${logoBase64}" alt="AL-ASR MOTORS" style="height: 85px; width: auto; object-fit: contain;" />
-              <div>
-                <div class="company-name" style="font-size: 28px; font-weight: 900; letter-spacing: 1px; color: #0f172a;">AL-ASR <span style="color: #0284c7;">MOTORS</span></div>
-                <div style="font-size: 13px; font-weight: bold; color: #0284c7; margin-top: 2px;">OFFICIAL VEHICLE RECEIVING LETTER • گاڑی وصولی لیٹر</div>
-                <div class="company-sub" style="font-size: 11px; color: #475569; margin-top: 2px;">Toyota, Honda, Suzuki, Hyundai, Mitsubishi • All kinds of luxury & commercial vehicles</div>
-                <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Main GT Road / City Center, Sahiwal, Pakistan • Phone: +92 300 1234567</div>
+          <div class="container">
+            <table class="header-table">
+              <tr>
+                <td class="logo-cell">
+                  <img src="${logoBase64}" style="height: 55px; width: auto; object-fit: contain;" />
+                </td>
+                <td class="title-cell">
+                  <div class="company-name">AL-ASR MOTORS</div>
+                  <div class="company-sub">Showroom & Dealership Management</div>
+                </td>
+                <td class="ref-cell">
+                  <strong>Ref:</strong> <span style="color: #0284c7; font-weight: bold;">${letter.letterNumber}</span><br/>
+                  <strong>Date:</strong> ${todayStr}
+                </td>
+              </tr>
+            </table>
+
+            <div class="doc-title">VEHICLE RECEIVING LETTER</div>
+
+            <table class="grid-table">
+              <tr>
+                <td style="width: 50%;">
+                  <div class="label">Date</div>
+                  <div class="val">${new Date(letter.date || letter.createdAt).toLocaleDateString()}</div>
+                </td>
+                <td style="width: 50%;">
+                  <div class="label">Vehicle Name & Model</div>
+                  <div class="val" style="color: #0284c7; font-size: 14px;">${letter.vehicleName}</div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="label">Chassis Number (Ch#)</div>
+                  <div class="val" style="font-family: monospace;">${letter.chassisNumber || 'N/A'}</div>
+                </td>
+                <td>
+                  <div class="label">Registration Number (Reg#)</div>
+                  <div class="val" style="font-family: monospace; color: #b45309;">${letter.regNumber || 'N/A'}</div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="label">Vehicle Color</div>
+                  <div class="val">${letter.color || 'N/A'}</div>
+                </td>
+                <td>
+                  <div class="label">Owner Name (Vehicle Handover By)</div>
+                  <div class="val">${letter.ownerName}</div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="label">Receiver Name (AL-ASR Representative)</div>
+                  <div class="val" style="color: #047857;">${letter.receiverName}</div>
+                </td>
+                <td>
+                  <div class="label">Registration File Status</div>
+                  <div class="val">${letter.fileStatus || 'N/A'}</div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="label">Vehicle Keys Status</div>
+                  <div class="val">${letter.keyStatus || 'N/A'}</div>
+                </td>
+                <td>
+                  <div class="label">Smart Card Status</div>
+                  <div class="val">${letter.smartCardStatus || 'N/A'}</div>
+                </td>
+              </tr>
+              <tr>
+                <td colspan="2">
+                  <div class="label">Accessories & Spare Tools Handed Over</div>
+                  <div class="val">${letter.anyOtherAccessory || 'None'}</div>
+                </td>
+              </tr>
+            </table>
+
+            <div class="notes-box">
+              <div class="label" style="color: #0f172a; margin-bottom: 4px;">Receiving Details & Vehicle Condition Notes:</div>
+              <div style="font-size: 11px; color: #334155; white-space: pre-wrap;">${letter.notes || 'Vehicle received in good condition with listed accessories and documents as per AL-ASR Motors receiving policy.'}</div>
+            </div>
+
+            <div class="signatures">
+              <div class="sig-box">
+                Vehicle Owner / Seller Signature<br/>
+                <span style="font-size: 10px; color: #64748b; font-weight: normal;">(${letter.ownerName})</span>
+              </div>
+              <div class="sig-box">
+                Receiver Signature & Stamp<br/>
+                <span style="font-size: 10px; color: #0284c7; font-weight: normal;">(${letter.receiverName} — AL-ASR MOTORS)</span>
               </div>
             </div>
-            <div style="text-align: right; background: #0f172a; color: #ffffff; padding: 12px 18px; border-radius: 10px; min-width: 170px;">
-              <div style="font-size: 14px; font-weight: 800; color: #38bdf8; text-transform: uppercase;">RECEIVING LETTER</div>
-              <div style="font-size: 12px; font-weight: bold; font-family: monospace; color: #f8fafc; margin-top: 3px;">Ref: ${rl.letterNumber || 'RL-DOC'}</div>
-              <div style="font-size: 10px; color: #cbd5e1; margin-top: 2px;">Date: ${letterDate}</div>
+
+            <div class="footer-text">
+              AL-ASR MOTORS • Official Vehicle Handover Receiving Copy • Generated on ${new Date().toLocaleString()}
             </div>
           </div>
-
-          <div class="doc-title">Receiving Letter – Al-Asr Motors.</div>
-
-          <table class="rec-table">
-            <tr>
-              <td>Date:</td>
-              <td>${letterDate}</td>
-            </tr>
-            <tr>
-              <td>Vehicle Name:</td>
-              <td><strong>${rl.vehicleName || ''}</strong></td>
-            </tr>
-            <tr>
-              <td>Ch# (Chassis Number):</td>
-              <td>${rl.chassisNumber || 'N/A'}</td>
-            </tr>
-            <tr>
-              <td>Reg # (Registration Number):</td>
-              <td><strong>${rl.regNumber || 'Unregistered'}</strong></td>
-            </tr>
-            <tr>
-              <td>Color:</td>
-              <td>${rl.color || 'N/A'}</td>
-            </tr>
-            <tr>
-              <td>Owner Name:</td>
-              <td><strong>${rl.ownerName || ''}</strong></td>
-            </tr>
-            <tr>
-              <td>Receiver Name:</td>
-              <td><strong>${rl.receiverName || ''}</strong></td>
-            </tr>
-            <tr>
-              <td>File:</td>
-              <td>${rl.fileStatus || 'N/A'}</td>
-            </tr>
-            <tr>
-              <td>Key:</td>
-              <td>${rl.keyStatus || 'N/A'}</td>
-            </tr>
-            <tr>
-              <td>Smart Card:</td>
-              <td>${rl.smartCardStatus || 'N/A'}</td>
-            </tr>
-            <tr>
-              <td>Any Other Accessory:</td>
-              <td>${rl.anyOtherAccessory || 'N/A'}</td>
-            </tr>
-          </table>
-
-          <div class="notes-box">
-            <div class="notes-title">Additional Notes & Detail Section:</div>
-            <div class="notes-content">${rl.notes || 'No extra notes recorded.'}</div>
-          </div>
-
-          <div class="sig-section">
-            <div class="sig-line">
-              X Owner
-            </div>
-            <div class="sig-line">
-              X Receiver
-            </div>
-          </div>
-
-          <div class="footer">
-            AL-ASR MOTORS • Official Vehicle Receiving Document • Generated by ${rl.createdByUser?.name || 'Staff'}
-          </div>
-
           <script>
-            window.onload = function() {
-              window.print();
-            };
+            window.onload = function() { window.print(); }
           </script>
         </body>
       </html>
@@ -276,22 +353,28 @@ export default function ReceivingLetterPage() {
   };
 
   return (
-    <div className="p-4 sm:p-8 space-y-6 max-w-7xl mx-auto">
-      {/* Top Header Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-6">
+      {/* Top Header & Actions Bar */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 glass-card p-6 rounded-3xl border border-white/10 shadow-2xl">
         <div>
           <div className="flex items-center space-x-2">
-            <FileCheck className="w-6 h-6 text-emerald-400" />
-            <h2 className="text-xl font-extrabold text-white tracking-tight">Vehicle Receiving Letters</h2>
+            <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full font-mono text-xs font-semibold">
+              Vehicle Inventory Management
+            </span>
+            <span className="text-xs text-slate-400 font-mono">Official Documentation</span>
           </div>
-          <p className="text-xs font-mono text-slate-400 mt-0.5">
-            Fill receiving details, generate vehicle handover reports, and export official AL-ASR Receiving Letters.
+          <h1 className="text-2xl font-black text-white mt-1 tracking-tight flex items-center gap-2">
+            <FileCheck className="w-7 h-7 text-emerald-400" />
+            Showroom Vehicle Receiving Letters
+          </h1>
+          <p className="text-xs text-slate-400 font-mono mt-0.5">
+            Create, manage, attach pictures, and print official vehicle receiving letters for AL-ASR Motors.
           </p>
         </div>
 
         <button
           onClick={() => { resetForm(); setIsAddModalOpen(true); }}
-          className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black font-bold rounded-xl text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center space-x-1.5"
+          className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black font-bold font-mono text-xs rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center space-x-2 flex-shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>New Receiving Letter</span>
@@ -321,73 +404,92 @@ export default function ReceivingLetterPage() {
                 <th className="py-3.5 px-4">Owner Name</th>
                 <th className="py-3.5 px-4">Receiver Name</th>
                 <th className="py-3.5 px-4">File / Key / Smart Card</th>
+                <th className="py-3.5 px-4">Pictures</th>
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-xs">
-              {letters.map((rl) => (
-                <tr key={rl.id} className="hover:bg-white/5 transition-colors">
-                  <td className="py-4 px-4 font-mono">
-                    <p className="font-bold text-emerald-400">{rl.letterNumber}</p>
-                    <p className="text-[10px] text-slate-400">{new Date(rl.date || rl.createdAt).toLocaleDateString()}</p>
-                  </td>
+              {letters.map((rl) => {
+                const imgCount = rl.images?.length || 0;
+                return (
+                  <tr key={rl.id} className="hover:bg-white/5 transition-colors">
+                    <td className="py-4 px-4 font-mono">
+                      <p className="font-bold text-emerald-400">{rl.letterNumber}</p>
+                      <p className="text-[10px] text-slate-400">{new Date(rl.date || rl.createdAt).toLocaleDateString()}</p>
+                    </td>
 
-                  <td className="py-4 px-4">
-                    <p className="font-extrabold text-white text-sm">{rl.vehicleName}</p>
-                    <p className="text-[11px] text-slate-400 font-mono">
-                      Reg: <span className="text-amber-300 font-bold">{rl.regNumber || 'N/A'}</span> • Color: {rl.color || 'N/A'}
-                    </p>
-                  </td>
+                    <td className="py-4 px-4">
+                      <p className="font-extrabold text-white text-sm">{rl.vehicleName}</p>
+                      <p className="text-[11px] text-slate-400 font-mono">
+                        Reg: <span className="text-amber-300 font-bold">{rl.regNumber || 'N/A'}</span> • Color: {rl.color || 'N/A'}
+                      </p>
+                    </td>
 
-                  <td className="py-4 px-4 font-semibold text-white">
-                    {rl.ownerName}
-                  </td>
+                    <td className="py-4 px-4 font-semibold text-white">
+                      {rl.ownerName}
+                    </td>
 
-                  <td className="py-4 px-4 font-semibold text-cyan-400">
-                    {rl.receiverName}
-                  </td>
+                    <td className="py-4 px-4 font-semibold text-cyan-400">
+                      {rl.receiverName}
+                    </td>
 
-                  <td className="py-4 px-4 font-mono text-[11px] text-slate-300">
-                    <p>File: <span className="text-slate-200">{rl.fileStatus || 'N/A'}</span></p>
-                    <p>Key: <span className="text-slate-200">{rl.keyStatus || 'N/A'}</span></p>
-                  </td>
+                    <td className="py-4 px-4 font-mono text-[11px] text-slate-300">
+                      <p>File: <span className="text-slate-200">{rl.fileStatus || 'N/A'}</span></p>
+                      <p>Key: <span className="text-slate-200">{rl.keyStatus || 'N/A'}</span></p>
+                    </td>
 
-                  <td className="py-4 px-4 text-right">
-                    <div className="flex items-center justify-end space-x-2">
+                    {/* Pictures column */}
+                    <td className="py-4 px-4 font-mono">
                       <button
-                        onClick={() => handleEditClick(rl)}
-                        className="px-2.5 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-mono text-[11px] flex items-center space-x-1 transition-all"
-                        title="Edit receiving letter details"
+                        onClick={() => openMediaModal(rl)}
+                        className={`px-2.5 py-1.5 rounded-lg border font-mono text-[11px] flex items-center space-x-1 transition-all ${
+                          imgCount > 0
+                            ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40 font-bold'
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-400 border-white/10'
+                        }`}
                       >
-                        <Edit className="w-3.5 h-3.5" />
-                        <span>Edit</span>
+                        <Camera className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Photos ({imgCount})</span>
                       </button>
+                    </td>
 
-                      <button
-                        onClick={() => exportReceivingLetterPDF(rl)}
-                        className="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-mono text-[11px] flex items-center space-x-1 transition-all"
-                        title="Print & Export official Receiving Letter PDF"
-                      >
-                        <Printer className="w-3.5 h-3.5" />
-                        <span>Export PDF</span>
-                      </button>
+                    <td className="py-4 px-4 text-right">
+                      <div className="flex items-center justify-end space-x-2">
+                        <button
+                          onClick={() => handleEditClick(rl)}
+                          className="px-2.5 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-mono text-[11px] flex items-center space-x-1 transition-all"
+                          title="Edit receiving letter details"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
 
-                      <button
-                        onClick={() => handleDeleteLetter(rl.id, rl.letterNumber)}
-                        className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-colors"
-                        title="Delete receiving letter"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        <button
+                          onClick={() => exportReceivingLetterPDF(rl)}
+                          className="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-mono text-[11px] flex items-center space-x-1 transition-all"
+                          title="Print & Export official Receiving Letter PDF"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span>Export PDF</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteLetter(rl.id, rl.letterNumber)}
+                          className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-colors"
+                          title="Delete receiving letter"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
 
               {letters.length === 0 && !loading && (
                 <tr>
-                  <td colSpan="6" className="py-12 text-center text-slate-500 font-mono text-xs">
-                    No receiving letters found. Click "New Receiving Letter" to create one.
+                  <td colSpan="7" className="py-12 text-center text-slate-500 font-mono text-xs">
+                    No vehicle receiving letters found. Click "New Receiving Letter" to create one.
                   </td>
                 </tr>
               )}
@@ -581,6 +683,42 @@ export default function ReceivingLetterPage() {
                 ></textarea>
               </div>
 
+              {/* IMAGE UPLOAD ATTACHMENTS SECTION */}
+              <div className="pt-2 border-t border-white/10">
+                <label className="block text-xs font-mono text-amber-400 font-bold mb-1">
+                  Attach Receiving Letter Pictures & Scanned Documents (Optional)
+                </label>
+                <div className="border-2 border-dashed border-white/10 rounded-xl p-3 bg-slate-900/60 hover:bg-slate-900 transition-colors">
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handleFileSelection}
+                    id="receiving-letter-photo-input"
+                    className="hidden"
+                  />
+                  <label htmlFor="receiving-letter-photo-input" className="cursor-pointer flex flex-col items-center justify-center py-2 space-y-1">
+                    <Upload className="w-5 h-5 text-amber-400" />
+                    <span className="text-xs font-mono text-slate-300 font-bold">Click or drag photos of vehicle, keys, smart card, or scanned letter</span>
+                    <span className="text-[10px] text-slate-500 font-mono">Supports JPG, PNG, WEBP files</span>
+                  </label>
+                </div>
+
+                {selectedFilesForUpload.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {selectedFilesForUpload.map((file, idx) => (
+                      <div key={idx} className="bg-slate-800 text-slate-300 text-[10px] font-mono px-2.5 py-1 rounded-lg border border-white/10 flex items-center space-x-1.5">
+                        <ImageIcon className="w-3 h-3 text-cyan-400" />
+                        <span className="truncate max-w-[140px]">{file.name}</span>
+                        <button type="button" onClick={() => removeSelectedFile(idx)} className="text-rose-400 hover:text-rose-300 ml-1">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="flex justify-end space-x-3 pt-4 border-t border-white/10">
                 <button
                   type="button"
@@ -602,6 +740,220 @@ export default function ReceivingLetterPage() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* PICTURE GALLERY & UPLOAD MODAL FOR RECEIVING LETTER */}
+      {isImageModalOpen && selectedLetterForMedia && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="glass-modal rounded-3xl p-6 w-full max-w-4xl border border-white/10 shadow-2xl my-8 relative flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-white/10 flex-shrink-0">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-full font-mono text-xs font-bold">
+                    Ref: {selectedLetterForMedia.letterNumber}
+                  </span>
+                  <span className="text-xs text-slate-300 font-mono font-bold">Vehicle: {selectedLetterForMedia.vehicleName}</span>
+                </div>
+                <h3 className="text-xl font-bold text-white mt-1">Receiving Letter Media Attachments</h3>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                <div className="flex bg-slate-900 p-1 rounded-xl border border-white/10 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setMediaActiveTab('gallery')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all flex items-center space-x-1.5 ${
+                      mediaActiveTab === 'gallery'
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <ImageIcon className="w-3.5 h-3.5" />
+                    <span>Gallery ({selectedLetterForMedia.images?.length || 0})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMediaActiveTab('upload')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all flex items-center space-x-1.5 ${
+                      mediaActiveTab === 'upload'
+                        ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload New</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsImageModalOpen(false)}
+                  className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-white/10"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Gallery View Tab */}
+            {mediaActiveTab === 'gallery' && (
+              <div className="py-4 overflow-y-auto flex-1">
+                {(!selectedLetterForMedia.images || selectedLetterForMedia.images.length === 0) ? (
+                  <div className="py-16 text-center text-slate-400 font-mono text-xs">
+                    <Camera className="w-10 h-10 mx-auto text-slate-600 mb-2" />
+                    <p>No photos attached to this receiving letter yet.</p>
+                    <button
+                      onClick={() => setMediaActiveTab('upload')}
+                      className="mt-3 px-4 py-2 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-xl font-mono text-xs hover:bg-amber-500/30 transition-all inline-flex items-center space-x-1"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload Photos Now</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    {selectedLetterForMedia.images.map((img, idx) => (
+                      <div key={img.id} className="group relative bg-slate-900 rounded-2xl border border-white/10 overflow-hidden shadow-lg">
+                        <img
+                          src={img.imageUrl}
+                          alt="Receiving letter attachment"
+                          className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer"
+                          onClick={() => setLightboxIndex(idx)}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2 flex items-end justify-between">
+                          <button
+                            type="button"
+                            onClick={() => setLightboxIndex(idx)}
+                            className="p-1.5 bg-black/60 backdrop-blur-md rounded-lg text-white hover:bg-black"
+                            title="View Fullscreen"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePicture(img.id)}
+                            className="p-1.5 bg-rose-500/80 backdrop-blur-md rounded-lg text-white hover:bg-rose-600"
+                            title="Delete Picture"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Direct Upload Tab */}
+            {mediaActiveTab === 'upload' && (
+              <div className="py-6 space-y-4 flex-1">
+                <div className="border-2 border-dashed border-cyan-500/40 rounded-2xl p-8 bg-slate-900/60 hover:bg-slate-900 text-center transition-all">
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    id="direct-receiving-photo-upload"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        setDirectUploadFiles(Array.from(e.target.files));
+                      }
+                    }}
+                  />
+                  <label htmlFor="direct-receiving-photo-upload" className="cursor-pointer flex flex-col items-center justify-center space-y-2">
+                    <Upload className="w-10 h-10 text-cyan-400 mb-1" />
+                    <span className="text-sm font-mono text-white font-bold">Select photos of vehicle, keys, or receiving letter document</span>
+                    <span className="text-xs text-slate-400 font-mono">You can select multiple image files at once</span>
+                  </label>
+                </div>
+
+                {directUploadFiles.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="text-xs font-mono text-slate-300 font-bold">Selected Files to Upload ({directUploadFiles.length}):</p>
+                    <div className="flex flex-wrap gap-2">
+                      {directUploadFiles.map((file, idx) => (
+                        <div key={idx} className="bg-slate-800 text-slate-200 text-xs font-mono px-3 py-1.5 rounded-xl border border-white/10 flex items-center space-x-2">
+                          <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
+                          <span className="truncate max-w-[180px]">{file.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setDirectUploadFiles(prev => prev.filter((_, i) => i !== idx))}
+                            className="text-rose-400 hover:text-rose-300"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={handleDirectUploadImages}
+                        disabled={uploadingDirectImages}
+                        className="px-6 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold font-mono text-xs rounded-xl shadow-lg shadow-cyan-500/20 transition-all flex items-center space-x-2"
+                      >
+                        <Upload className="w-4 h-4" />
+                        <span>{uploadingDirectImages ? 'Uploading Pictures...' : 'Upload Pictures Now'}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* FULLSCREEN LIGHTBOX PREVIEW */}
+      {lightboxIndex !== null && selectedLetterForMedia?.images?.[lightboxIndex] && (
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-2xl flex items-center justify-center z-[100] p-4">
+          <button
+            type="button"
+            onClick={() => setLightboxIndex(null)}
+            className="absolute top-4 right-4 p-2 bg-white/10 rounded-full text-white hover:bg-white/20"
+          >
+            <X className="w-6 h-6" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setLightboxIndex(prev => prev > 0 ? prev - 1 : selectedLetterForMedia.images.length - 1)}
+            className="absolute left-4 p-3 bg-white/10 rounded-full text-white hover:bg-white/20"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+
+          <div className="max-w-4xl max-h-[85vh] flex flex-col items-center">
+            <img
+              src={selectedLetterForMedia.images[lightboxIndex].imageUrl}
+              alt="Fullscreen receiving letter preview"
+              className="max-w-full max-h-[75vh] object-contain rounded-2xl border border-white/10 shadow-2xl"
+            />
+            <div className="mt-4 flex items-center space-x-4">
+              <a
+                href={selectedLetterForMedia.images[lightboxIndex].imageUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="px-4 py-2 bg-slate-800 text-slate-200 text-xs font-mono rounded-xl border border-white/10 hover:bg-slate-700 flex items-center space-x-1"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Open Full Resolution</span>
+              </a>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setLightboxIndex(prev => prev < selectedLetterForMedia.images.length - 1 ? prev + 1 : 0)}
+            className="absolute right-4 p-3 bg-white/10 rounded-full text-white hover:bg-white/20"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
         </div>
       )}
     </div>
