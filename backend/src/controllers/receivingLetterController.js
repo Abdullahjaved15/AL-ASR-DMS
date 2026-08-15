@@ -121,6 +121,59 @@ const getReceivingLetterById = async (req, res) => {
   }
 };
 
+// Update a Receiving Letter
+const updateReceivingLetter = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      date,
+      vehicleName,
+      chassisNumber,
+      regNumber,
+      color,
+      ownerName,
+      receiverName,
+      fileStatus,
+      keyStatus,
+      smartCardStatus,
+      anyOtherAccessory,
+      notes
+    } = req.body;
+
+    if (!vehicleName || !ownerName || !receiverName) {
+      return res.status(400).json({ error: 'Vehicle Name, Owner Name, and Receiver Name are required fields.' });
+    }
+
+    const updatedLetter = await prisma.receivingLetter.update({
+      where: { id },
+      data: {
+        date: date ? new Date(date) : undefined,
+        vehicleName,
+        chassisNumber: chassisNumber || null,
+        regNumber: regNumber || null,
+        color: color || null,
+        ownerName,
+        receiverName,
+        fileStatus: fileStatus || null,
+        keyStatus: keyStatus || null,
+        smartCardStatus: smartCardStatus || null,
+        anyOtherAccessory: anyOtherAccessory || null,
+        notes: notes || null
+      },
+      include: {
+        createdByUser: {
+          select: { id: true, name: true, email: true }
+        }
+      }
+    });
+
+    res.json(updatedLetter);
+  } catch (error) {
+    console.error('Error updating receiving letter:', error);
+    res.status(500).json({ error: 'Failed to update receiving letter', details: error.message });
+  }
+};
+
 // Delete a Receiving Letter
 const deleteReceivingLetter = async (req, res) => {
   try {
@@ -139,5 +192,7 @@ module.exports = {
   createReceivingLetter,
   getReceivingLetters,
   getReceivingLetterById,
+  updateReceivingLetter,
   deleteReceivingLetter
 };
+

@@ -379,5 +379,90 @@ export const api = {
       headers: getHeaders()
     });
     return handleResponse(res);
+  },
+
+  updateReceivingLetter: async (id, data) => {
+    const res = await fetch(`${API_BASE}/receiving-letters/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  // Attendance Module API (Super Admin)
+  getEmployees: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/attendance/employees?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  createEmployee: async (data) => {
+    const res = await fetch(`${API_BASE}/attendance/employees`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  updateEmployee: async (id, data) => {
+    const res = await fetch(`${API_BASE}/attendance/employees/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  deleteEmployee: async (id) => {
+    const res = await fetch(`${API_BASE}/attendance/employees/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  getAttendance: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/attendance?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  saveAttendance: async (data) => {
+    const res = await fetch(`${API_BASE}/attendance`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  saveBulkAttendance: async (data) => {
+    const res = await fetch(`${API_BASE}/attendance/bulk`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  deleteAttendance: async (id) => {
+    const res = await fetch(`${API_BASE}/attendance/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  getAttendanceReports: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/attendance/reports?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  getAttendanceExportUrl: (params = {}) => {
+    const query = cleanParams(params);
+    return `${API_BASE}/attendance/export-csv?${query}`;
   }
 };

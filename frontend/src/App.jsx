@@ -15,10 +15,11 @@ import CollaborationCenter from './pages/CollaborationCenter';
 import CurrentStock from './pages/CurrentStock';
 import Invoices from './pages/Invoices';
 import ReceivingLetter from './pages/ReceivingLetter';
+import Attendance from './pages/Attendance';
 import Settings from './pages/Settings';
 
 function MainLayout() {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, isSuperAdmin, loading } = useAuth();
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [search, setSearch] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -131,6 +132,10 @@ function MainLayout() {
 
           <div className={currentTab === 'receiving_letter' ? 'block' : 'hidden'}>
             <ReceivingLetter />
+          </div>
+
+          <div className={(currentTab === 'attendance' && isSuperAdmin) ? 'block' : 'hidden'}>
+            <Attendance />
           </div>
 
           <div className={currentTab === 'deals' ? 'block' : 'hidden'}>

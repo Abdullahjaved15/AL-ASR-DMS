@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileCheck, Plus, Search, Printer, Trash2, Car, User, Calendar, FileText, CheckCircle2 } from 'lucide-react';
+import { FileCheck, Plus, Search, Printer, Edit, Trash2, Car, User, Calendar, FileText, CheckCircle2 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { logoBase64 } from '../utils/logoBase64';
@@ -11,6 +11,7 @@ export default function ReceivingLetterPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingLetter, setEditingLetter] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -69,6 +70,7 @@ export default function ReceivingLetterPage() {
   };
 
   const resetForm = () => {
+    setEditingLetter(null);
     setFormData({
       date: new Date().toISOString().slice(0, 10),
       vehicleName: '',
@@ -85,18 +87,43 @@ export default function ReceivingLetterPage() {
     });
   };
 
-  const handleCreateLetter = async (e) => {
+  const handleEditClick = (rl) => {
+    setEditingLetter(rl);
+    setFormData({
+      date: rl.date ? new Date(rl.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+      vehicleName: rl.vehicleName || '',
+      chassisNumber: rl.chassisNumber || '',
+      regNumber: rl.regNumber || '',
+      color: rl.color || '',
+      ownerName: rl.ownerName || '',
+      receiverName: rl.receiverName || user?.name || '',
+      fileStatus: rl.fileStatus || 'Complete Original File',
+      keyStatus: rl.keyStatus || '2 Keys (Master + Spare)',
+      smartCardStatus: rl.smartCardStatus || 'Smart Card Available',
+      anyOtherAccessory: rl.anyOtherAccessory || 'Spare Wheel, Jack, Toolkit, Floor Mats',
+      notes: rl.notes || ''
+    });
+    setIsAddModalOpen(true);
+  };
+
+  const handleSaveLetter = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const newLetter = await api.createReceivingLetter(formData);
-      setIsAddModalOpen(false);
-      resetForm();
-      fetchLetters();
-      // Optionally auto print upon creation
-      exportReceivingLetterPDF(newLetter);
+      if (editingLetter) {
+        await api.updateReceivingLetter(editingLetter.id, formData);
+        setIsAddModalOpen(false);
+        resetForm();
+        fetchLetters();
+      } else {
+        const newLetter = await api.createReceivingLetter(formData);
+        setIsAddModalOpen(false);
+        resetForm();
+        fetchLetters();
+        exportReceivingLetterPDF(newLetter);
+      }
     } catch (err) {
-      alert(err.message || 'Failed to create receiving letter');
+      alert(err.message || 'Failed to save receiving letter');
     } finally {
       setSubmitting(false);
     }
@@ -328,6 +355,15 @@ export default function ReceivingLetterPage() {
                   <td className="py-4 px-4 text-right">
                     <div className="flex items-center justify-end space-x-2">
                       <button
+                        onClick={() => handleEditClick(rl)}
+                        className="px-2.5 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-mono text-[11px] flex items-center space-x-1 transition-all"
+                        title="Edit receiving letter details"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                        <span>Edit</span>
+                      </button>
+
+                      <button
                         onClick={() => exportReceivingLetterPDF(rl)}
                         className="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-mono text-[11px] flex items-center space-x-1 transition-all"
                         title="Print & Export official Receiving Letter PDF"
@@ -360,17 +396,19 @@ export default function ReceivingLetterPage() {
         </div>
       </div>
 
-      {/* CREATE RECEIVING LETTER MODAL */}
+      {/* CREATE / EDIT RECEIVING LETTER MODAL */}
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="glass-modal rounded-3xl p-6 w-full max-w-3xl border border-white/10 shadow-2xl my-8">
             <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-5">
               <div className="flex items-center space-x-2">
                 <FileCheck className="w-6 h-6 text-emerald-400" />
-                <h3 className="text-xl font-bold text-white">Create Receiving Letter – AL-ASR MOTORS</h3>
+                <h3 className="text-xl font-bold text-white">
+                  {editingLetter ? `Edit Receiving Letter (${editingLetter.letterNumber})` : 'Create Receiving Letter – AL-ASR MOTORS'}
+                </h3>
               </div>
               <button
-                onClick={() => setIsAddModalOpen(false)}
+                onClick={() => { setIsAddModalOpen(false); resetForm(); }}
                 className="text-slate-400 hover:text-white"
               >
                 ✕
@@ -378,7 +416,7 @@ export default function ReceivingLetterPage() {
             </div>
 
             {/* Quick fill selector from current seller stock */}
-            {sellers.length > 0 && (
+            {sellers.length > 0 && !editingLetter && (
               <div className="mb-4 p-3 bg-slate-900/90 rounded-2xl border border-white/10 flex items-center space-x-3">
                 <Car className="w-4 h-4 text-cyan-400 flex-shrink-0" />
                 <span className="text-xs text-slate-300 font-mono flex-shrink-0">Quick Fill from Inventory:</span>
@@ -396,7 +434,7 @@ export default function ReceivingLetterPage() {
               </div>
             )}
 
-            <form onSubmit={handleCreateLetter} className="space-y-4">
+            <form onSubmit={handleSaveLetter} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">Date *</label>
@@ -546,7 +584,7 @@ export default function ReceivingLetterPage() {
               <div className="flex justify-end space-x-3 pt-4 border-t border-white/10">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
+                  onClick={() => { setIsAddModalOpen(false); resetForm(); }}
                   className="px-4 py-2 bg-slate-800 text-slate-300 font-mono text-xs rounded-xl hover:bg-slate-700 transition-colors"
                 >
                   Cancel
@@ -557,7 +595,9 @@ export default function ReceivingLetterPage() {
                   className="px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black font-bold font-mono text-xs rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center space-x-1.5"
                 >
                   <FileCheck className="w-4 h-4" />
-                  <span>{submitting ? 'Saving...' : 'Save & Print Receiving Letter'}</span>
+                  <span>
+                    {submitting ? 'Saving...' : editingLetter ? 'Update Receiving Letter' : 'Save & Print Receiving Letter'}
+                  </span>
                 </button>
               </div>
             </form>

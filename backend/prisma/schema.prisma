@@ -29,6 +29,7 @@ model User {
 
   primaryCollaborations Collaboration[] @relation("PrimaryCollaborations")
   partnerCollaborations Collaboration[] @relation("PartnerCollaborations")
+  employees       Employee[]
 }
 
 model Seller {
@@ -365,3 +366,39 @@ model ReceivingLetter {
   @@index([letterNumber])
   @@index([createdAt])
 }
+
+model Employee {
+  id          String       @id @default(uuid())
+  name        String
+  designation String?      @default("Sales Executive")
+  phone       String?
+  email       String?
+  department  String?      @default("Sales")
+  status      String       @default("ACTIVE") // ACTIVE, INACTIVE
+  userId      String?      // Optional link to system User if available
+  user        User?        @relation(fields: [userId], references: [id])
+  attendances Attendance[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([status])
+}
+
+model Attendance {
+  id         String    @id @default(uuid())
+  employeeId String
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date       DateTime  // Stores the date of attendance (00:00:00 UTC)
+  checkIn    String?   // Format e.g., "09:00 AM" or "09:00"
+  checkOut   String?   // Format e.g., "06:00 PM" or "18:00"
+  status     String    @default("PRESENT") // PRESENT, ABSENT, HALF_DAY, LATE, LEAVE
+  totalHours Float?    @default(0)
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([employeeId, date])
+  @@index([date])
+  @@index([employeeId, date])
+}
+
