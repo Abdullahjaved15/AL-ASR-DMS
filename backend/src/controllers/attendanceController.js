@@ -40,6 +40,54 @@ const calculateHours = (checkIn, checkOut) => {
   }
 };
 
+// Helper to perform safe upsert for attendance record avoiding P2002 unique constraint errors
+const upsertAttendanceRecord = async (employeeId, date, data) => {
+  const normDate = normalizeDate(date);
+  const startOfDay = new Date(normDate);
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const endOfDay = new Date(normDate);
+  endOfDay.setUTCHours(23, 59, 59, 999);
+
+  const existing = await prisma.attendance.findFirst({
+    where: {
+      employeeId,
+      date: {
+        gte: startOfDay,
+        lte: endOfDay
+      }
+    }
+  });
+
+  const calculatedHours = calculateHours(data.checkIn, data.checkOut);
+
+  if (existing) {
+    return await prisma.attendance.update({
+      where: { id: existing.id },
+      data: {
+        checkIn: data.checkIn || null,
+        checkOut: data.checkOut || null,
+        status: data.status || 'PRESENT',
+        totalHours: calculatedHours,
+        notes: data.notes || null
+      },
+      include: { employee: true }
+    });
+  } else {
+    return await prisma.attendance.create({
+      data: {
+        employeeId,
+        date: normDate,
+        checkIn: data.checkIn || null,
+        checkOut: data.checkOut || null,
+        status: data.status || 'PRESENT',
+        totalHours: calculatedHours,
+        notes: data.notes || null
+      },
+      include: { employee: true }
+    });
+  }
+};
+
 // --- EMPLOYEE MANAGEMENT ---
 
 // Get all employees
@@ -153,12 +201,18 @@ const getAttendance = async (req, res) => {
     if (employeeId) where.employeeId = employeeId;
 
     if (date) {
-      where.date = normalizeDate(date);
+      const normDate = normalizeDate(date);
+      const startOfDay = new Date(normDate);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      const endOfDay = new Date(normDate);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+      where.date = { gte: startOfDay, lte: endOfDay };
     } else if (startDate && endDate) {
-      where.date = {
-        gte: normalizeDate(startDate),
-        lte: normalizeDate(endDate)
-      };
+      const start = normalizeDate(startDate);
+      start.setUTCHours(0, 0, 0, 0);
+      const end = normalizeDate(endDate);
+      end.setUTCHours(23, 59, 59, 999);
+      where.date = { gte: start, lte: end };
     }
 
     const records = await prisma.attendance.findMany({
@@ -184,33 +238,11 @@ const saveAttendance = async (req, res) => {
       return res.status(400).json({ error: 'Employee ID and Date are required' });
     }
 
-    const normDate = normalizeDate(date);
-    const calculatedHours = calculateHours(checkIn, checkOut);
-
-    const record = await prisma.attendance.upsert({
-      where: {
-        employeeId_date: {
-          employeeId,
-          date: normDate
-        }
-      },
-      update: {
-        checkIn: checkIn || null,
-        checkOut: checkOut || null,
-        status: status || 'PRESENT',
-        totalHours: calculatedHours,
-        notes: notes || null
-      },
-      create: {
-        employeeId,
-        date: normDate,
-        checkIn: checkIn || null,
-        checkOut: checkOut || null,
-        status: status || 'PRESENT',
-        totalHours: calculatedHours,
-        notes: notes || null
-      },
-      include: { employee: true }
+    const record = await upsertAttendanceRecord(employeeId, date, {
+      checkIn,
+      checkOut,
+      status,
+      notes
     });
 
     res.json(record);
@@ -228,35 +260,15 @@ const saveBulkAttendance = async (req, res) => {
       return res.status(400).json({ error: 'Date and records array are required' });
     }
 
-    const normDate = normalizeDate(date);
     const updatedRecords = [];
 
     for (const rec of records) {
       if (!rec.employeeId) continue;
-      const hours = calculateHours(rec.checkIn, rec.checkOut);
-      const saved = await prisma.attendance.upsert({
-        where: {
-          employeeId_date: {
-            employeeId: rec.employeeId,
-            date: normDate
-          }
-        },
-        update: {
-          checkIn: rec.checkIn || null,
-          checkOut: rec.checkOut || null,
-          status: rec.status || 'PRESENT',
-          totalHours: hours,
-          notes: rec.notes || null
-        },
-        create: {
-          employeeId: rec.employeeId,
-          date: normDate,
-          checkIn: rec.checkIn || null,
-          checkOut: rec.checkOut || null,
-          status: rec.status || 'PRESENT',
-          totalHours: hours,
-          notes: rec.notes || null
-        }
+      const saved = await upsertAttendanceRecord(rec.employeeId, date, {
+        checkIn: rec.checkIn,
+        checkOut: rec.checkOut,
+        status: rec.status,
+        notes: rec.notes
       });
       updatedRecords.push(saved);
     }
@@ -264,7 +276,7 @@ const saveBulkAttendance = async (req, res) => {
     res.json({ message: 'Bulk attendance saved successfully', count: updatedRecords.length });
   } catch (error) {
     console.error('Error in bulk attendance save:', error);
-    res.status(500).json({ error: 'Failed to save bulk attendance' });
+    res.status(500).json({ error: 'Failed to save bulk attendance', details: error.message });
   }
 };
 
