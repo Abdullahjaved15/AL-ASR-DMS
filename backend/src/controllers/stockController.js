@@ -59,18 +59,14 @@ const createStockItem = async (req, res) => {
   try {
     const { vehicle, model, year, color, mileage, askingPrice, purchasePrice, status, location, notes, careOf, regNumber } = req.body;
 
-    if (!vehicle || !model || !askingPrice) {
-      return res.status(400).json({ message: 'Vehicle make, model, and asking price are required' });
-    }
-
     const newStock = await prisma.currentStock.create({
       data: {
-        vehicle,
-        model,
+        vehicle: (vehicle && vehicle.trim()) ? vehicle.trim() : 'Vehicle',
+        model: (model && model.trim()) ? model.trim() : 'Car',
         year: year ? String(year) : String(new Date().getFullYear()),
         color: color || 'White',
         mileage: parseInt(mileage) || 0,
-        askingPrice: parseFloat(askingPrice),
+        askingPrice: parseFloat(askingPrice) || 0,
         purchasePrice: purchasePrice ? parseFloat(purchasePrice) : null,
         status: status || 'AVAILABLE',
         location: location || 'Main Showroom',

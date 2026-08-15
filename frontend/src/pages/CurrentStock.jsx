@@ -501,10 +501,9 @@ export default function CurrentStock() {
             <form onSubmit={isEditModalOpen ? handleUpdate : handleCreate} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Vehicle Make / Brand *</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Vehicle Make / Brand</label>
                   <input
                     type="text"
-                    required
                     placeholder="E.g., Toyota, Honda, Hyundai"
                     value={formData.vehicle}
                     onChange={(e) => setFormData({ ...formData, vehicle: e.target.value })}
@@ -513,10 +512,9 @@ export default function CurrentStock() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Model Variant *</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Model Variant</label>
                   <input
                     type="text"
-                    required
                     placeholder="E.g., Corolla Altis 1.6"
                     value={formData.model}
                     onChange={(e) => setFormData({ ...formData, model: e.target.value })}
@@ -525,10 +523,9 @@ export default function CurrentStock() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Model Year *</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Model Year</label>
                   <input
                     type="text"
-                    required
                     placeholder="e.g. 2022 or 2022/23"
                     value={formData.year}
                     onChange={(e) => setFormData({ ...formData, year: e.target.value })}
@@ -537,10 +534,9 @@ export default function CurrentStock() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Color *</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Color</label>
                   <input
                     type="text"
-                    required
                     placeholder="E.g., Super White, Black"
                     value={formData.color}
                     onChange={(e) => setFormData({ ...formData, color: e.target.value })}
@@ -549,10 +545,9 @@ export default function CurrentStock() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Mileage (KM) *</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Mileage (KM)</label>
                   <input
                     type="number"
-                    required
                     value={formData.mileage}
                     onChange={(e) => setFormData({ ...formData, mileage: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none font-mono"
@@ -560,10 +555,9 @@ export default function CurrentStock() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Asking Price (PKR) *</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Asking Price (PKR)</label>
                   <input
                     type="number"
-                    required
                     placeholder="E.g., 7500000"
                     value={formData.askingPrice}
                     onChange={(e) => setFormData({ ...formData, askingPrice: e.target.value })}
