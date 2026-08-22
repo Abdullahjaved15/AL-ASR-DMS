@@ -29,6 +29,8 @@ export default function ReceivingLetterPage() {
     chassisNumber: '',
     regNumber: '',
     color: '',
+    mileage: '',
+    fullFinalAmount: '',
     ownerName: '',
     receiverName: user?.name || '',
     fileStatus: 'Complete Original File',
@@ -72,6 +74,8 @@ export default function ReceivingLetterPage() {
         vehicleName: `${s.vehicle} ${s.model}`,
         regNumber: s.numberPlate || '',
         color: s.color || '',
+        mileage: s.mileage ? s.mileage.toString() : '',
+        fullFinalAmount: s.demandPrice ? s.demandPrice.toString() : '',
         ownerName: s.sellerName || '',
         chassisNumber: prev.chassisNumber || ''
       }));
@@ -87,6 +91,8 @@ export default function ReceivingLetterPage() {
       chassisNumber: '',
       regNumber: '',
       color: '',
+      mileage: '',
+      fullFinalAmount: '',
       ownerName: '',
       receiverName: user?.name || '',
       fileStatus: 'Complete Original File',
@@ -106,6 +112,8 @@ export default function ReceivingLetterPage() {
       chassisNumber: rl.chassisNumber || '',
       regNumber: rl.regNumber || '',
       color: rl.color || '',
+      mileage: rl.mileage || '',
+      fullFinalAmount: rl.fullFinalAmount || '',
       ownerName: rl.ownerName || '',
       receiverName: rl.receiverName || user?.name || '',
       fileStatus: rl.fileStatus || 'Complete Original File',
@@ -289,6 +297,16 @@ export default function ReceivingLetterPage() {
                   <div class="val">${letter.color || 'N/A'}</div>
                 </td>
                 <td>
+                  <div class="label">Vehicle Mileage</div>
+                  <div class="val" style="font-family: monospace; color: #0284c7; font-weight: bold;">${letter.mileage ? letter.mileage + (String(letter.mileage).toLowerCase().includes('km') ? '' : ' KM') : 'N/A'}</div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="label">Full & Final Amount (F & F)</div>
+                  <div class="val" style="color: #047857; font-size: 13px; font-weight: 800;">${letter.fullFinalAmount ? (String(letter.fullFinalAmount).toLowerCase().includes('rs') || String(letter.fullFinalAmount).includes('pkr') ? letter.fullFinalAmount : 'Rs. ' + Number(letter.fullFinalAmount.replace(/[^0-9.]/g, '') || 0).toLocaleString()) : 'N/A'}</div>
+                </td>
+                <td>
                   <div class="label">Owner Name (Vehicle Handover By)</div>
                   <div class="val">${letter.ownerName}</div>
                 </td>
@@ -386,7 +404,7 @@ export default function ReceivingLetterPage() {
         <Search className="w-4 h-4 text-slate-400 ml-2" />
         <input
           type="text"
-          placeholder="Search receiving letters by Vehicle, Owner Name, Receiver Name, Reg #, Chassis #..."
+          placeholder="Search receiving letters by Vehicle, Owner, Receiver, Reg #, Chassis #, Mileage, F&F Amount..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full bg-transparent text-xs text-white placeholder-slate-400 focus:outline-none font-mono"
@@ -401,6 +419,7 @@ export default function ReceivingLetterPage() {
               <tr className="bg-slate-900/80 border-b border-white/10 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
                 <th className="py-3.5 px-4">Ref # & Date</th>
                 <th className="py-3.5 px-4">Vehicle Details</th>
+                <th className="py-3.5 px-4">Mileage & F&F Amount</th>
                 <th className="py-3.5 px-4">Owner Name</th>
                 <th className="py-3.5 px-4">Receiver Name</th>
                 <th className="py-3.5 px-4">File / Key / Smart Card</th>
@@ -422,6 +441,18 @@ export default function ReceivingLetterPage() {
                       <p className="font-extrabold text-white text-sm">{rl.vehicleName}</p>
                       <p className="text-[11px] text-slate-400 font-mono">
                         Reg: <span className="text-amber-300 font-bold">{rl.regNumber || 'N/A'}</span> • Color: {rl.color || 'N/A'}
+                      </p>
+                      {rl.chassisNumber && (
+                        <p className="text-[10px] text-slate-500 font-mono">Chassis: {rl.chassisNumber}</p>
+                      )}
+                    </td>
+
+                    <td className="py-4 px-4 font-mono">
+                      <p className="text-xs font-bold text-cyan-300">
+                        {rl.mileage ? `${rl.mileage}${String(rl.mileage).toLowerCase().includes('km') ? '' : ' KM'}` : '—'}
+                      </p>
+                      <p className="text-[11px] font-bold text-emerald-400 mt-0.5">
+                        {rl.fullFinalAmount ? (String(rl.fullFinalAmount).toLowerCase().includes('rs') ? rl.fullFinalAmount : `Rs. ${rl.fullFinalAmount}`) : '—'}
                       </p>
                     </td>
 
@@ -488,7 +519,7 @@ export default function ReceivingLetterPage() {
 
               {letters.length === 0 && !loading && (
                 <tr>
-                  <td colSpan="7" className="py-12 text-center text-slate-500 font-mono text-xs">
+                  <td colSpan="8" className="py-12 text-center text-slate-500 font-mono text-xs">
                     No vehicle receiving letters found. Click "New Receiving Letter" to create one.
                   </td>
                 </tr>
@@ -573,7 +604,7 @@ export default function ReceivingLetterPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">Reg # (Registration Number)</label>
                   <input
@@ -597,6 +628,30 @@ export default function ReceivingLetterPage() {
                 </div>
 
                 <div>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Mileage (KM)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 45,000 km"
+                    value={formData.mileage}
+                    onChange={(e) => setFormData({ ...formData, mileage: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-cyan-300 font-mono font-semibold focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-emerald-400 font-bold mb-1">Full & Final (F&F) Amount</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 3,500,000"
+                    value={formData.fullFinalAmount}
+                    onChange={(e) => setFormData({ ...formData, fullFinalAmount: e.target.value })}
+                    className="w-full bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-2 text-sm text-emerald-300 font-mono font-bold focus:outline-none focus:border-emerald-400"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">Owner Name *</label>
                   <input
                     type="text"
@@ -607,9 +662,7 @@ export default function ReceivingLetterPage() {
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">Receiver Name *</label>
                   <input
@@ -621,7 +674,9 @@ export default function ReceivingLetterPage() {
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-cyan-300 font-semibold focus:outline-none focus:border-emerald-500"
                   />
                 </div>
+              </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">File Status</label>
                   <input
@@ -643,9 +698,7 @@ export default function ReceivingLetterPage() {
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">Smart Card Status</label>
                   <input
@@ -656,17 +709,17 @@ export default function ReceivingLetterPage() {
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
                   />
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Any Other Accessory</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Spare Wheel, Jack, Toolkit, Navigation, Audio"
-                    value={formData.anyOtherAccessory}
-                    onChange={(e) => setFormData({ ...formData, anyOtherAccessory: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-mono text-slate-400 mb-1">Any Other Accessory</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Spare Wheel, Jack, Toolkit, Navigation, Audio"
+                  value={formData.anyOtherAccessory}
+                  onChange={(e) => setFormData({ ...formData, anyOtherAccessory: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                />
               </div>
 
               {/* Notes / Detail Section at the end */}

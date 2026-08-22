@@ -351,6 +351,8 @@ model ReceivingLetter {
   chassisNumber     String?
   regNumber         String?
   color             String?
+  mileage           String?  // Vehicle Mileage (e.g. 45,000 km)
+  fullFinalAmount   String?  // Full & Final Amount (F & F)
   ownerName         String
   receiverName      String
   fileStatus        String?

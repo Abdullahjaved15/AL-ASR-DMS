@@ -20,6 +20,8 @@ const createReceivingLetter = async (req, res) => {
       chassisNumber,
       regNumber,
       color,
+      mileage,
+      fullFinalAmount,
       ownerName,
       receiverName,
       fileStatus,
@@ -43,6 +45,8 @@ const createReceivingLetter = async (req, res) => {
         chassisNumber: chassisNumber || null,
         regNumber: regNumber || null,
         color: color || null,
+        mileage: mileage ? String(mileage).trim() : null,
+        fullFinalAmount: fullFinalAmount ? String(fullFinalAmount).trim() : null,
         ownerName,
         receiverName,
         fileStatus: fileStatus || null,
@@ -78,18 +82,22 @@ const createReceivingLetter = async (req, res) => {
       }
       if (!modelName) modelName = vehicleName;
 
+      const parsedMileage = mileage ? (parseInt(String(mileage).replace(/[^0-9]/g, '')) || 0) : 0;
+      const parsedPrice = fullFinalAmount ? (parseFloat(String(fullFinalAmount).replace(/[^0-9.]/g, '')) || 0) : 0;
+
       await prisma.currentStock.create({
         data: {
           vehicle: vehicleMake,
           model: modelName,
           year: yearStr,
           color: color || 'White',
+          mileage: parsedMileage,
           regNumber: regNumber || null,
           careOf: receiverName, // Receiver Name mapped to Care Of Name
-          askingPrice: 0,
+          askingPrice: parsedPrice,
           status: 'AVAILABLE',
           location: 'Main Showroom',
-          notes: `Auto-added from Receiving Letter Ref: ${letterNumber}. Owner: ${ownerName}.${notes ? ' Notes: ' + notes : ''}`
+          notes: `Auto-added from Receiving Letter Ref: ${letterNumber}. Owner: ${ownerName}.${fullFinalAmount ? ' F&F Amount: Rs. ' + fullFinalAmount + '.' : ''}${notes ? ' Notes: ' + notes : ''}`
         }
       });
     } catch (stockErr) {
@@ -116,7 +124,9 @@ const getReceivingLetters = async (req, res) => {
         { ownerName: { contains: search, mode: 'insensitive' } },
         { receiverName: { contains: search, mode: 'insensitive' } },
         { regNumber: { contains: search, mode: 'insensitive' } },
-        { chassisNumber: { contains: search, mode: 'insensitive' } }
+        { chassisNumber: { contains: search, mode: 'insensitive' } },
+        { mileage: { contains: search, mode: 'insensitive' } },
+        { fullFinalAmount: { contains: search, mode: 'insensitive' } }
       ];
     }
 
@@ -173,6 +183,8 @@ const updateReceivingLetter = async (req, res) => {
       chassisNumber,
       regNumber,
       color,
+      mileage,
+      fullFinalAmount,
       ownerName,
       receiverName,
       fileStatus,
@@ -194,6 +206,8 @@ const updateReceivingLetter = async (req, res) => {
         chassisNumber: chassisNumber || null,
         regNumber: regNumber || null,
         color: color || null,
+        mileage: mileage !== undefined ? (mileage ? String(mileage).trim() : null) : undefined,
+        fullFinalAmount: fullFinalAmount !== undefined ? (fullFinalAmount ? String(fullFinalAmount).trim() : null) : undefined,
         ownerName,
         receiverName,
         fileStatus: fileStatus || null,
@@ -209,6 +223,13 @@ const updateReceivingLetter = async (req, res) => {
         images: true
       }
     });
+
+    res.json(updatedLetter);
+  } catch (error) {
+    console.error('Error updating receiving letter:', error);
+    res.status(500).json({ error: 'Failed to update receiving letter', details: error.message });
+  }
+};
 
     res.json(updatedLetter);
   } catch (error) {
