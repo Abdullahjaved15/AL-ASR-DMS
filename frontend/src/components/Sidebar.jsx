@@ -15,6 +15,8 @@ import {
   Building2,
   FileCheck,
   Clock,
+  Truck,
+  ShieldCheck,
   Settings as SettingsIcon,
   X
 } from 'lucide-react';
@@ -27,8 +29,10 @@ export default function Sidebar({ currentTab, setCurrentTab, isMobileOpen, setIs
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, role: 'ALL' },
     { id: 'all_sellers', label: 'All Sellers Inventory', icon: Car, role: 'ALL' },
     { id: 'my_sellers', label: 'My Sellers Leads', icon: UserCheck, role: 'ALL' },
+    { id: 'commercial_sellers', label: 'Commercial Vehicle Sellers', icon: Truck, role: 'ALL' },
     { id: 'all_buyers', label: 'All Buyers Inquiries', icon: Users, role: 'ALL' },
     { id: 'my_buyers', label: 'My Buyers Leads', icon: Briefcase, role: 'ALL' },
+    { id: 'commercial_buyers', label: 'Commercial Vehicle Buyers', icon: Truck, role: 'ALL' },
     { id: 'bank_cases', label: 'Bank Cases & Cars', icon: Building2, role: 'ADMIN' },
     { id: 'receiving_letter', label: 'Receiving Letter', icon: FileCheck, role: 'ALL' },
     { id: 'attendance', label: 'Employee Attendance', icon: Clock, role: 'SUPER_ADMIN' },
@@ -36,6 +40,7 @@ export default function Sidebar({ currentTab, setCurrentTab, isMobileOpen, setIs
     { id: 'collaboration', label: 'Collaboration Center', icon: Handshake, role: 'ALL' },
     { id: 'stock', label: 'Showroom Current Stock', icon: Package, role: 'ALL' },
     { id: 'invoices', label: 'Invoices & Vouchers', icon: Receipt, role: 'SUPER_ADMIN' },
+    { id: 'approvals', label: 'Approval Requests', icon: ShieldCheck, role: 'ADMIN' },
     { id: 'users', label: 'User & Salesmen', icon: UserCheck, role: 'ADMIN' },
     { id: 'reports', label: 'Sales Reports', icon: BarChart3, role: 'ADMIN' },
     { id: 'settings', label: 'Account Settings', icon: SettingsIcon, role: 'ALL' },

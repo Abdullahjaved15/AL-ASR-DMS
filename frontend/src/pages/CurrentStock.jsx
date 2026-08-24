@@ -7,7 +7,7 @@ import { logoBase64 } from '../utils/logoBase64';
 export default function CurrentStock() {
   const { user, isAdmin } = useAuth();
   const [stockList, setStockList] = useState([]);
-  const [stats, setStats] = useState({ totalUnits: 0, totalValuation: 0, availableUnits: 0, reservedUnits: 0, avgPrice: 0 });
+  const [stats, setStats] = useState({ totalUnits: 0, totalValuation: 0, availableUnits: 0, reservedUnits: 0, atCustomerUnits: 0, avgPrice: 0 });
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState('');
@@ -79,7 +79,10 @@ export default function CurrentStock() {
     if (!selectedStock) return;
     setSubmitting(true);
     try {
-      await api.updateStockItem(selectedStock.id, cleanStockPayload(formData));
+      const res = await api.updateStockItem(selectedStock.id, cleanStockPayload(formData));
+      if (res?.requiresApproval) {
+        alert(res.message || 'Edit request submitted to Super Admin for approval.');
+      }
       setIsEditModalOpen(false);
       setSelectedStock(null);
       resetForm();
@@ -94,7 +97,10 @@ export default function CurrentStock() {
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this showroom stock entry?')) return;
     try {
-      await api.deleteStockItem(id);
+      const res = await api.deleteStockItem(id);
+      if (res?.requiresApproval) {
+        alert(res.message || 'Deletion request submitted to Super Admin for approval.');
+      }
       fetchStock();
     } catch (err) {
       alert(err.message || 'Failed to delete stock entry');
@@ -186,6 +192,8 @@ export default function CurrentStock() {
             .badge { display: inline-block; padding: 1px 4px; border-radius: 3px; font-size: 7.5px; font-weight: 700; }
             .badge-available { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
             .badge-reserved { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+            .badge-customer { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-weight: bold; }
+            .badge-sold { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
             .badge-care { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-weight: bold; }
             .footer { margin-top: 6px; text-align: center; font-size: 7.5px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 3px; }
           </style>
@@ -207,6 +215,7 @@ export default function CurrentStock() {
                     <div class="stats-inline">
                       <div class="stat-item">Total Units: <strong>${stats.totalUnits || stockList.length}</strong></div>
                       <div class="stat-item">Available: <strong>${stats.availableUnits || 0}</strong></div>
+                      <div class="stat-item">At Customer: <strong>${stats.atCustomerUnits || 0}</strong></div>
                       <div class="stat-item">Valuation: <strong>Rs. ${(stats.totalValuation || 0).toLocaleString()}</strong></div>
                       <div class="stat-item" style="color: #0284c7;">Sheet <strong>${pageIdx + 1} of ${totalPages}</strong></div>
                     </div>
@@ -223,7 +232,7 @@ export default function CurrentStock() {
                         <th style="width: 95px;">Asking Price (PKR)</th>
                         <th style="width: 65px;">Care Of</th>
                         <th style="width: 100px;">Reg / Plate #</th>
-                        <th style="width: 65px;">Status</th>
+                        <th style="width: 75px;">Status</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -233,6 +242,13 @@ export default function CurrentStock() {
                         </tr>
                       ` : chunk.map((item, idx) => {
                         const globalIdx = startIdx + idx + 1;
+                        const badgeClass = item.status === 'AVAILABLE'
+                          ? 'badge-available'
+                          : (item.status === 'At Customer' || item.status === 'AT_CUSTOMER')
+                          ? 'badge-customer'
+                          : item.status === 'RESERVED'
+                          ? 'badge-reserved'
+                          : 'badge-sold';
                         return `
                         <tr>
                           <td><strong>${globalIdx}</strong></td>
@@ -243,7 +259,7 @@ export default function CurrentStock() {
                           <td><strong style="color: #0f172a;">Rs. ${(item.askingPrice || 0).toLocaleString()}</strong></td>
                           <td><span class="badge badge-care">${item.careOf || 'AL Asr'}</span></td>
                           <td><strong style="color: #0284c7; font-family: monospace;">${item.regNumber || 'UNREGISTERED'}</strong></td>
-                          <td><span class="badge ${item.status === 'AVAILABLE' ? 'badge-available' : 'badge-reserved'}">${item.status}</span></td>
+                          <td><span class="badge ${badgeClass}">${item.status}</span></td>
                         </tr>
                         `;
                       }).join('')}
@@ -307,7 +323,7 @@ export default function CurrentStock() {
       </div>
 
       {/* KPI Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="glass-card p-5 rounded-2xl border border-white/10 flex items-center justify-between">
           <div>
             <p className="text-[11px] font-mono uppercase tracking-wider text-slate-400">Total Showroom Vehicles</p>
@@ -330,6 +346,26 @@ export default function CurrentStock() {
 
         <div className="glass-card p-5 rounded-2xl border border-white/10 flex items-center justify-between">
           <div>
+            <p className="text-[11px] font-mono uppercase tracking-wider text-slate-400">Reserved Vehicles</p>
+            <h3 className="text-2xl font-extrabold text-amber-400 mt-1">{stats.reservedUnits || 0} Units</h3>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center">
+            <Clock className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="glass-card p-5 rounded-2xl border border-white/10 flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-mono uppercase tracking-wider text-slate-400">At Customer</p>
+            <h3 className="text-2xl font-extrabold text-sky-400 mt-1">{stats.atCustomerUnits || 0} Units</h3>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center">
+            <UserCheck className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="glass-card p-5 rounded-2xl border border-white/10 flex items-center justify-between">
+          <div>
             <p className="text-[11px] font-mono uppercase tracking-wider text-slate-400">Total Stock Valuation</p>
             <h3 className="text-xl font-extrabold text-cyan-400 mt-1">
               Rs. {(stats.totalValuation || 0).toLocaleString()}
@@ -337,16 +373,6 @@ export default function CurrentStock() {
           </div>
           <div className="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center">
             <DollarSign className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="glass-card p-5 rounded-2xl border border-white/10 flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-mono uppercase tracking-wider text-slate-400">Reserved Vehicles</p>
-            <h3 className="text-2xl font-extrabold text-amber-400 mt-1">{stats.reservedUnits || 0} Units</h3>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center">
-            <Clock className="w-5 h-5" />
           </div>
         </div>
       </div>
@@ -364,8 +390,8 @@ export default function CurrentStock() {
           />
         </div>
 
-        <div className="flex items-center space-x-2 w-full sm:w-auto">
-          {['', 'AVAILABLE', 'RESERVED', 'SOLD'].map((st) => (
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          {['', 'AVAILABLE', 'RESERVED', 'At Customer', 'SOLD'].map((st) => (
             <button
               key={st}
               onClick={() => setStatusFilter(st)}
@@ -375,7 +401,7 @@ export default function CurrentStock() {
                   : 'bg-slate-900/80 text-slate-400 hover:text-white border border-white/10'
               }`}
             >
-              {st || 'ALL STOCK'}
+              {st ? (st === 'At Customer' ? 'AT CUSTOMER' : st) : 'ALL STOCK'}
             </button>
           ))}
         </div>
@@ -437,6 +463,8 @@ export default function CurrentStock() {
                     <span className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold uppercase border ${
                       item.status === 'AVAILABLE'
                         ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        : (item.status === 'At Customer' || item.status === 'AT_CUSTOMER')
+                        ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
                         : item.status === 'RESERVED'
                         ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                         : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
@@ -599,10 +627,11 @@ export default function CurrentStock() {
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none font-mono"
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none font-mono font-bold"
                   >
                     <option value="AVAILABLE">AVAILABLE</option>
                     <option value="RESERVED">RESERVED</option>
+                    <option value="At Customer">At Customer</option>
                     <option value="SOLD">SOLD</option>
                   </select>
                 </div>

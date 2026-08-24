@@ -16,6 +16,7 @@ import CurrentStock from './pages/CurrentStock';
 import Invoices from './pages/Invoices';
 import ReceivingLetter from './pages/ReceivingLetter';
 import Attendance from './pages/Attendance';
+import Approvals from './pages/Approvals';
 import Settings from './pages/Settings';
 
 function MainLayout() {
@@ -103,6 +104,15 @@ function MainLayout() {
             />
           </div>
 
+          <div className={currentTab === 'commercial_sellers' ? 'block' : 'hidden'}>
+            <Sellers
+              scope="commercial"
+              search={search}
+              isAddModalOpen={isSellerModalOpen}
+              setIsAddModalOpen={setIsSellerModalOpen}
+            />
+          </div>
+
           <div className={(currentTab === 'all_buyers' || currentTab === 'buyers') ? 'block' : 'hidden'}>
             <Buyers
               scope="all"
@@ -115,6 +125,15 @@ function MainLayout() {
           <div className={currentTab === 'my_buyers' ? 'block' : 'hidden'}>
             <Buyers
               scope="mine"
+              search={search}
+              isAddModalOpen={isBuyerModalOpen}
+              setIsAddModalOpen={setIsBuyerModalOpen}
+            />
+          </div>
+
+          <div className={currentTab === 'commercial_buyers' ? 'block' : 'hidden'}>
+            <Buyers
+              scope="commercial"
               search={search}
               isAddModalOpen={isBuyerModalOpen}
               setIsAddModalOpen={setIsBuyerModalOpen}
@@ -156,6 +175,10 @@ function MainLayout() {
 
           <div className={currentTab === 'invoices' ? 'block' : 'hidden'}>
             <Invoices />
+          </div>
+
+          <div className={(currentTab === 'approvals' && isAdmin) ? 'block' : 'hidden'}>
+            <Approvals />
           </div>
 
           <div className={currentTab === 'users' ? 'block' : 'hidden'}>

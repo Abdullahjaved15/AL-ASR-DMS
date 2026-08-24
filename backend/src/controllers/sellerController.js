@@ -16,9 +16,9 @@ invalidateSellersCache();
 
 const getSellers = async (req, res) => {
   try {
-    const { search, leadStatus, assignedTo, city, vehicle, model, minYear, maxYear, year, minPrice, maxPrice, fromDate, toDate } = req.query;
+    const { search, leadStatus, assignedTo, city, vehicle, model, minYear, maxYear, year, minPrice, maxPrice, isCommercial, vehicleType, fromDate, toDate } = req.query;
 
-    const hasFilters = Boolean(search || leadStatus || assignedTo || city || vehicle || model || minYear || maxYear || year || minPrice || maxPrice || fromDate || toDate);
+    const hasFilters = Boolean(search || leadStatus || assignedTo || city || vehicle || model || minYear || maxYear || year || minPrice || maxPrice || (isCommercial !== undefined && isCommercial !== '') || vehicleType || fromDate || toDate);
 
     // Return cached response for default un-filtered ADMIN requests within 15s TTL
     if (!hasFilters && (req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN') && sellersCache && (Date.now() - sellersCacheTime < CACHE_TTL_MS)) {
@@ -42,6 +42,14 @@ const getSellers = async (req, res) => {
 
     if (leadStatus) {
       where.leadStatus = leadStatus;
+    }
+
+    if (isCommercial !== undefined && isCommercial !== '') {
+      where.isCommercial = isCommercial === 'true' || isCommercial === true;
+    }
+
+    if (vehicleType) {
+      where.vehicleType = { contains: vehicleType, mode: 'insensitive' };
     }
 
     if (city) {
@@ -177,7 +185,7 @@ const createSeller = async (req, res) => {
 
     const {
       vehicle, model, year, color, mileage, numberPlate, demandPrice,
-      carCondition, zeroMeterType,
+      carCondition, zeroMeterType, isCommercial, vehicleType,
       sellerName, sellerPhone, sellerCity,
       leadSource, leadReference, leadReferredBy, assignedTo, leadStatus, comments
     } = req.body;
@@ -202,6 +210,7 @@ const createSeller = async (req, res) => {
     }
 
     const assignedSalesman = assignedTo || req.user.id;
+    const commercialFlag = Boolean(isCommercial) || vehicleType === 'Commercial';
 
     const newSeller = await prisma.seller.create({
       data: {
@@ -215,6 +224,8 @@ const createSeller = async (req, res) => {
         demandPrice: demandPrice !== undefined && demandPrice !== '' ? parseFloat(demandPrice) : 0,
         carCondition: carCondition || 'Used',
         zeroMeterType: carCondition === 'Zero Meter' ? zeroMeterType || 'Cash' : null,
+        isCommercial: commercialFlag,
+        vehicleType: commercialFlag ? 'Commercial' : (vehicleType || 'Personal'),
         sellerName: sellerName || '',
         sellerPhone: sellerPhone ? formatPakistaniPhone(sellerPhone) : '',
         sellerCity: sellerCity || '',
@@ -235,7 +246,7 @@ const createSeller = async (req, res) => {
       data: {
         userId: req.user.id,
         action: 'CREATE_SELLER',
-        details: `Added seller ${sellerName || 'N/A'} for ${year || ''} ${vehicle || ''} ${model || ''} (Plate: ${numberPlate || 'N/A'})`
+        details: `Added seller ${sellerName || 'N/A'} for ${year || ''} ${vehicle || ''} ${model || ''} (Type: ${commercialFlag ? 'Commercial' : 'Personal'}, Plate: ${numberPlate || 'N/A'})`
       }
     });
 
@@ -262,6 +273,7 @@ const updateSeller = async (req, res) => {
 
     const {
       vehicle, model, year, color, mileage, numberPlate, demandPrice,
+      carCondition, zeroMeterType, isCommercial, vehicleType,
       sellerName, sellerPhone, sellerCity,
       leadSource, leadReference, leadReferredBy, assignedTo, leadStatus, comments
     } = req.body;
@@ -285,10 +297,6 @@ const updateSeller = async (req, res) => {
       }
     }
 
-    const {
-      carCondition, zeroMeterType
-    } = req.body;
-
     const updateData = {};
     if (vehicle !== undefined) updateData.vehicle = vehicle;
     if (model !== undefined) updateData.model = model;
@@ -299,6 +307,13 @@ const updateSeller = async (req, res) => {
     if (demandPrice !== undefined) updateData.demandPrice = demandPrice !== '' ? parseFloat(demandPrice) : 0;
     if (carCondition !== undefined) updateData.carCondition = carCondition;
     if (zeroMeterType !== undefined) updateData.zeroMeterType = carCondition === 'Zero Meter' ? zeroMeterType : null;
+    if (isCommercial !== undefined) {
+      updateData.isCommercial = Boolean(isCommercial);
+      updateData.vehicleType = Boolean(isCommercial) ? 'Commercial' : (vehicleType || 'Personal');
+    } else if (vehicleType !== undefined) {
+      updateData.vehicleType = vehicleType;
+      updateData.isCommercial = vehicleType === 'Commercial';
+    }
     if (sellerName !== undefined) updateData.sellerName = sellerName;
     if (sellerPhone !== undefined) updateData.sellerPhone = sellerPhone ? formatPakistaniPhone(sellerPhone) : '';
     if (sellerCity !== undefined) updateData.sellerCity = sellerCity;
@@ -308,6 +323,37 @@ const updateSeller = async (req, res) => {
     if (isAdminUser && assignedTo !== undefined) updateData.assignedTo = assignedTo;
     if (leadStatus !== undefined) updateData.leadStatus = leadStatus;
     if (comments !== undefined) updateData.comments = comments;
+
+    // If requester is ADMIN (not SUPER_ADMIN), route to Approval Request workflow
+    if (req.user.role === 'ADMIN') {
+      const request = await prisma.approvalRequest.create({
+        data: {
+          entityType: 'SELLER',
+          entityId: id,
+          entityName: `${existingSeller.year || ''} ${existingSeller.vehicle || ''} ${existingSeller.model || ''} (Seller: ${existingSeller.sellerName || 'N/A'})`.trim(),
+          action: 'EDIT',
+          status: 'PENDING',
+          requestedById: req.user.id,
+          proposedData: updateData,
+          currentData: existingSeller,
+          reason: req.body.reason || 'Admin submitted changes for seller lead'
+        }
+      });
+
+      await prisma.activityLog.create({
+        data: {
+          userId: req.user.id,
+          action: 'SUBMIT_APPROVAL_REQUEST',
+          details: `Admin requested EDIT approval for seller lead #${id} (${existingSeller.sellerName})`
+        }
+      });
+
+      return res.json({
+        message: 'Your edit request has been submitted to the Super Admin for approval.',
+        requiresApproval: true,
+        approvalRequest: request
+      });
+    }
 
     const updatedSeller = await prisma.seller.update({
       where: { id },
@@ -342,8 +388,38 @@ const deleteSeller = async (req, res) => {
       return res.status(404).json({ message: 'Seller not found' });
     }
 
-    if (req.user.role !== 'ADMIN' && existingSeller.assignedTo !== req.user.id && existingSeller.createdBy !== req.user.id) {
+    if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN' && existingSeller.assignedTo !== req.user.id && existingSeller.createdBy !== req.user.id) {
       return res.status(403).json({ message: 'Access denied: You can only delete your own seller leads' });
+    }
+
+    // If requester is ADMIN (not SUPER_ADMIN), route to Approval Request workflow
+    if (req.user.role === 'ADMIN') {
+      const request = await prisma.approvalRequest.create({
+        data: {
+          entityType: 'SELLER',
+          entityId: id,
+          entityName: `${existingSeller.year || ''} ${existingSeller.vehicle || ''} ${existingSeller.model || ''} (Seller: ${existingSeller.sellerName || 'N/A'})`.trim(),
+          action: 'DELETE',
+          status: 'PENDING',
+          requestedById: req.user.id,
+          currentData: existingSeller,
+          reason: req.body?.reason || 'Admin requested deletion of seller lead'
+        }
+      });
+
+      await prisma.activityLog.create({
+        data: {
+          userId: req.user.id,
+          action: 'SUBMIT_APPROVAL_REQUEST',
+          details: `Admin requested DELETE approval for seller lead #${id} (${existingSeller.sellerName})`
+        }
+      });
+
+      return res.json({
+        message: 'Deletion request has been submitted to the Super Admin for approval.',
+        requiresApproval: true,
+        approvalRequest: request
+      });
     }
 
     await prisma.seller.delete({ where: { id } });

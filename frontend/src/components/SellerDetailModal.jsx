@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Car, Phone, MapPin, Calendar, Tag, UserCheck, Edit, Upload, ExternalLink, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { X, Car, Phone, MapPin, Calendar, Tag, UserCheck, Edit, Upload, ExternalLink, ChevronLeft, ChevronRight, FileText, Truck } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import ImageDropzone from './ImageDropzone';
 
@@ -47,12 +47,22 @@ export default function SellerDetailModal({ seller, onClose, onEdit, onImagesUpd
         {/* Modal Header */}
         <div className="flex flex-wrap items-center justify-between pb-4 border-b border-white/10 gap-3 flex-shrink-0">
           <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 text-black font-extrabold text-lg">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg font-extrabold text-lg ${
+              (seller.isCommercial || seller.vehicleType === 'Commercial')
+                ? 'bg-gradient-to-tr from-amber-500 to-orange-600 shadow-amber-500/20 text-black'
+                : 'bg-gradient-to-tr from-cyan-500 to-blue-600 shadow-cyan-500/20 text-black'
+            }`}>
               {seller.vehicle?.substring(0, 2).toUpperCase()}
             </div>
             <div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 flex-wrap gap-1">
                 <h3 className="text-xl font-extrabold text-white">{seller.vehicle} {seller.model}</h3>
+                {(seller.isCommercial || seller.vehicleType === 'Commercial') && (
+                  <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-mono font-extrabold">
+                    <Truck className="w-3 h-3 text-amber-400" />
+                    <span>COMMERCIAL VEHICLE</span>
+                  </span>
+                )}
                 <StatusBadge status={seller.leadStatus} />
               </div>
               <p className="text-xs text-slate-400 font-mono mt-0.5">

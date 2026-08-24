@@ -30,6 +30,8 @@ model User {
   primaryCollaborations Collaboration[] @relation("PrimaryCollaborations")
   partnerCollaborations Collaboration[] @relation("PartnerCollaborations")
   employees       Employee[]
+  requestedApprovals ApprovalRequest[] @relation("RequestedApprovals")
+  reviewedApprovals  ApprovalRequest[] @relation("ReviewedApprovals")
 }
 
 model Seller {
@@ -48,6 +50,8 @@ model Seller {
   demandPrice      Float?        @default(0)
   carCondition     String?       @default("Used") // Used, Zero Meter
   zeroMeterType    String?       // Cash, Booking
+  isCommercial     Boolean       @default(false)
+  vehicleType      String?       @default("Personal") // Personal, Commercial
 
   sellerName       String?       @default("")
   sellerPhone      String?       @default("")
@@ -78,6 +82,7 @@ model Seller {
   @@index([numberPlate])
   @@index([demandPrice])
   @@index([year])
+  @@index([isCommercial])
   @@index([assignedTo, leadStatus])
   @@index([assignedTo, createdAt])
   @@index([vehicle, model])
@@ -109,6 +114,8 @@ model Buyer {
   budget           Float?   @default(0)
   carCondition     String?  @default("Used") // Used, Zero Meter
   zeroMeterType    String?  // Cash, Booking
+  isCommercial     Boolean  @default(false)
+  vehicleType      String?  @default("Personal") // Personal, Commercial
 
   isBankCase       Boolean  @default(false)
   bankName         String?
@@ -146,6 +153,7 @@ model Buyer {
   @@index([vehicle])
   @@index([model])
   @@index([isBankCase])
+  @@index([isCommercial])
   @@index([budget])
   @@index([year])
   @@index([assignedTo, leadStatus])
@@ -331,7 +339,7 @@ model CurrentStock {
   mileage       Int      @default(0)
   askingPrice   Float
   purchasePrice Float?
-  status        String   @default("AVAILABLE") // AVAILABLE, RESERVED, SOLD
+  status        String   @default("AVAILABLE") // AVAILABLE, RESERVED, AT_CUSTOMER, SOLD
   location      String   @default("Main Showroom")
   notes         String?
   careOf        String?  // Care of / Salesman in charge
@@ -347,12 +355,14 @@ model ReceivingLetter {
   id                String   @id @default(uuid())
   letterNumber      String   @unique
   date              DateTime @default(now())
+  receivingTime     String?  // Time of receiving vehicle (e.g. 11:30 AM)
   vehicleName       String
   chassisNumber     String?
   regNumber         String?
   color             String?
   mileage           String?  // Vehicle Mileage (e.g. 45,000 km)
-  fullFinalAmount   String?  // Full & Final Amount (F & F)
+  demandAmount      String?  // Vehicle Demand Amount (PKR)
+  fullFinalAmount   String?  // Backward compatibility alias for demand
   ownerName         String
   receiverName      String
   fileStatus        String?
@@ -412,5 +422,33 @@ model Attendance {
   @@unique([employeeId, date])
   @@index([date])
   @@index([employeeId, date])
+}
+
+model ApprovalRequest {
+  id              String    @id @default(uuid())
+  entityType      String    // SELLER, BUYER, CURRENT_STOCK, RECEIVING_LETTER, CASH_BOOK
+  entityId        String    // ID of the record being edited/deleted
+  entityName      String?   // Friendly summary name e.g. "Toyota Fortuner 2022 (Plate ATG-081)"
+  action          String    // EDIT, DELETE
+  status          String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  
+  requestedById   String
+  requestedByUser User      @relation("RequestedApprovals", fields: [requestedById], references: [id], onDelete: Cascade)
+  
+  proposedData    Json?     // New fields for EDIT
+  currentData     Json?     // Snapshot before modification
+  reason          String?   // Admin reason / note
+  
+  reviewedById    String?
+  reviewedByUser  User?     @relation("ReviewedApprovals", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewNotes     String?   // Super admin notes
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  resolvedAt      DateTime?
+
+  @@index([status])
+  @@index([entityType])
+  @@index([requestedById])
 }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Filter, Edit, Trash2, Phone, MapPin, DollarSign, UserCheck, Eye, Printer, Building2, ClipboardCheck, FileText } from 'lucide-react';
+import { Users, Plus, Filter, Edit, Trash2, Phone, MapPin, DollarSign, UserCheck, Eye, Printer, Building2, ClipboardCheck, FileText, Truck } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import BuyerDetailModal from '../components/BuyerDetailModal';
 import BankChecklistModal from '../components/BankChecklistModal';
@@ -39,6 +39,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
     leadStatus: '',
     assignedTo: '',
     isBankCase: '',
+    isCommercial: '',
     caseNo: ''
   });
 
@@ -62,6 +63,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
       leadStatus: '',
       assignedTo: '',
       isBankCase: '',
+      isCommercial: '',
       caseNo: ''
     });
   };
@@ -82,7 +84,9 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
     budget: '',
     carCondition: 'Used',
     zeroMeterType: 'Cash',
-    isBankCase: false,
+    isCommercial: scope === 'commercial',
+    vehicleType: scope === 'commercial' ? 'Commercial' : 'Personal',
+    isBankCase: scope === 'bank_cases',
     bankName: '',
     bankCaseStatus: 'Not Confirmed',
     processingFees: 0,
@@ -115,6 +119,9 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
       if (scope === 'bank_cases') {
         activeFilters.isBankCase = 'true';
       }
+      if (scope === 'commercial') {
+        activeFilters.isCommercial = 'true';
+      }
       const data = await api.getBuyers({
         search,
         ...activeFilters
@@ -132,6 +139,9 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
       }
       if (scope === 'bank_cases') {
         filteredData = filteredData.filter(b => b.isBankCase);
+      }
+      if (scope === 'commercial') {
+        filteredData = filteredData.filter(b => b.isCommercial || b.vehicleType === 'Commercial');
       }
       setBuyers(filteredData);
     } catch (err) {
@@ -162,6 +172,8 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
       budget: '',
       carCondition: 'Used',
       zeroMeterType: 'Cash',
+      isCommercial: scope === 'commercial',
+      vehicleType: scope === 'commercial' ? 'Commercial' : 'Personal',
       isBankCase: scope === 'bank_cases',
       bankName: '',
       bankCaseStatus: 'Not Confirmed',
@@ -211,7 +223,10 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
   const handleUpdateBuyer = async (e) => {
     e.preventDefault();
     try {
-      await api.updateBuyer(selectedBuyer.id, formData);
+      const res = await api.updateBuyer(selectedBuyer.id, formData);
+      if (res?.requiresApproval) {
+        alert(res.message || 'Edit request submitted to Super Admin for approval.');
+      }
       setIsEditModalOpen(false);
       setSelectedBuyer(null);
       fetchBuyers();
@@ -223,7 +238,10 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
   const handleDeleteBuyer = async (id) => {
     if (!window.confirm('Are you sure you want to delete this buyer record?')) return;
     try {
-      await api.deleteBuyer(id);
+      const res = await api.deleteBuyer(id);
+      if (res?.requiresApproval) {
+        alert(res.message || 'Deletion request submitted to Super Admin for approval.');
+      }
       fetchBuyers();
     } catch (err) {
       alert(err.message || 'Failed to delete buyer');
@@ -241,6 +259,8 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
       budget: buyer.budget || '',
       carCondition: buyer.carCondition || 'Used',
       zeroMeterType: buyer.zeroMeterType || 'Cash',
+      isCommercial: Boolean(buyer.isCommercial),
+      vehicleType: buyer.vehicleType || (buyer.isCommercial ? 'Commercial' : 'Personal'),
       isBankCase: Boolean(buyer.isBankCase),
       bankName: buyer.bankName || '',
       bankCaseStatus: buyer.bankCaseStatus || 'Not Confirmed',
@@ -473,12 +493,13 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
         <div>
           <div className="flex items-center space-x-2">
             {scope === 'bank_cases' && <Building2 className="w-6 h-6 text-sky-400" />}
+            {scope === 'commercial' && <Truck className="w-6 h-6 text-amber-400" />}
             <h2 className="text-xl font-extrabold text-white tracking-tight">
-              {scope === 'bank_cases' ? 'Bank Financing Cases & Cars' : 'Buyer Inquiries & Leads'}
+              {scope === 'bank_cases' ? 'Bank Financing Cases & Cars' : scope === 'commercial' ? 'Commercial Vehicle Buyers Inquiries' : 'Buyer Inquiries & Leads'}
             </h2>
           </div>
           <p className="text-xs font-mono text-slate-400 mt-0.5">
-            Showing <strong className="text-cyan-400">{displayBuyers.length}</strong> matching {scope === 'bank_cases' ? 'bank financing case(s)' : 'buyer inquiry(ies)'}
+            Showing <strong className="text-cyan-400">{displayBuyers.length}</strong> matching {scope === 'bank_cases' ? 'bank financing case(s)' : scope === 'commercial' ? 'commercial vehicle buyer inquiry(ies)' : 'buyer inquiry(ies)'}
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -494,8 +515,8 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
               onClick={() => { resetForm(); setIsAddModalOpen(true); }}
               className="px-4 py-2 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-black font-bold rounded-xl text-xs shadow-lg shadow-sky-500/20 transition-all flex items-center space-x-1.5"
             >
-              <Plus className="w-4 h-4" />
-              <span>{scope === 'bank_cases' ? 'New Bank Case Entry' : 'New Buyer Entry'}</span>
+              {scope === 'commercial' ? <Truck className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+              <span>{scope === 'bank_cases' ? 'New Bank Case Entry' : scope === 'commercial' ? 'New Commercial Buyer Entry' : 'New Buyer Entry'}</span>
             </button>
           )}
         </div>
@@ -562,7 +583,15 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                     </td>
 
                     <td className="py-4 px-4 font-mono" onClick={() => openDetailModal(buyer)}>
-                      <div className="font-bold text-sky-400">{buyer.vehicle} {buyer.model}</div>
+                      <div className="flex items-center space-x-2 flex-wrap gap-1">
+                        <span className="font-bold text-sky-400">{buyer.vehicle} {buyer.model}</span>
+                        {(buyer.isCommercial || buyer.vehicleType === 'Commercial') && (
+                          <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 font-mono text-[9px] font-bold">
+                            <Truck className="w-2.5 h-2.5" />
+                            <span>COMMERCIAL</span>
+                          </span>
+                        )}
+                      </div>
                       <div className="text-slate-400 text-[11px]">Year: {buyer.year} • Color: {buyer.color || 'Any'}</div>
                     </td>
 
@@ -818,8 +847,31 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                   </select>
                 </div>
 
+                <div>
+                  <label className="block text-xs font-mono text-amber-400 font-bold mb-1">Vehicle Usage Category</label>
+                  <select
+                    value={formData.isCommercial ? 'Commercial' : 'Personal'}
+                    onChange={(e) => {
+                      const isComm = e.target.value === 'Commercial';
+                      setFormData({ 
+                        ...formData, 
+                        isCommercial: isComm,
+                        vehicleType: isComm ? 'Commercial' : 'Personal'
+                      });
+                    }}
+                    className={`w-full bg-slate-900 border rounded-xl px-3 py-2 text-sm font-bold focus:outline-none ${
+                      formData.isCommercial 
+                        ? 'border-amber-500/50 text-amber-300 focus:border-amber-400' 
+                        : 'border-white/10 text-white focus:border-cyan-500'
+                    }`}
+                  >
+                    <option value="Personal">🚗 Passenger / Personal Vehicle</option>
+                    <option value="Commercial">🚚 Commercial Vehicle (Hiace, Van, Pickup, Truck, Bus, Loader)</option>
+                  </select>
+                </div>
+
                 {formData.carCondition === 'Zero Meter' && (
-                  <div>
+                  <div className="sm:col-span-2">
                     <label className="block text-xs font-mono text-emerald-400 font-bold mb-1">Zero Meter Payment Option</label>
                     <select
                       value={formData.zeroMeterType}

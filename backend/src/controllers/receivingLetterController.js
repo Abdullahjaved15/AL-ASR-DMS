@@ -16,11 +16,15 @@ const createReceivingLetter = async (req, res) => {
   try {
     const {
       date,
+      receivingTime,
+      time,
       vehicleName,
       chassisNumber,
       regNumber,
       color,
       mileage,
+      demandAmount,
+      demand,
       fullFinalAmount,
       ownerName,
       receiverName,
@@ -36,17 +40,21 @@ const createReceivingLetter = async (req, res) => {
     }
 
     const letterNumber = generateLetterNumber();
+    const effectiveDemand = (demandAmount || demand || fullFinalAmount) ? String(demandAmount || demand || fullFinalAmount).trim() : null;
+    const effectiveTime = (receivingTime || time) ? String(receivingTime || time).trim() : null;
 
     const newLetter = await prisma.receivingLetter.create({
       data: {
         letterNumber,
         date: date ? new Date(date) : new Date(),
+        receivingTime: effectiveTime,
         vehicleName,
         chassisNumber: chassisNumber || null,
         regNumber: regNumber || null,
         color: color || null,
         mileage: mileage ? String(mileage).trim() : null,
-        fullFinalAmount: fullFinalAmount ? String(fullFinalAmount).trim() : null,
+        demandAmount: effectiveDemand,
+        fullFinalAmount: effectiveDemand,
         ownerName,
         receiverName,
         fileStatus: fileStatus || null,
@@ -179,11 +187,15 @@ const updateReceivingLetter = async (req, res) => {
     const { id } = req.params;
     const {
       date,
+      receivingTime,
+      time,
       vehicleName,
       chassisNumber,
       regNumber,
       color,
       mileage,
+      demandAmount,
+      demand,
       fullFinalAmount,
       ownerName,
       receiverName,
@@ -198,24 +210,72 @@ const updateReceivingLetter = async (req, res) => {
       return res.status(400).json({ error: 'Vehicle Name, Owner Name, and Receiver Name are required fields.' });
     }
 
+    const existing = await prisma.receivingLetter.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Receiving Letter not found' });
+    }
+
+    const effectiveDemand = (demandAmount !== undefined || demand !== undefined || fullFinalAmount !== undefined)
+      ? ((demandAmount || demand || fullFinalAmount) ? String(demandAmount || demand || fullFinalAmount).trim() : null)
+      : undefined;
+
+    const effectiveTime = (receivingTime !== undefined || time !== undefined)
+      ? ((receivingTime || time) ? String(receivingTime || time).trim() : null)
+      : undefined;
+
+    const updateData = {
+      date: date ? new Date(date) : undefined,
+      receivingTime: effectiveTime !== undefined ? effectiveTime : existing.receivingTime,
+      vehicleName,
+      chassisNumber: chassisNumber || null,
+      regNumber: regNumber || null,
+      color: color || null,
+      mileage: mileage !== undefined ? (mileage ? String(mileage).trim() : null) : undefined,
+      demandAmount: effectiveDemand !== undefined ? effectiveDemand : existing.demandAmount,
+      fullFinalAmount: effectiveDemand !== undefined ? effectiveDemand : existing.fullFinalAmount,
+      ownerName,
+      receiverName,
+      fileStatus: fileStatus || null,
+      keyStatus: keyStatus || null,
+      smartCardStatus: smartCardStatus || null,
+      anyOtherAccessory: anyOtherAccessory || null,
+      notes: notes || null
+    };
+
+    // If requester is ADMIN (not SUPER_ADMIN), route to Approval Request workflow
+    if (req.user.role === 'ADMIN') {
+      const request = await prisma.approvalRequest.create({
+        data: {
+          entityType: 'RECEIVING_LETTER',
+          entityId: id,
+          entityName: `Letter #${existing.letterNumber} - ${existing.vehicleName}`,
+          action: 'EDIT',
+          status: 'PENDING',
+          requestedById: req.user.id,
+          proposedData: updateData,
+          currentData: existing,
+          reason: req.body.reason || 'Admin submitted changes for receiving letter'
+        }
+      });
+
+      await prisma.activityLog.create({
+        data: {
+          userId: req.user.id,
+          action: 'SUBMIT_APPROVAL_REQUEST',
+          details: `Admin requested EDIT approval for receiving letter #${existing.letterNumber}`
+        }
+      });
+
+      return res.json({
+        message: 'Your edit request has been submitted to the Super Admin for approval.',
+        requiresApproval: true,
+        approvalRequest: request
+      });
+    }
+
     const updatedLetter = await prisma.receivingLetter.update({
       where: { id },
-      data: {
-        date: date ? new Date(date) : undefined,
-        vehicleName,
-        chassisNumber: chassisNumber || null,
-        regNumber: regNumber || null,
-        color: color || null,
-        mileage: mileage !== undefined ? (mileage ? String(mileage).trim() : null) : undefined,
-        fullFinalAmount: fullFinalAmount !== undefined ? (fullFinalAmount ? String(fullFinalAmount).trim() : null) : undefined,
-        ownerName,
-        receiverName,
-        fileStatus: fileStatus || null,
-        keyStatus: keyStatus || null,
-        smartCardStatus: smartCardStatus || null,
-        anyOtherAccessory: anyOtherAccessory || null,
-        notes: notes || null
-      },
+      data: updateData,
       include: {
         createdByUser: {
           select: { id: true, name: true, email: true }
@@ -231,17 +291,46 @@ const updateReceivingLetter = async (req, res) => {
   }
 };
 
-    res.json(updatedLetter);
-  } catch (error) {
-    console.error('Error updating receiving letter:', error);
-    res.status(500).json({ error: 'Failed to update receiving letter', details: error.message });
-  }
-};
-
 // Delete a Receiving Letter
 const deleteReceivingLetter = async (req, res) => {
   try {
     const { id } = req.params;
+    const existing = await prisma.receivingLetter.findUnique({ where: { id } });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Receiving Letter not found' });
+    }
+
+    // If requester is ADMIN (not SUPER_ADMIN), route to Approval Request workflow
+    if (req.user.role === 'ADMIN') {
+      const request = await prisma.approvalRequest.create({
+        data: {
+          entityType: 'RECEIVING_LETTER',
+          entityId: id,
+          entityName: `Letter #${existing.letterNumber} - ${existing.vehicleName}`,
+          action: 'DELETE',
+          status: 'PENDING',
+          requestedById: req.user.id,
+          currentData: existing,
+          reason: req.body?.reason || 'Admin requested deletion of receiving letter'
+        }
+      });
+
+      await prisma.activityLog.create({
+        data: {
+          userId: req.user.id,
+          action: 'SUBMIT_APPROVAL_REQUEST',
+          details: `Admin requested DELETE approval for receiving letter #${existing.letterNumber}`
+        }
+      });
+
+      return res.json({
+        message: 'Deletion request has been submitted to the Super Admin for approval.',
+        requiresApproval: true,
+        approvalRequest: request
+      });
+    }
+
     await prisma.receivingLetter.delete({
       where: { id }
     });

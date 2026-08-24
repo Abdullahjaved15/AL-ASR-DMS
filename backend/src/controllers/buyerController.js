@@ -3,7 +3,7 @@ const { formatPakistaniPhone } = require('../utils/phoneFormatter');
 
 const getBuyers = async (req, res) => {
   try {
-    const { search, leadStatus, assignedTo, city, vehicle, model, minYear, maxYear, year, minPrice, maxPrice, isBankCase, fromDate, toDate } = req.query;
+    const { search, leadStatus, assignedTo, city, vehicle, model, minYear, maxYear, year, minPrice, maxPrice, isBankCase, isCommercial, vehicleType, fromDate, toDate } = req.query;
 
     const where = {};
 
@@ -34,6 +34,14 @@ const getBuyers = async (req, res) => {
 
     if (leadStatus) {
       where.leadStatus = leadStatus;
+    }
+
+    if (isCommercial !== undefined && isCommercial !== '') {
+      where.isCommercial = isCommercial === 'true' || isCommercial === true;
+    }
+
+    if (vehicleType) {
+      where.vehicleType = { contains: vehicleType, mode: 'insensitive' };
     }
 
     if (req.user.role === 'SALESMAN') {
@@ -156,7 +164,7 @@ const createBuyer = async (req, res) => {
 
     const {
       vehicle, model, year, color, mileage, budget,
-      carCondition, zeroMeterType,
+      carCondition, zeroMeterType, isCommercial, vehicleType,
       isBankCase, bankName, bankCaseStatus, bankChecklist, processingFees, downpaymentPercent,
       buyerName, buyerPhone, buyerCity,
       leadSource, leadReference, leadReferredBy, assignedTo, leadStatus, comments
@@ -173,6 +181,7 @@ const createBuyer = async (req, res) => {
     const calculatedDueAmount = isBankCase ? ((numBudget - numDownAmount) + numProcessingFees) : 0;
 
     const assignedSalesman = assignedTo || req.user.id;
+    const commercialFlag = Boolean(isCommercial) || vehicleType === 'Commercial';
 
     // Bank Case Confirmation & Case # Logic
     const targetBankCaseStatus = isBankCase ? (bankCaseStatus || 'Not Confirmed') : 'Not Confirmed';
@@ -192,6 +201,8 @@ const createBuyer = async (req, res) => {
         budget: numBudget,
         carCondition: carCondition || 'Used',
         zeroMeterType: carCondition === 'Zero Meter' ? zeroMeterType || 'Cash' : null,
+        isCommercial: commercialFlag,
+        vehicleType: commercialFlag ? 'Commercial' : (vehicleType || 'Personal'),
         isBankCase: Boolean(isBankCase),
         bankName: isBankCase ? bankName || null : null,
         bankCaseStatus: targetBankCaseStatus,
@@ -220,7 +231,7 @@ const createBuyer = async (req, res) => {
       data: {
         userId: req.user.id,
         action: 'CREATE_BUYER',
-        details: `Added buyer inquiry ${buyerName || 'N/A'} for ${vehicle || ''} ${model || ''} (Bank Case: ${isBankCase ? 'YES (' + (bankName || 'Bank') + ', Status: ' + targetBankCaseStatus + (assignedCaseNo ? ', Case #' + assignedCaseNo : '') + ')' : 'NO'})`
+        details: `Added buyer inquiry ${buyerName || 'N/A'} for ${vehicle || ''} ${model || ''} (Type: ${commercialFlag ? 'Commercial' : 'Personal'}, Bank Case: ${isBankCase ? 'YES (' + (bankName || 'Bank') + ', Status: ' + targetBankCaseStatus + (assignedCaseNo ? ', Case #' + assignedCaseNo : '') + ')' : 'NO'})`
       }
     });
 
@@ -246,7 +257,7 @@ const updateBuyer = async (req, res) => {
 
     const {
       vehicle, model, year, color, mileage, budget,
-      carCondition, zeroMeterType,
+      carCondition, zeroMeterType, isCommercial, vehicleType,
       isBankCase, bankName, bankCaseStatus, bankChecklist, processingFees, downpaymentPercent,
       buyerName, buyerPhone, buyerCity,
       leadSource, leadReference, leadReferredBy, assignedTo, leadStatus, comments
@@ -260,6 +271,13 @@ const updateBuyer = async (req, res) => {
     if (mileage !== undefined) updateData.mileage = parseInt(mileage) || 0;
     if (carCondition !== undefined) updateData.carCondition = carCondition;
     if (zeroMeterType !== undefined) updateData.zeroMeterType = carCondition === 'Zero Meter' ? zeroMeterType : null;
+    if (isCommercial !== undefined) {
+      updateData.isCommercial = Boolean(isCommercial);
+      updateData.vehicleType = Boolean(isCommercial) ? 'Commercial' : (vehicleType || 'Personal');
+    } else if (vehicleType !== undefined) {
+      updateData.vehicleType = vehicleType;
+      updateData.isCommercial = vehicleType === 'Commercial';
+    }
     
     const targetIsBankCase = isBankCase !== undefined ? Boolean(isBankCase) : existingBuyer.isBankCase;
 
@@ -311,6 +329,37 @@ const updateBuyer = async (req, res) => {
       updateData.assignedTo = assignedTo;
     }
 
+    // If requester is ADMIN (not SUPER_ADMIN), route to Approval Request workflow
+    if (req.user.role === 'ADMIN') {
+      const request = await prisma.approvalRequest.create({
+        data: {
+          entityType: 'BUYER',
+          entityId: id,
+          entityName: `${existingBuyer.buyerName || 'Buyer'} - ${existingBuyer.vehicle || ''} ${existingBuyer.model || ''}`.trim(),
+          action: 'EDIT',
+          status: 'PENDING',
+          requestedById: req.user.id,
+          proposedData: updateData,
+          currentData: existingBuyer,
+          reason: req.body.reason || 'Admin submitted changes for buyer inquiry'
+        }
+      });
+
+      await prisma.activityLog.create({
+        data: {
+          userId: req.user.id,
+          action: 'SUBMIT_APPROVAL_REQUEST',
+          details: `Admin requested EDIT approval for buyer inquiry #${id} (${existingBuyer.buyerName})`
+        }
+      });
+
+      return res.json({
+        message: 'Your edit request has been submitted to the Super Admin for approval.',
+        requiresApproval: true,
+        approvalRequest: request
+      });
+    }
+
     const updatedBuyer = await prisma.buyer.update({
       where: { id },
       data: updateData,
@@ -342,8 +391,38 @@ const deleteBuyer = async (req, res) => {
       return res.status(404).json({ message: 'Buyer not found' });
     }
 
-    if (req.user.role !== 'ADMIN' && existingBuyer.assignedTo !== req.user.id && existingBuyer.createdBy !== req.user.id) {
+    if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN' && existingBuyer.assignedTo !== req.user.id && existingBuyer.createdBy !== req.user.id) {
       return res.status(403).json({ message: 'Access denied: You can only delete your own buyer leads' });
+    }
+
+    // If requester is ADMIN (not SUPER_ADMIN), route to Approval Request workflow
+    if (req.user.role === 'ADMIN') {
+      const request = await prisma.approvalRequest.create({
+        data: {
+          entityType: 'BUYER',
+          entityId: id,
+          entityName: `${existingBuyer.buyerName || 'Buyer'} - ${existingBuyer.vehicle || ''} ${existingBuyer.model || ''}`.trim(),
+          action: 'DELETE',
+          status: 'PENDING',
+          requestedById: req.user.id,
+          currentData: existingBuyer,
+          reason: req.body?.reason || 'Admin requested deletion of buyer inquiry'
+        }
+      });
+
+      await prisma.activityLog.create({
+        data: {
+          userId: req.user.id,
+          action: 'SUBMIT_APPROVAL_REQUEST',
+          details: `Admin requested DELETE approval for buyer inquiry #${id} (${existingBuyer.buyerName})`
+        }
+      });
+
+      return res.json({
+        message: 'Deletion request has been submitted to the Super Admin for approval.',
+        requiresApproval: true,
+        approvalRequest: request
+      });
     }
 
     await prisma.buyer.delete({ where: { id } });

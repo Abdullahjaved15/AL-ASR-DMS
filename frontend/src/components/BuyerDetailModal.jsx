@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Users, Phone, MapPin, Calendar, Tag, UserCheck, Edit, DollarSign, FileText } from 'lucide-react';
+import { X, Users, Phone, MapPin, Calendar, Tag, UserCheck, Edit, DollarSign, FileText, Truck } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import { useAuth } from '../context/AuthContext';
 
@@ -23,12 +23,22 @@ export default function BuyerDetailModal({ buyer, onClose, onEdit }) {
         {/* Modal Header */}
         <div className="flex flex-wrap items-center justify-between pb-4 border-b border-white/10 gap-3">
           <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-black font-extrabold text-lg">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg font-extrabold text-lg ${
+              (buyer.isCommercial || buyer.vehicleType === 'Commercial')
+                ? 'bg-gradient-to-tr from-amber-500 to-orange-600 shadow-amber-500/20 text-black'
+                : 'bg-gradient-to-tr from-emerald-500 to-teal-600 shadow-emerald-500/20 text-black'
+            }`}>
               {buyer.buyerName?.charAt(0).toUpperCase() || 'B'}
             </div>
             <div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 flex-wrap gap-1">
                 <h3 className="text-xl font-extrabold text-white">{buyer.buyerName}</h3>
+                {(buyer.isCommercial || buyer.vehicleType === 'Commercial') && (
+                  <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-mono font-extrabold">
+                    <Truck className="w-3 h-3 text-amber-400" />
+                    <span>COMMERCIAL BUYER</span>
+                  </span>
+                )}
                 <StatusBadge status={buyer.leadStatus} />
               </div>
               <p className="text-xs text-slate-400 font-mono mt-0.5">

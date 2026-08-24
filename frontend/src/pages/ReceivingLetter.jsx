@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileCheck, Plus, Search, Printer, Edit, Trash2, Car, User, Calendar, FileText, CheckCircle2, Camera, Image as ImageIcon, Upload, Eye, X, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
+import { FileCheck, Plus, Search, Printer, Edit, Trash2, Car, User, Calendar, Clock, FileText, CheckCircle2, Camera, Image as ImageIcon, Upload, Eye, X, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { logoBase64 } from '../utils/logoBase64';
@@ -23,13 +23,19 @@ export default function ReceivingLetterPage() {
   const [uploadingDirectImages, setUploadingDirectImages] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(null);
 
+  const getCurrentTimeFormatted = () => {
+    return new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  };
+
   const [formData, setFormData] = useState({
     date: new Date().toISOString().slice(0, 10),
+    receivingTime: getCurrentTimeFormatted(),
     vehicleName: '',
     chassisNumber: '',
     regNumber: '',
     color: '',
     mileage: '',
+    demandAmount: '',
     fullFinalAmount: '',
     ownerName: '',
     receiverName: user?.name || '',
@@ -75,6 +81,7 @@ export default function ReceivingLetterPage() {
         regNumber: s.numberPlate || '',
         color: s.color || '',
         mileage: s.mileage ? s.mileage.toString() : '',
+        demandAmount: s.demandPrice ? s.demandPrice.toString() : '',
         fullFinalAmount: s.demandPrice ? s.demandPrice.toString() : '',
         ownerName: s.sellerName || '',
         chassisNumber: prev.chassisNumber || ''
@@ -87,11 +94,13 @@ export default function ReceivingLetterPage() {
     setSelectedFilesForUpload([]);
     setFormData({
       date: new Date().toISOString().slice(0, 10),
+      receivingTime: getCurrentTimeFormatted(),
       vehicleName: '',
       chassisNumber: '',
       regNumber: '',
       color: '',
       mileage: '',
+      demandAmount: '',
       fullFinalAmount: '',
       ownerName: '',
       receiverName: user?.name || '',
@@ -108,12 +117,14 @@ export default function ReceivingLetterPage() {
     setSelectedFilesForUpload([]);
     setFormData({
       date: rl.date ? new Date(rl.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+      receivingTime: rl.receivingTime || getCurrentTimeFormatted(),
       vehicleName: rl.vehicleName || '',
       chassisNumber: rl.chassisNumber || '',
       regNumber: rl.regNumber || '',
       color: rl.color || '',
       mileage: rl.mileage || '',
-      fullFinalAmount: rl.fullFinalAmount || '',
+      demandAmount: rl.demandAmount || rl.fullFinalAmount || '',
+      fullFinalAmount: rl.demandAmount || rl.fullFinalAmount || '',
       ownerName: rl.ownerName || '',
       receiverName: rl.receiverName || user?.name || '',
       fileStatus: rl.fileStatus || 'Complete Original File',
@@ -222,6 +233,12 @@ export default function ReceivingLetterPage() {
     const todayStr = new Date(letter.date || letter.createdAt).toLocaleDateString('en-US', {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
+    const effectiveDemand = letter.demandAmount || letter.fullFinalAmount || '';
+    const formattedDemand = effectiveDemand 
+      ? (String(effectiveDemand).toLowerCase().includes('rs') || String(effectiveDemand).includes('pkr') 
+          ? effectiveDemand 
+          : 'Rs. ' + Number(String(effectiveDemand).replace(/[^0-9.]/g, '') || 0).toLocaleString()) 
+      : 'N/A';
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -236,7 +253,7 @@ export default function ReceivingLetterPage() {
             .header-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; border-bottom: 2px solid #0f172a; padding-bottom: 8px; }
             .logo-cell { width: 180px; vertical-align: middle; }
             .title-cell { text-align: center; vertical-align: middle; }
-            .ref-cell { width: 180px; text-align: right; vertical-align: middle; font-family: monospace; font-size: 11px; }
+            .ref-cell { width: 200px; text-align: right; vertical-align: middle; font-family: monospace; font-size: 11px; }
             .company-name { font-size: 22px; font-weight: 900; color: #0f172a; letter-spacing: 1px; }
             .company-sub { font-size: 11px; font-weight: 700; color: #0284c7; text-transform: uppercase; margin-top: 2px; }
             .doc-title { text-align: center; font-size: 16px; font-weight: 900; background: #0f172a; color: #ffffff; padding: 6px; border-radius: 4px; margin: 12px 0 15px 0; text-transform: uppercase; letter-spacing: 1px; }
@@ -263,7 +280,8 @@ export default function ReceivingLetterPage() {
                 </td>
                 <td class="ref-cell">
                   <strong>Ref:</strong> <span style="color: #0284c7; font-weight: bold;">${letter.letterNumber}</span><br/>
-                  <strong>Date:</strong> ${todayStr}
+                  <strong>Date:</strong> ${todayStr}<br/>
+                  <strong>Receiving Time:</strong> <span style="color: #047857; font-weight: bold;">${letter.receivingTime || 'N/A'}</span>
                 </td>
               </tr>
             </table>
@@ -273,8 +291,8 @@ export default function ReceivingLetterPage() {
             <table class="grid-table">
               <tr>
                 <td style="width: 50%;">
-                  <div class="label">Date</div>
-                  <div class="val">${new Date(letter.date || letter.createdAt).toLocaleDateString()}</div>
+                  <div class="label">Date & Time Received</div>
+                  <div class="val">${new Date(letter.date || letter.createdAt).toLocaleDateString()} ${letter.receivingTime ? '• at ' + letter.receivingTime : ''}</div>
                 </td>
                 <td style="width: 50%;">
                   <div class="label">Vehicle Name & Model</div>
@@ -303,8 +321,8 @@ export default function ReceivingLetterPage() {
               </tr>
               <tr>
                 <td>
-                  <div class="label">Full & Final Amount (F & F)</div>
-                  <div class="val" style="color: #047857; font-size: 13px; font-weight: 800;">${letter.fullFinalAmount ? (String(letter.fullFinalAmount).toLowerCase().includes('rs') || String(letter.fullFinalAmount).includes('pkr') ? letter.fullFinalAmount : 'Rs. ' + Number(letter.fullFinalAmount.replace(/[^0-9.]/g, '') || 0).toLocaleString()) : 'N/A'}</div>
+                  <div class="label">Vehicle Demand (PKR)</div>
+                  <div class="val" style="color: #047857; font-size: 14px; font-weight: 800;">${formattedDemand}</div>
                 </td>
                 <td>
                   <div class="label">Owner Name (Vehicle Handover By)</div>
@@ -341,7 +359,7 @@ export default function ReceivingLetterPage() {
 
             <div class="notes-box">
               <div class="label" style="color: #0f172a; margin-bottom: 4px;">Receiving Details & Vehicle Condition Notes:</div>
-              <div style="font-size: 11px; color: #334155; white-space: pre-wrap;">${letter.notes || 'Vehicle received in good condition with listed accessories and documents as per AL-ASR Motors receiving policy.'}</div>
+              <div style="font-size: 11px; color: #334155; white-space: pre-wrap;">${letter.notes || `Vehicle received in good condition at ${letter.receivingTime || 'the designated time'} with listed accessories and documents as per AL-ASR Motors receiving policy.`}</div>
             </div>
 
             <div class="signatures">
@@ -404,7 +422,7 @@ export default function ReceivingLetterPage() {
         <Search className="w-4 h-4 text-slate-400 ml-2" />
         <input
           type="text"
-          placeholder="Search receiving letters by Vehicle, Owner, Receiver, Reg #, Chassis #, Mileage, F&F Amount..."
+          placeholder="Search receiving letters by Vehicle, Owner, Receiver, Reg #, Chassis #, Mileage, Demand..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full bg-transparent text-xs text-white placeholder-slate-400 focus:outline-none font-mono"
@@ -417,9 +435,9 @@ export default function ReceivingLetterPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-900/80 border-b border-white/10 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
-                <th className="py-3.5 px-4">Ref # & Date</th>
+                <th className="py-3.5 px-4">Ref #, Date & Time</th>
                 <th className="py-3.5 px-4">Vehicle Details</th>
-                <th className="py-3.5 px-4">Mileage & F&F Amount</th>
+                <th className="py-3.5 px-4">Mileage & Demand</th>
                 <th className="py-3.5 px-4">Owner Name</th>
                 <th className="py-3.5 px-4">Receiver Name</th>
                 <th className="py-3.5 px-4">File / Key / Smart Card</th>
@@ -430,11 +448,15 @@ export default function ReceivingLetterPage() {
             <tbody className="divide-y divide-white/5 text-xs">
               {letters.map((rl) => {
                 const imgCount = rl.images?.length || 0;
+                const effectiveDemand = rl.demandAmount || rl.fullFinalAmount || '';
                 return (
                   <tr key={rl.id} className="hover:bg-white/5 transition-colors">
                     <td className="py-4 px-4 font-mono">
                       <p className="font-bold text-emerald-400">{rl.letterNumber}</p>
-                      <p className="text-[10px] text-slate-400">{new Date(rl.date || rl.createdAt).toLocaleDateString()}</p>
+                      <p className="text-[10px] text-slate-400 flex items-center space-x-1 mt-0.5">
+                        <Clock className="w-2.5 h-2.5 text-cyan-400 inline flex-shrink-0" />
+                        <span>{new Date(rl.date || rl.createdAt).toLocaleDateString()} {rl.receivingTime ? '• ' + rl.receivingTime : ''}</span>
+                      </p>
                     </td>
 
                     <td className="py-4 px-4">
@@ -452,7 +474,7 @@ export default function ReceivingLetterPage() {
                         {rl.mileage ? `${rl.mileage}${String(rl.mileage).toLowerCase().includes('km') ? '' : ' KM'}` : '—'}
                       </p>
                       <p className="text-[11px] font-bold text-emerald-400 mt-0.5">
-                        {rl.fullFinalAmount ? (String(rl.fullFinalAmount).toLowerCase().includes('rs') ? rl.fullFinalAmount : `Rs. ${rl.fullFinalAmount}`) : '—'}
+                        {effectiveDemand ? (String(effectiveDemand).toLowerCase().includes('rs') ? effectiveDemand : `Rs. ${effectiveDemand}`) : '—'}
                       </p>
                     </td>
 
@@ -568,7 +590,7 @@ export default function ReceivingLetterPage() {
             )}
 
             <form onSubmit={handleSaveLetter} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">Date *</label>
                   <input
@@ -578,6 +600,30 @@ export default function ReceivingLetterPage() {
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
                   />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-mono text-emerald-400 font-bold">Receiving Time *</label>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, receivingTime: getCurrentTimeFormatted() })}
+                      className="text-[10px] font-mono text-cyan-400 hover:text-white underline"
+                    >
+                      Set Now
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Clock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. 11:30 AM"
+                      value={formData.receivingTime}
+                      onChange={(e) => setFormData({ ...formData, receivingTime: e.target.value })}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm text-emerald-300 focus:outline-none focus:border-emerald-500 font-mono font-bold"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -639,12 +685,12 @@ export default function ReceivingLetterPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-emerald-400 font-bold mb-1">Full & Final (F&F) Amount</label>
+                  <label className="block text-xs font-mono text-emerald-400 font-bold mb-1">Demand (PKR / Rs.)</label>
                   <input
                     type="text"
                     placeholder="e.g. 3,500,000"
-                    value={formData.fullFinalAmount}
-                    onChange={(e) => setFormData({ ...formData, fullFinalAmount: e.target.value })}
+                    value={formData.demandAmount || formData.fullFinalAmount}
+                    onChange={(e) => setFormData({ ...formData, demandAmount: e.target.value, fullFinalAmount: e.target.value })}
                     className="w-full bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-2 text-sm text-emerald-300 font-mono font-bold focus:outline-none focus:border-emerald-400"
                   />
                 </div>

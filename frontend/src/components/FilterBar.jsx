@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Filter, RotateCcw, ChevronDown, ChevronUp, X, Car, Calendar, DollarSign, MapPin, Tag, UserCheck, Building2 } from 'lucide-react';
+import { Filter, RotateCcw, ChevronDown, ChevronUp, X, Car, Calendar, DollarSign, MapPin, Tag, UserCheck, Building2, Truck } from 'lucide-react';
 
 const COMMON_BRANDS = [
   'Toyota', 'Honda', 'Suzuki', 'Hyundai', 'Kia', 'BMW', 'Mercedes-Benz', 
@@ -211,6 +211,25 @@ export default function FilterBar({
             </select>
           </div>
 
+          {/* Vehicle Category Filter (Personal vs Commercial) */}
+          {filters.isCommercial !== undefined && (
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider flex items-center space-x-1">
+                <Truck className="w-3.5 h-3.5 text-amber-400" />
+                <span>Vehicle Usage</span>
+              </label>
+              <select
+                value={filters.isCommercial || ''}
+                onChange={(e) => handleInputChange('isCommercial', e.target.value)}
+                className="w-full bg-slate-900/90 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+              >
+                <option value="">All Vehicles</option>
+                <option value="true">Commercial Vehicles Only</option>
+                <option value="false">Personal / Passenger Cars Only</option>
+              </select>
+            </div>
+          )}
+
           {/* Bank Case Filter (If supported) */}
           {filters.isBankCase !== undefined && (
             <div className="space-y-1.5">
@@ -360,6 +379,15 @@ export default function FilterBar({
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/30 text-xs font-mono">
               <span>Status: <strong>{filters.leadStatus}</strong></span>
               <button onClick={() => removeFilter('leadStatus')} className="hover:text-white transition-colors">
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+
+          {filters.isCommercial && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30 text-xs font-mono">
+              <span>Usage: <strong>{filters.isCommercial === 'true' ? 'Commercial' : 'Personal'}</strong></span>
+              <button onClick={() => removeFilter('isCommercial')} className="hover:text-white transition-colors">
                 <X className="w-3 h-3" />
               </button>
             </span>

@@ -49,6 +49,7 @@ const getCurrentStock = async (req, res) => {
     const totalValuation = stock.reduce((sum, item) => sum + (item.askingPrice || 0), 0);
     const availableUnits = stock.filter(item => item.status === 'AVAILABLE').length;
     const reservedUnits = stock.filter(item => item.status === 'RESERVED').length;
+    const atCustomerUnits = stock.filter(item => item.status === 'AT_CUSTOMER' || item.status === 'At Customer').length;
 
     return res.json({
       stock,
@@ -57,6 +58,7 @@ const getCurrentStock = async (req, res) => {
         totalValuation,
         availableUnits,
         reservedUnits,
+        atCustomerUnits,
         avgPrice: totalUnits > 0 ? Math.round(totalValuation / totalUnits) : 0
       }
     });
@@ -113,24 +115,55 @@ const updateStockItem = async (req, res) => {
       return res.status(404).json({ message: 'Stock entry not found' });
     }
 
-    const { vehicle, model, year, color, mileage, askingPrice, purchasePrice, status, location, notes, careOf, regNumber } = req.body;
+    const updateData = {
+      vehicle: (vehicle !== undefined && vehicle !== null && String(vehicle).trim()) ? String(vehicle).trim() : existing.vehicle,
+      model: (model !== undefined && model !== null && String(model).trim()) ? String(model).trim() : existing.model,
+      year: year !== undefined ? String(year) : existing.year,
+      color: color !== undefined ? String(color) : existing.color,
+      mileage: mileage !== undefined ? safeInt(mileage, existing.mileage) : existing.mileage,
+      askingPrice: askingPrice !== undefined ? safeFloat(askingPrice, existing.askingPrice) : existing.askingPrice,
+      purchasePrice: purchasePrice !== undefined ? (purchasePrice ? safeFloat(purchasePrice, null) : null) : existing.purchasePrice,
+      status: status !== undefined ? status : existing.status,
+      location: location !== undefined ? location : existing.location,
+      notes: notes !== undefined ? notes : existing.notes,
+      careOf: careOf !== undefined ? careOf : existing.careOf,
+      regNumber: regNumber !== undefined ? regNumber : existing.regNumber
+    };
+
+    // If requester is ADMIN (not SUPER_ADMIN), route to Approval Request workflow
+    if (req.user.role === 'ADMIN') {
+      const request = await prisma.approvalRequest.create({
+        data: {
+          entityType: 'CURRENT_STOCK',
+          entityId: id,
+          entityName: `${existing.year || ''} ${existing.vehicle || ''} ${existing.model || ''} (Plate: ${existing.regNumber || 'UNREGISTERED'})`.trim(),
+          action: 'EDIT',
+          status: 'PENDING',
+          requestedById: req.user.id,
+          proposedData: updateData,
+          currentData: existing,
+          reason: req.body.reason || 'Admin submitted changes for showroom stock vehicle'
+        }
+      });
+
+      await prisma.activityLog.create({
+        data: {
+          userId: req.user.id,
+          action: 'SUBMIT_APPROVAL_REQUEST',
+          details: `Admin requested EDIT approval for showroom stock #${id} (${existing.vehicle} ${existing.model})`
+        }
+      });
+
+      return res.json({
+        message: 'Your edit request has been submitted to the Super Admin for approval.',
+        requiresApproval: true,
+        approvalRequest: request
+      });
+    }
 
     const updated = await prisma.currentStock.update({
       where: { id },
-      data: {
-        vehicle: (vehicle !== undefined && vehicle !== null && String(vehicle).trim()) ? String(vehicle).trim() : existing.vehicle,
-        model: (model !== undefined && model !== null && String(model).trim()) ? String(model).trim() : existing.model,
-        year: year !== undefined ? String(year) : existing.year,
-        color: color !== undefined ? String(color) : existing.color,
-        mileage: mileage !== undefined ? safeInt(mileage, existing.mileage) : existing.mileage,
-        askingPrice: askingPrice !== undefined ? safeFloat(askingPrice, existing.askingPrice) : existing.askingPrice,
-        purchasePrice: purchasePrice !== undefined ? (purchasePrice ? safeFloat(purchasePrice, null) : null) : existing.purchasePrice,
-        status: status !== undefined ? status : existing.status,
-        location: location !== undefined ? location : existing.location,
-        notes: notes !== undefined ? notes : existing.notes,
-        careOf: careOf !== undefined ? careOf : existing.careOf,
-        regNumber: regNumber !== undefined ? regNumber : existing.regNumber
-      }
+      data: updateData
     });
 
     await prisma.activityLog.create({
@@ -157,6 +190,36 @@ const deleteStockItem = async (req, res) => {
 
     if (!existing) {
       return res.status(404).json({ message: 'Stock entry not found' });
+    }
+
+    // If requester is ADMIN (not SUPER_ADMIN), route to Approval Request workflow
+    if (req.user.role === 'ADMIN') {
+      const request = await prisma.approvalRequest.create({
+        data: {
+          entityType: 'CURRENT_STOCK',
+          entityId: id,
+          entityName: `${existing.year || ''} ${existing.vehicle || ''} ${existing.model || ''} (Plate: ${existing.regNumber || 'UNREGISTERED'})`.trim(),
+          action: 'DELETE',
+          status: 'PENDING',
+          requestedById: req.user.id,
+          currentData: existing,
+          reason: req.body?.reason || 'Admin requested deletion of showroom stock vehicle'
+        }
+      });
+
+      await prisma.activityLog.create({
+        data: {
+          userId: req.user.id,
+          action: 'SUBMIT_APPROVAL_REQUEST',
+          details: `Admin requested DELETE approval for showroom stock #${id} (${existing.vehicle} ${existing.model})`
+        }
+      });
+
+      return res.json({
+        message: 'Deletion request has been submitted to the Super Admin for approval.',
+        requiresApproval: true,
+        approvalRequest: request
+      });
     }
 
     await prisma.currentStock.delete({ where: { id } });

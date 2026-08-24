@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Car, Plus, Search, Filter, Image as ImageIcon, Edit, Trash2, Eye, UserCheck, Phone, MapPin, Tag, Printer, ShieldAlert } from 'lucide-react';
+import { Car, Plus, Search, Filter, Image as ImageIcon, Edit, Trash2, Eye, UserCheck, Phone, MapPin, Tag, Printer, ShieldAlert, Truck } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import ImageDropzone from '../components/ImageDropzone';
 import ImageViewerModal from '../components/ImageViewerModal';
@@ -38,7 +38,8 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
     maxPrice: '',
     city: '',
     leadStatus: '',
-    assignedTo: ''
+    assignedTo: '',
+    isCommercial: ''
   });
 
   // UI Pagination State
@@ -59,7 +60,8 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
       maxPrice: '',
       city: '',
       leadStatus: '',
-      assignedTo: ''
+      assignedTo: '',
+      isCommercial: ''
     });
   };
 
@@ -80,6 +82,8 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
     demandPrice: '',
     carCondition: 'Used',
     zeroMeterType: 'Cash',
+    isCommercial: scope === 'commercial',
+    vehicleType: scope === 'commercial' ? 'Commercial' : 'Personal',
     sellerName: '',
     sellerPhone: '',
     sellerCity: '',
@@ -105,6 +109,9 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
       } else if (scope === 'all') {
         delete activeFilters.assignedTo;
       }
+      if (scope === 'commercial') {
+        activeFilters.isCommercial = 'true';
+      }
       const data = await api.getSellers({
         search,
         ...activeFilters
@@ -119,6 +126,9 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
           (cleanUserName && s.leadReferredBy?.toLowerCase().includes(cleanUserName))
         );
         filteredData = mine.length > 0 ? mine : data;
+      }
+      if (scope === 'commercial') {
+        filteredData = filteredData.filter(s => s.isCommercial || s.vehicleType === 'Commercial');
       }
       setSellers(filteredData);
     } catch (err) {
@@ -150,6 +160,8 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
       demandPrice: '',
       carCondition: 'Used',
       zeroMeterType: 'Cash',
+      isCommercial: scope === 'commercial',
+      vehicleType: scope === 'commercial' ? 'Commercial' : 'Personal',
       sellerName: '',
       sellerPhone: '',
       sellerCity: '',
@@ -194,7 +206,10 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
   const handleUpdateSeller = async (e) => {
     e.preventDefault();
     try {
-      await api.updateSeller(selectedSeller.id, formData);
+      const res = await api.updateSeller(selectedSeller.id, formData);
+      if (res?.requiresApproval) {
+        alert(res.message || 'Edit request submitted to Super Admin for approval.');
+      }
       setIsEditModalOpen(false);
       setSelectedSeller(null);
       fetchSellers();
@@ -206,7 +221,10 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
   const handleDeleteSeller = async (id) => {
     if (!window.confirm('Are you sure you want to delete this seller record?')) return;
     try {
-      await api.deleteSeller(id);
+      const res = await api.deleteSeller(id);
+      if (res?.requiresApproval) {
+        alert(res.message || 'Deletion request submitted to Super Admin for approval.');
+      }
       fetchSellers();
     } catch (err) {
       alert(err.message || 'Failed to delete seller');
@@ -225,6 +243,8 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
       demandPrice: seller.demandPrice || '',
       carCondition: seller.carCondition || 'Used',
       zeroMeterType: seller.zeroMeterType || 'Cash',
+      isCommercial: Boolean(seller.isCommercial),
+      vehicleType: seller.vehicleType || (seller.isCommercial ? 'Commercial' : 'Personal'),
       sellerName: seller.sellerName || '',
       sellerPhone: seller.sellerPhone || '',
       sellerCity: seller.sellerCity || '',
@@ -384,12 +404,13 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2">
+            {scope === 'commercial' && <Truck className="w-6 h-6 text-amber-400" />}
             <h2 className="text-xl font-extrabold text-white tracking-tight">
-              {scope === 'mine' ? 'My Sellers Leads' : 'All Sellers Inventory'}
+              {scope === 'mine' ? 'My Sellers Leads' : scope === 'commercial' ? 'Commercial Vehicle Sellers Inventory' : 'All Sellers Inventory'}
             </h2>
           </div>
           <p className="text-xs font-mono text-slate-400 mt-0.5">
-            Showing <strong className="text-cyan-400">{sellers.length}</strong> matching seller lead vehicle(s)
+            Showing <strong className="text-cyan-400">{sellers.length}</strong> matching {scope === 'commercial' ? 'commercial vehicle inventory' : 'seller lead vehicle(s)'}
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -405,8 +426,8 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
               onClick={() => { resetForm(); setIsAddModalOpen(true); }}
               className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold rounded-xl text-xs shadow-lg shadow-cyan-500/20 transition-all flex items-center space-x-1.5"
             >
-              <Plus className="w-4 h-4" />
-              <span>New Seller Registration</span>
+              {scope === 'commercial' ? <Truck className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+              <span>{scope === 'commercial' ? 'New Commercial Seller Registration' : 'New Seller Registration'}</span>
             </button>
           )}
         </div>
@@ -450,14 +471,22 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                   </td>
                   <td className="py-4 px-4">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-xl bg-slate-900 border border-white/10 group-hover:border-cyan-500/50 flex items-center justify-center text-cyan-400 font-mono font-bold transition-all">
+                      <div className={`w-10 h-10 rounded-xl bg-slate-900 border flex items-center justify-center font-mono font-bold transition-all ${
+                        (seller.isCommercial || seller.vehicleType === 'Commercial') ? 'border-amber-500/40 text-amber-400' : 'border-white/10 group-hover:border-cyan-500/50 text-cyan-400'
+                      }`}>
                         {seller.vehicle?.substring(0, 2).toUpperCase()}
                       </div>
                       <div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-2 flex-wrap gap-1">
                           <p className="font-extrabold text-white text-sm group-hover:text-cyan-400 transition-colors">
                             {seller.vehicle} {seller.model}
                           </p>
+                          {(seller.isCommercial || seller.vehicleType === 'Commercial') && (
+                            <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 font-mono text-[9px] font-bold">
+                              <Truck className="w-2.5 h-2.5" />
+                              <span>COMMERCIAL</span>
+                            </span>
+                          )}
                           {seller.numberPlate ? (
                             <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono text-[10px] font-bold">
                               {seller.numberPlate}
@@ -742,8 +771,31 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                   </select>
                 </div>
 
+                <div>
+                  <label className="block text-xs font-mono text-amber-400 font-bold mb-1">Vehicle Usage Category</label>
+                  <select
+                    value={formData.isCommercial ? 'Commercial' : 'Personal'}
+                    onChange={(e) => {
+                      const isComm = e.target.value === 'Commercial';
+                      setFormData({ 
+                        ...formData, 
+                        isCommercial: isComm,
+                        vehicleType: isComm ? 'Commercial' : 'Personal'
+                      });
+                    }}
+                    className={`w-full bg-slate-900 border rounded-xl px-3 py-2 text-sm font-bold focus:outline-none ${
+                      formData.isCommercial 
+                        ? 'border-amber-500/50 text-amber-300 focus:border-amber-400' 
+                        : 'border-white/10 text-white focus:border-cyan-500'
+                    }`}
+                  >
+                    <option value="Personal">🚗 Passenger / Personal Vehicle</option>
+                    <option value="Commercial">🚚 Commercial Vehicle (Hiace, Van, Pickup, Truck, Bus, Loader)</option>
+                  </select>
+                </div>
+
                 {formData.carCondition === 'Zero Meter' && (
-                  <div>
+                  <div className="sm:col-span-2">
                     <label className="block text-xs font-mono text-emerald-400 font-bold mb-1">Zero Meter Payment Option</label>
                     <select
                       value={formData.zeroMeterType}

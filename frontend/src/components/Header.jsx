@@ -23,15 +23,23 @@ const { user, isAdmin, logout } = useAuth();
     dashboard: 'Executive Overview',
     all_sellers: 'All Sellers Inventory',
     my_sellers: 'My Sellers Leads',
+    commercial_sellers: 'Commercial Vehicle Sellers Inventory',
     all_buyers: 'All Buyers Inquiries',
     my_buyers: 'My Buyers Leads',
+    commercial_buyers: 'Commercial Vehicle Buyers Inquiries',
+    bank_cases: 'Bank Financing Cases & Cars',
+    receiving_letter: 'Vehicle Receiving Letters',
+    attendance: 'Employee Attendance Register',
     sellers: 'Vehicle Inventory & Sellers',
     buyers: 'Buyer Inquiries & Leads',
     deals: 'Completed Transactions & Profit',
     collaboration: '50-50% Commission Collaboration Center',
     stock: 'Showroom Current Stock Floor',
+    invoices: 'Invoices & Financial Vouchers',
+    approvals: 'Super Admin Approval Requests',
     users: 'Salesmen & Account Management',
-    reports: 'Performance Analytics & Exports'
+    reports: 'Performance Analytics & Exports',
+    settings: 'Account Settings'
   };
 
   const currentDate = new Date().toLocaleDateString('en-US', {
@@ -80,23 +88,23 @@ const { user, isAdmin, logout } = useAuth();
         {/* Quick Action Buttons (Admin Only) */}
         {isAdmin && (
           <>
-            {(currentTab === 'all_sellers' || currentTab === 'my_sellers' || currentTab === 'sellers' || currentTab === 'dashboard') && (
+            {(currentTab === 'all_sellers' || currentTab === 'my_sellers' || currentTab === 'commercial_sellers' || currentTab === 'sellers' || currentTab === 'dashboard') && (
               <button
                 onClick={() => onOpenModal('seller')}
                 className="px-3 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold rounded-xl text-xs shadow-lg shadow-cyan-500/20 transition-all flex items-center space-x-1.5"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Add Seller</span>
+                <span>{currentTab === 'commercial_sellers' ? 'Add Commercial Seller' : 'Add Seller'}</span>
               </button>
             )}
 
-            {(currentTab === 'all_buyers' || currentTab === 'my_buyers' || currentTab === 'buyers' || currentTab === 'dashboard') && (
+            {(currentTab === 'all_buyers' || currentTab === 'my_buyers' || currentTab === 'commercial_buyers' || currentTab === 'buyers' || currentTab === 'dashboard') && (
               <button
                 onClick={() => onOpenModal('buyer')}
                 className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold border border-white/10 rounded-xl text-xs transition-all flex items-center space-x-1.5"
               >
                 <UserPlus className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Add Buyer</span>
+                <span>{currentTab === 'commercial_buyers' ? 'Add Commercial Buyer' : 'Add Buyer'}</span>
               </button>
             )}
 

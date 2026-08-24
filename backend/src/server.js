@@ -15,6 +15,7 @@ const stockRoutes = require('./routes/stockRoutes');
 const invoiceRoutes = require('./routes/invoiceRoutes');
 const receivingLetterRoutes = require('./routes/receivingLetterRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
+const approvalRoutes = require('./routes/approvalRoutes');
 
 const app = express();
 
@@ -45,6 +46,7 @@ app.use('/api/stock', stockRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/receiving-letters', receivingLetterRoutes);
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/approvals', approvalRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {

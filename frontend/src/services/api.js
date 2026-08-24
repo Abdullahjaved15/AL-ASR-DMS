@@ -484,5 +484,39 @@ export const api = {
   getAttendanceExportUrl: (params = {}) => {
     const query = cleanParams(params);
     return `${API_BASE}/attendance/export-csv?${query}`;
+  },
+
+  // Approvals API (Super Admin / Admin)
+  getApprovals: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/approvals?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  createApprovalRequest: async (data) => {
+    const res = await fetch(`${API_BASE}/approvals/request`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  approveRequest: async (id, reviewNotes = '') => {
+    const res = await fetch(`${API_BASE}/approvals/${id}/approve`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ reviewNotes })
+    });
+    return handleResponse(res);
+  },
+
+  rejectRequest: async (id, reviewNotes = '') => {
+    const res = await fetch(`${API_BASE}/approvals/${id}/reject`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ reviewNotes })
+    });
+    return handleResponse(res);
   }
 };
