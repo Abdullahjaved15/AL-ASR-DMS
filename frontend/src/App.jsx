@@ -185,8 +185,8 @@ function MainLayout() {
             <Users />
           </div>
 
-          <div className={currentTab === 'reports' ? 'block' : 'hidden'}>
-            <Reports />
+          <div className={((currentTab === 'reports' || currentTab === 'bank_cases_report') && isAdmin) ? 'block' : 'hidden'}>
+            <Reports defaultTab={currentTab === 'bank_cases_report' ? 'bank_cases' : 'salesmen'} />
           </div>
 
           <div className={currentTab === 'settings' ? 'block' : 'hidden'}>

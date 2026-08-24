@@ -29,6 +29,7 @@ const { user, isAdmin, logout } = useAuth();
     my_buyers: 'My Buyers Leads',
     commercial_buyers: 'Commercial Vehicle Buyers Inquiries',
     bank_cases: 'Bank Financing Cases & Cars',
+    bank_cases_report: 'Bank Financing & Cases Financial Report',
     receiving_letter: 'Vehicle Receiving Letters',
     attendance: 'Employee Attendance Register',
     sellers: 'Vehicle Inventory & Sellers',

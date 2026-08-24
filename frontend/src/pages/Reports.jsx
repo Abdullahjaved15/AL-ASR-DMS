@@ -17,8 +17,14 @@ const bankCaseStatuses = [
   { id: 'Rejected', label: 'Rejected' }
 ];
 
-export default function Reports() {
-  const [activeTab, setActiveTab] = useState('salesmen'); // 'salesmen' | 'bank_cases'
+export default function Reports({ defaultTab = 'salesmen' }) {
+  const [activeTab, setActiveTab] = useState(defaultTab);
+
+  useEffect(() => {
+    if (defaultTab) {
+      setActiveTab(defaultTab);
+    }
+  }, [defaultTab]);
 
   // Common date filters
   const [selectedRange, setSelectedRange] = useState('This Month');

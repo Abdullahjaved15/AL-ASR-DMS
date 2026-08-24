@@ -35,6 +35,7 @@ export default function Sidebar({ currentTab, setCurrentTab, isMobileOpen, setIs
     { id: 'my_buyers', label: 'My Buyers Leads', icon: Briefcase, role: 'ALL' },
     { id: 'commercial_buyers', label: 'Commercial Vehicle Buyers', icon: Truck, role: 'ALL' },
     { id: 'bank_cases', label: 'Bank Cases & Cars', icon: Building2, role: 'ADMIN' },
+    { id: 'bank_cases_report', label: 'Bank Cases Report', icon: Building2, role: 'ADMIN' },
     { id: 'receiving_letter', label: 'Receiving Letter', icon: FileCheck, role: 'ALL' },
     { id: 'attendance', label: 'Employee Attendance', icon: Clock, role: 'ADMIN' },
     { id: 'deals', label: 'Closed Deals', icon: Handshake, role: 'ALL' },
