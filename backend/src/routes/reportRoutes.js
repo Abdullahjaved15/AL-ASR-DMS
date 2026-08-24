@@ -1,5 +1,10 @@
 const express = require('express');
-const { getSalesmenReports, exportReportsCSV } = require('../controllers/reportController');
+const { 
+  getSalesmenReports, 
+  exportReportsCSV,
+  getBankCasesReport,
+  exportBankCasesReportCSV
+} = require('../controllers/reportController');
 const { authenticateToken } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
 
@@ -10,5 +15,7 @@ router.use(requireRole('ADMIN'));
 
 router.get('/salesmen', getSalesmenReports);
 router.get('/export-csv', exportReportsCSV);
+router.get('/bank-cases', getBankCasesReport);
+router.get('/export-bank-cases-csv', exportBankCasesReportCSV);
 
 module.exports = router;

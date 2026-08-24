@@ -229,6 +229,17 @@ export const api = {
     return `${API_BASE}/reports/export-csv?${query}`;
   },
 
+  getBankCasesReport: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/reports/bank-cases?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  getExportBankCasesCSVUrl: (params = {}) => {
+    const query = cleanParams(params);
+    return `${API_BASE}/reports/export-bank-cases-csv?${query}`;
+  },
+
   // Collaborations API
   getCollaborations: async () => {
     const res = await fetch(`${API_BASE}/collaborations`, { headers: getHeaders() });

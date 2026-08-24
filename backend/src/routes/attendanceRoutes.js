@@ -15,9 +15,9 @@ const {
   exportAttendanceCSV
 } = require('../controllers/attendanceController');
 
-// All endpoints in Attendance Module require Authentication AND Super Admin Role
+// All endpoints in Attendance Module require Authentication AND Admin/Super Admin Role
 router.use(authenticateToken);
-router.use(requireRole('SUPER_ADMIN'));
+router.use(requireRole('ADMIN'));
 
 // Employee Roster Routes
 router.get('/employees', getEmployees);

@@ -248,4 +248,191 @@ const exportReportsCSV = async (req, res) => {
   }
 };
 
-module.exports = { getSalesmenReports, exportReportsCSV };
+// Bank Cases Financial & Ledger Report
+const getBankCasesReport = async (req, res) => {
+  try {
+    const { range = 'This Month', startDate, endDate, status, bankName, search } = req.query;
+    const { start, end } = getDateRange(range, startDate, endDate);
+
+    const where = {
+      isBankCase: true
+    };
+
+    if (range !== 'All Time') {
+      where.createdAt = { gte: start, lte: end };
+    }
+
+    if (status && status !== 'ALL') {
+      where.bankCaseStatus = status;
+    }
+
+    if (bankName && bankName !== 'ALL') {
+      where.bankName = { equals: bankName, mode: 'insensitive' };
+    }
+
+    if (search && search.trim()) {
+      const q = search.trim();
+      where.OR = [
+        { buyerName: { contains: q, mode: 'insensitive' } },
+        { buyerPhone: { contains: q, mode: 'insensitive' } },
+        { buyerCity: { contains: q, mode: 'insensitive' } },
+        { vehicle: { contains: q, mode: 'insensitive' } },
+        { model: { contains: q, mode: 'insensitive' } },
+        { bankName: { contains: q, mode: 'insensitive' } },
+        { bankCaseNo: { contains: q, mode: 'insensitive' } }
+      ];
+    }
+
+    const cases = await prisma.buyer.findMany({
+      where,
+      include: {
+        assignedUser: { select: { id: true, name: true, email: true, phone: true } },
+        createdByUser: { select: { id: true, name: true, email: true } }
+      },
+      orderBy: [
+        { bankCaseNo: 'asc' },
+        { createdAt: 'desc' }
+      ]
+    });
+
+    // Compute totals and stats
+    let totalCases = cases.length;
+    let confirmedCount = 0;
+    let notConfirmedCount = 0;
+    let inProgressCount = 0;
+    let totalBudget = 0;
+    let totalDownpayment = 0;
+    let totalProcessingFees = 0;
+    let totalDueAmount = 0;
+    const bankSummary = {};
+
+    cases.forEach(c => {
+      const budget = Number(c.budget) || 0;
+      const downpayment = Number(c.downpaymentAmount) || 0;
+      const fees = Number(c.processingFees) || 0;
+      const due = Number(c.dueAmount) || (budget - downpayment + fees);
+
+      totalBudget += budget;
+      totalDownpayment += downpayment;
+      totalProcessingFees += fees;
+      totalDueAmount += due;
+
+      const st = c.bankCaseStatus || 'Not Confirmed';
+      if (st === 'Confirmed') confirmedCount++;
+      else if (st === 'Not Confirmed') notConfirmedCount++;
+      else inProgressCount++;
+
+      const bName = (c.bankName && c.bankName.trim()) ? c.bankName.trim() : 'Unspecified Bank';
+      if (!bankSummary[bName]) {
+        bankSummary[bName] = {
+          bankName: bName,
+          count: 0,
+          confirmedCount: 0,
+          totalBudget: 0,
+          totalDownpayment: 0,
+          totalDueAmount: 0
+        };
+      }
+      bankSummary[bName].count++;
+      if (st === 'Confirmed') bankSummary[bName].confirmedCount++;
+      bankSummary[bName].totalBudget += budget;
+      bankSummary[bName].totalDownpayment += downpayment;
+      bankSummary[bName].totalDueAmount += due;
+    });
+
+    // Get list of distinct banks for dropdown
+    const distinctBanks = await prisma.buyer.findMany({
+      where: { isBankCase: true, bankName: { not: null } },
+      select: { bankName: true },
+      distinct: ['bankName']
+    });
+    const allBanksList = distinctBanks.map(b => b.bankName).filter(Boolean);
+
+    return res.json({
+      range,
+      startDate: start,
+      endDate: end,
+      stats: {
+        totalCases,
+        confirmedCount,
+        notConfirmedCount,
+        inProgressCount,
+        totalBudget,
+        totalDownpayment,
+        totalProcessingFees,
+        totalDueAmount
+      },
+      bankSummary: Object.values(bankSummary).sort((a, b) => b.totalBudget - a.totalBudget),
+      availableBanks: allBanksList,
+      cases
+    });
+  } catch (error) {
+    console.error('Error generating bank cases report:', error);
+    return res.status(500).json({ message: 'Failed to generate bank cases report', error: error.message });
+  }
+};
+
+// Export Bank Cases Financial Report CSV
+const exportBankCasesReportCSV = async (req, res) => {
+  try {
+    const { range = 'This Month', startDate, endDate, status, bankName, search } = req.query;
+    const { start, end } = getDateRange(range, startDate, endDate);
+
+    const where = { isBankCase: true };
+    if (range !== 'All Time') {
+      where.createdAt = { gte: start, lte: end };
+    }
+    if (status && status !== 'ALL') {
+      where.bankCaseStatus = status;
+    }
+    if (bankName && bankName !== 'ALL') {
+      where.bankName = { equals: bankName, mode: 'insensitive' };
+    }
+    if (search && search.trim()) {
+      const q = search.trim();
+      where.OR = [
+        { buyerName: { contains: q, mode: 'insensitive' } },
+        { buyerPhone: { contains: q, mode: 'insensitive' } },
+        { buyerCity: { contains: q, mode: 'insensitive' } },
+        { vehicle: { contains: q, mode: 'insensitive' } },
+        { model: { contains: q, mode: 'insensitive' } },
+        { bankName: { contains: q, mode: 'insensitive' } },
+        { bankCaseNo: { contains: q, mode: 'insensitive' } }
+      ];
+    }
+
+    const cases = await prisma.buyer.findMany({
+      where,
+      include: {
+        assignedUser: { select: { id: true, name: true } }
+      },
+      orderBy: [{ bankCaseNo: 'asc' }, { createdAt: 'desc' }]
+    });
+
+    let csvContent = 'Case No,Status,Client Name,Phone,City,Financing Bank,Vehicle,Total Vehicle Price (PKR),Downpayment % (Given),Downpayment Amount Paid (PKR),Processing Fee (PKR),Remaining Bank Due (PKR),Salesman Officer,Created Date\n';
+
+    cases.forEach(c => {
+      const budget = Number(c.budget) || 0;
+      const downPercent = Number(c.downpaymentPercent) || 0;
+      const downAmount = Number(c.downpaymentAmount) || 0;
+      const fee = Number(c.processingFees) || 0;
+      const due = Number(c.dueAmount) || (budget - downAmount + fee);
+      const dateStr = c.createdAt ? new Date(c.createdAt).toISOString().slice(0, 10) : '';
+
+      csvContent += `"${c.bankCaseNo || 'N/A'}","${c.bankCaseStatus || 'Not Confirmed'}","${c.buyerName}","${c.buyerPhone || ''}","${c.buyerCity || ''}","${c.bankName || 'Unspecified'}","${c.year || ''} ${c.vehicle} ${c.model}",${budget},${downPercent},${downAmount},${fee},${due},"${c.assignedUser?.name || 'Unassigned'}","${dateStr}"\n`;
+    });
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=AL_ASR_Bank_Cases_Report_${range.replace(/\s+/g, '_')}.csv`);
+    return res.status(200).send(csvContent);
+  } catch (error) {
+    return res.status(500).json({ message: 'Bank cases CSV export failed', error: error.message });
+  }
+};
+
+module.exports = {
+  getSalesmenReports,
+  exportReportsCSV,
+  getBankCasesReport,
+  exportBankCasesReportCSV
+};

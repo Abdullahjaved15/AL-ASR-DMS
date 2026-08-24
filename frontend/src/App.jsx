@@ -153,7 +153,7 @@ function MainLayout() {
             <ReceivingLetter />
           </div>
 
-          <div className={(currentTab === 'attendance' && isSuperAdmin) ? 'block' : 'hidden'}>
+          <div className={(currentTab === 'attendance' && isAdmin) ? 'block' : 'hidden'}>
             <Attendance />
           </div>
 
