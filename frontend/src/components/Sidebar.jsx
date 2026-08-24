@@ -21,6 +21,7 @@ import {
   X
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import InstallAppButton from './InstallAppButton';
 
 export default function Sidebar({ currentTab, setCurrentTab, isMobileOpen, setIsMobileOpen }) {
   const { user, logout, isSuperAdmin, isAdmin } = useAuth();
@@ -148,8 +149,9 @@ export default function Sidebar({ currentTab, setCurrentTab, isMobileOpen, setIs
           })}
         </nav>
 
-        {/* Logout Footer - Always Pinned at Bottom */}
-        <div className="p-3 border-t border-white/5 flex-shrink-0 bg-[#051424]">
+        {/* Footer - Install App & Logout */}
+        <div className="p-3 border-t border-white/5 flex-shrink-0 bg-[#051424] space-y-2">
+          <InstallAppButton variant="sidebar" />
           <button
             onClick={logout}
             className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-all text-xs font-bold shadow-sm"

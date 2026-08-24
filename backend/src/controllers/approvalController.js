@@ -199,6 +199,13 @@ const approveRequest = async (req, res) => {
       delete cleanData.images;
       delete cleanData.sellerImages;
 
+      if (cleanData.date && typeof cleanData.date === 'string') {
+        cleanData.date = new Date(cleanData.date);
+      }
+      if (cleanData.registrationDate && typeof cleanData.registrationDate === 'string') {
+        cleanData.registrationDate = new Date(cleanData.registrationDate);
+      }
+
       if (entityType === 'SELLER') {
         await prisma.seller.update({
           where: { id: entityId },

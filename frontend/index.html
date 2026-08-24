@@ -2,8 +2,18 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
+    
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#051424" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="AL ASR Motors" />
+    
     <title>AL ASR Motors - Dealership Management System</title>
     <!-- Google Fonts - Inter Plain Sans-Serif -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,5 +23,14 @@
   <body class="bg-[#051424] text-slate-100 antialiased font-sans min-h-screen selection:bg-cyan-500 selection:text-black">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(err => {
+            console.log('SW registration error: ', err);
+          });
+        });
+      }
+    </script>
   </body>
 </html>

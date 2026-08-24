@@ -115,6 +115,21 @@ const updateStockItem = async (req, res) => {
       return res.status(404).json({ message: 'Stock entry not found' });
     }
 
+    const {
+      vehicle,
+      model,
+      year,
+      color,
+      mileage,
+      askingPrice,
+      purchasePrice,
+      status,
+      location,
+      notes,
+      careOf,
+      regNumber
+    } = req.body;
+
     const updateData = {
       vehicle: (vehicle !== undefined && vehicle !== null && String(vehicle).trim()) ? String(vehicle).trim() : existing.vehicle,
       model: (model !== undefined && model !== null && String(model).trim()) ? String(model).trim() : existing.model,

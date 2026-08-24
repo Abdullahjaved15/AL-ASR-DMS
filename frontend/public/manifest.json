@@ -1,0 +1,36 @@
+{
+  "short_name": "AL ASR Motors",
+  "name": "AL ASR Motors - Dealership Management System",
+  "description": "AL ASR Motors showroom, vehicle inventory, buyers, sellers, and dealership management hub.",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#051424",
+  "theme_color": "#051424",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "scope": "/"
+}
