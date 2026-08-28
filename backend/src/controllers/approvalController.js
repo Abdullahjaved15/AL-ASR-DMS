@@ -183,6 +183,9 @@ const approveRequest = async (req, res) => {
       } else if (entityType === 'RECEIVING_LETTER') {
         const exist = await prisma.receivingLetter.findUnique({ where: { id: entityId } });
         if (exist) await prisma.receivingLetter.delete({ where: { id: entityId } });
+      } else if (entityType === 'INCENTIVE_APPROVAL_SHEET') {
+        const exist = await prisma.incentiveApprovalSheet.findUnique({ where: { id: entityId } });
+        if (exist) await prisma.incentiveApprovalSheet.delete({ where: { id: entityId } });
       }
     } else if (action === 'EDIT') {
       if (!proposedData) {
@@ -224,6 +227,11 @@ const approveRequest = async (req, res) => {
         });
       } else if (entityType === 'RECEIVING_LETTER') {
         await prisma.receivingLetter.update({
+          where: { id: entityId },
+          data: cleanData
+        });
+      } else if (entityType === 'INCENTIVE_APPROVAL_SHEET') {
+        await prisma.incentiveApprovalSheet.update({
           where: { id: entityId },
           data: cleanData
         });

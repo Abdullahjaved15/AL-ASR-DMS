@@ -529,5 +529,65 @@ export const api = {
       body: JSON.stringify({ reviewNotes })
     });
     return handleResponse(res);
+  },
+
+  // Incentive Approval Sheet API
+  getIncentiveApprovalSheets: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/incentive-approvals?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  getIncentiveApprovalSheetById: async (id) => {
+    const res = await fetch(`${API_BASE}/incentive-approvals/${id}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  createIncentiveApprovalSheet: async (data) => {
+    const res = await fetch(`${API_BASE}/incentive-approvals`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  updateIncentiveApprovalSheet: async (id, data) => {
+    const res = await fetch(`${API_BASE}/incentive-approvals/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  deleteIncentiveApprovalSheet: async (id, data = {}) => {
+    const res = await fetch(`${API_BASE}/incentive-approvals/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  uploadIncentiveApprovalSheetImages: async (sheetId, files) => {
+    const formData = new FormData();
+    Array.from(files).forEach((file) => formData.append('images', file));
+
+    const res = await fetch(`${API_BASE}/incentive-approvals/${sheetId}/images`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: formData
+    });
+    return handleResponse(res);
+  },
+
+  deleteIncentiveApprovalSheetImage: async (sheetId, imageId) => {
+    const res = await fetch(`${API_BASE}/incentive-approvals/${sheetId}/images/${imageId}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
   }
 };
+

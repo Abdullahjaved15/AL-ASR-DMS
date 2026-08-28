@@ -15,6 +15,7 @@ import CollaborationCenter from './pages/CollaborationCenter';
 import CurrentStock from './pages/CurrentStock';
 import Invoices from './pages/Invoices';
 import ReceivingLetter from './pages/ReceivingLetter';
+import IncentiveApprovalSheet from './pages/IncentiveApprovalSheet';
 import Attendance from './pages/Attendance';
 import Approvals from './pages/Approvals';
 import Settings from './pages/Settings';
@@ -151,6 +152,10 @@ function MainLayout() {
 
           <div className={currentTab === 'receiving_letter' ? 'block' : 'hidden'}>
             <ReceivingLetter />
+          </div>
+
+          <div className={currentTab === 'incentive_approval' ? 'block' : 'hidden'}>
+            <IncentiveApprovalSheet />
           </div>
 
           <div className={(currentTab === 'attendance' && isAdmin) ? 'block' : 'hidden'}>

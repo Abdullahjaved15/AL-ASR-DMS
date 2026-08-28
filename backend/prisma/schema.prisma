@@ -32,6 +32,7 @@ model User {
   employees       Employee[]
   requestedApprovals ApprovalRequest[] @relation("RequestedApprovals")
   reviewedApprovals  ApprovalRequest[] @relation("ReviewedApprovals")
+  incentiveApprovalSheets IncentiveApprovalSheet[]
 }
 
 model Seller {
@@ -450,5 +451,109 @@ model ApprovalRequest {
   @@index([status])
   @@index([entityType])
   @@index([requestedById])
+}
+
+model IncentiveApprovalSheet {
+  id                    String   @id @default(uuid())
+  sheetNumber           String   @unique
+  
+  // Row 1: Date
+  dateCol1              String?  @default("")
+  dateCol2              String?  @default("")
+  
+  // Row 2: Vehicle + REG#
+  vehicleRegCol1        String?  @default("")
+  vehicleRegCol2        String?  @default("")
+  
+  // Row 3: Ch#
+  chassisNoCol1         String?  @default("")
+  chassisNoCol2         String?  @default("")
+  
+  // Row 4: Color
+  colorCol1             String?  @default("")
+  colorCol2             String?  @default("")
+  
+  // Row 5: Model
+  modelCol1             String?  @default("")
+  modelCol2             String?  @default("")
+  
+  // Row 6: Purchaser Name/Number
+  purchaserCol1         String?  @default("")
+  purchaserCol2         String?  @default("")
+  
+  // Row 7: Seller Name/Number
+  sellerCol1            String?  @default("")
+  sellerCol2            String?  @default("")
+  
+  // Row 8: Personal Contact
+  personalContactCol1   String?  @default("")
+  personalContactCol2   String?  @default("")
+  
+  // Row 9: Social Media
+  socialMediaCol1       String?  @default("")
+  socialMediaCol2       String?  @default("")
+  
+  // Row 10: Walking Customer
+  walkingCustomerCol1   String?  @default("")
+  walkingCustomerCol2   String?  @default("")
+  
+  // Row 11: Visiting Customer
+  visitingCustomerCol1  String?  @default("")
+  visitingCustomerCol2  String?  @default("")
+  
+  // Row 12: Other
+  otherCol1             String?  @default("")
+  otherCol2             String?  @default("")
+  
+  // Row 13: Cash/Bank
+  cashBankCol1          String?  @default("")
+  cashBankCol2          String?  @default("")
+  
+  // Row 14: Sale Person/Name Sign
+  salePersonSignCol1    String?  @default("")
+  salePersonSignCol2    String?  @default("")
+  
+  // Row 15: Deal
+  dealCol1              String?  @default("")
+  dealCol2              String?  @default("")
+  
+  // Row 16: Amount
+  amountCol1            String?  @default("")
+  amountCol2            String?  @default("")
+  
+  // Row 17: Commision/ % Or Fee
+  commissionCol1        String?  @default("")
+  commissionCol2        String?  @default("")
+  
+  // Row 18: Location
+  locationCol1          String?  @default("")
+  locationCol2          String?  @default("")
+  
+  // Row 19: Bio Status
+  bioStatusCol1         String?  @default("")
+  bioStatusCol2         String?  @default("")
+  
+  // Row 20: Approved By
+  approvedByCol1        String?  @default("")
+  approvedByCol2        String?  @default("")
+
+  createdBy             String
+  createdByUser         User     @relation(fields: [createdBy], references: [id])
+  images                IncentiveApprovalSheetImage[]
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([sheetNumber])
+  @@index([createdAt])
+}
+
+model IncentiveApprovalSheetImage {
+  id                    String                 @id @default(uuid())
+  sheetId               String
+  sheet                 IncentiveApprovalSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  imageUrl              String
+  cloudinaryPublicId    String?
+  uploadedAt            DateTime               @default(now())
 }
 
