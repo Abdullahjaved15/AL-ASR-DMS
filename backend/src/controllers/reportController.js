@@ -135,8 +135,8 @@ const getSalesmenReports = async (req, res) => {
 
       const smDeals = dealsMap[sm.id] || [];
       const dealsClosedCount = smDeals.length;
-      const totalRevenue = smDeals.reduce((sum, d) => sum + d.dealPrice, 0);
-      const totalProfit = smDeals.reduce((sum, d) => sum + d.profit, 0);
+      const totalRevenue = smDeals.reduce((sum, d) => sum + (parseFloat(String(d.dealPrice || 0).replace(/[^0-9.]/g, '')) || 0), 0);
+      const totalProfit = smDeals.reduce((sum, d) => sum + (parseFloat(String(d.profit || 0).replace(/[^0-9.]/g, '')) || 0), 0);
 
       const conversionRate = totalLeadsCount > 0 
         ? ((dealsClosedCount / totalLeadsCount) * 100).toFixed(1) 
@@ -224,8 +224,8 @@ const exportReportsCSV = async (req, res) => {
       if (totalLeads === 0 && deals.length === 0) continue; // Skip dummy entries
 
       const dealsClosed = deals.length;
-      const revenue = deals.reduce((s, d) => s + d.dealPrice, 0);
-      const profit = deals.reduce((s, d) => s + d.profit, 0);
+      const revenue = deals.reduce((s, d) => s + (parseFloat(String(d.dealPrice || 0).replace(/[^0-9.]/g, '')) || 0), 0);
+      const profit = deals.reduce((s, d) => s + (parseFloat(String(d.profit || 0).replace(/[^0-9.]/g, '')) || 0), 0);
       const rate = totalLeads > 0 ? ((dealsClosed / totalLeads) * 100).toFixed(1) + '%' : '0.0%';
 
       let totalDays = 0, count = 0;

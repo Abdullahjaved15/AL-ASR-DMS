@@ -170,7 +170,7 @@ const createBuyer = async (req, res) => {
       leadSource, leadReference, leadReferredBy, assignedTo, leadStatus, comments
     } = req.body;
 
-    const numBudget = budget !== undefined && budget !== '' ? parseFloat(budget) : 0;
+    const numBudget = budget !== undefined && budget !== '' ? (parseFloat(budget) || 0) : 0;
     const numDownPercent = parseFloat(downpaymentPercent) || 0;
     const numProcessingFees = parseFloat(processingFees) || 0;
     
@@ -198,7 +198,7 @@ const createBuyer = async (req, res) => {
         year: year ? String(year) : String(new Date().getFullYear()),
         color: color || 'Any',
         mileage: parseInt(mileage) || 0,
-        budget: numBudget,
+        budget: budget !== undefined && budget !== null ? String(budget) : '',
         carCondition: carCondition || 'Used',
         zeroMeterType: carCondition === 'Zero Meter' ? zeroMeterType || 'Cash' : null,
         isCommercial: commercialFlag,
@@ -208,10 +208,10 @@ const createBuyer = async (req, res) => {
         bankCaseStatus: targetBankCaseStatus,
         bankCaseNo: assignedCaseNo,
         bankChecklist: isBankCase ? bankChecklist || null : null,
-        processingFees: isBankCase ? numProcessingFees : 0,
-        downpaymentPercent: isBankCase ? numDownPercent : 0,
-        downpaymentAmount: numDownAmount,
-        dueAmount: calculatedDueAmount,
+        processingFees: isBankCase ? String(numProcessingFees) : '',
+        downpaymentPercent: isBankCase ? String(numDownPercent) : '',
+        downpaymentAmount: isBankCase ? String(numDownAmount) : '',
+        dueAmount: isBankCase ? String(calculatedDueAmount) : '',
         buyerName: buyerName || '',
         buyerPhone: buyerPhone ? formatPakistaniPhone(buyerPhone) : '',
         buyerCity: buyerCity || '',
@@ -282,20 +282,21 @@ const updateBuyer = async (req, res) => {
     const targetIsBankCase = isBankCase !== undefined ? Boolean(isBankCase) : existingBuyer.isBankCase;
 
     if (budget !== undefined || isBankCase !== undefined || downpaymentPercent !== undefined || processingFees !== undefined) {
-      const targetBudget = budget !== undefined && budget !== '' ? parseFloat(budget) : (existingBuyer.budget || 0);
-      const targetDownPercent = downpaymentPercent !== undefined ? parseFloat(downpaymentPercent) : (existingBuyer.downpaymentPercent || 0);
-      const targetProcessingFees = processingFees !== undefined ? parseFloat(processingFees) : (existingBuyer.processingFees || 0);
+      const budgetStr = budget !== undefined ? (budget !== null ? String(budget) : '') : (existingBuyer.budget || '');
+      const targetBudget = parseFloat(String(budgetStr).replace(/[^0-9.]/g, '')) || 0;
+      const targetDownPercent = downpaymentPercent !== undefined ? (parseFloat(downpaymentPercent) || 0) : (parseFloat(existingBuyer.downpaymentPercent) || 0);
+      const targetProcessingFees = processingFees !== undefined ? (parseFloat(processingFees) || 0) : (parseFloat(existingBuyer.processingFees) || 0);
 
-      updateData.budget = targetBudget;
+      updateData.budget = budgetStr;
       updateData.isBankCase = targetIsBankCase;
-      updateData.processingFees = targetIsBankCase ? targetProcessingFees : 0;
-      updateData.downpaymentPercent = targetIsBankCase ? targetDownPercent : 0;
+      updateData.processingFees = targetIsBankCase ? String(targetProcessingFees) : '';
+      updateData.downpaymentPercent = targetIsBankCase ? String(targetDownPercent) : '';
       
       const computedDownAmount = targetIsBankCase ? (targetBudget * (targetDownPercent / 100)) : 0;
       const computedDueAmount = targetIsBankCase ? ((targetBudget - computedDownAmount) + targetProcessingFees) : 0;
 
-      updateData.downpaymentAmount = computedDownAmount;
-      updateData.dueAmount = computedDueAmount;
+      updateData.downpaymentAmount = targetIsBankCase ? String(computedDownAmount) : '';
+      updateData.dueAmount = targetIsBankCase ? String(computedDueAmount) : '';
     }
 
     // Handle Bank Case Status & Case # updates

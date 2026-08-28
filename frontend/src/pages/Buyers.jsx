@@ -891,8 +891,8 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                     {formData.isBankCase ? 'Total Amount (PKR / Rs.)' : 'Target Budget (PKR / Rs.)'}
                   </label>
                   <input
-                    type="number"
-                    placeholder="20000000"
+                    type="text"
+                    placeholder="e.g. 20000000, 2 Crore, 85 Lac"
                     value={formData.budget}
                     onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-emerald-400 font-mono font-bold focus:outline-none focus:border-cyan-500"
@@ -982,9 +982,8 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                       <div>
                         <label className="block text-xs font-mono text-amber-300 mb-1">Downpayment (%)</label>
                         <input
-                          type="number"
-                          step="0.1"
-                          placeholder="20"
+                          type="text"
+                          placeholder="e.g. 20, 25%"
                           value={formData.downpaymentPercent}
                           onChange={(e) => setFormData({ ...formData, downpaymentPercent: e.target.value })}
                           className="w-full bg-slate-950 border border-amber-500/30 rounded-xl px-3 py-2 text-sm text-amber-300 focus:outline-none focus:border-amber-400 font-mono font-bold"
@@ -994,8 +993,8 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                       <div>
                         <label className="block text-xs font-mono text-purple-300 mb-1">Processing Fees (PKR)</label>
                         <input
-                          type="number"
-                          placeholder="50000"
+                          type="text"
+                          placeholder="e.g. 50000, 50k"
                           value={formData.processingFees}
                           onChange={(e) => setFormData({ ...formData, processingFees: e.target.value })}
                           className="w-full bg-slate-950 border border-purple-500/30 rounded-xl px-3 py-2 text-sm text-purple-300 focus:outline-none focus:border-purple-400 font-mono font-bold"

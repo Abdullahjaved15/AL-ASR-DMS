@@ -73,8 +73,9 @@ const getInvoices = async (req, res) => {
         }
       }),
       prisma.invoice.count({ where: whereClause }),
-      prisma.invoice.aggregate({
-        _sum: {
+      prisma.invoice.findMany({
+        where: whereClause,
+        select: {
           totalPrice: true,
           saleAmount: true,
           commissionAmount: true,
@@ -83,9 +84,9 @@ const getInvoices = async (req, res) => {
       })
     ]);
 
-    const totalSalesVolume = statsRaw._sum.totalPrice || statsRaw._sum.saleAmount || 0;
-    const totalCommissionEarned = statsRaw._sum.commissionAmount || 0;
-    const grandTotalValue = statsRaw._sum.totalAmount || (totalSalesVolume + totalCommissionEarned);
+    const totalSalesVolume = statsRaw.reduce((sum, inv) => sum + (parseFloat(String(inv.totalPrice || inv.saleAmount || 0).replace(/[^0-9.]/g, '')) || 0), 0);
+    const totalCommissionEarned = statsRaw.reduce((sum, inv) => sum + (parseFloat(String(inv.commissionAmount || 0).replace(/[^0-9.]/g, '')) || 0), 0);
+    const grandTotalValue = statsRaw.reduce((sum, inv) => sum + (parseFloat(String(inv.totalAmount || 0).replace(/[^0-9.]/g, '')) || 0), 0) || (totalSalesVolume + totalCommissionEarned);
 
     return res.json({
       invoices,
@@ -211,12 +212,12 @@ const createInvoice = async (req, res) => {
     const finalVehicleMaker = vehicleMaker || carVehicle || 'N/A';
     const finalVehicleModel = vehicleModel || carModel || 'N/A';
 
-    const numericTotalPrice = parseFloat(totalPrice) || parseFloat(agreedAmount) || parseFloat(saleAmount) || 0;
-    const numericAdvance = parseFloat(advanceAmount) || 0;
+    const numericTotalPrice = parseFloat(String(totalPrice || agreedAmount || saleAmount || 0).replace(/[^0-9.]/g, '')) || 0;
+    const numericAdvance = parseFloat(String(advanceAmount || 0).replace(/[^0-9.]/g, '')) || 0;
     const numericRemaining = remainingAmount !== undefined && remainingAmount !== null && remainingAmount !== '' 
-      ? parseFloat(remainingAmount) 
+      ? (parseFloat(String(remainingAmount).replace(/[^0-9.]/g, '')) || 0)
       : (numericTotalPrice - numericAdvance);
-    const numericCommPercent = parseFloat(commissionPercent) || 0;
+    const numericCommPercent = parseFloat(String(commissionPercent || 0).replace(/[^0-9.]/g, '')) || 0;
     const commissionAmount = (numericTotalPrice * numericCommPercent) / 100;
     const totalAmountCalculated = numericTotalPrice + commissionAmount;
 
@@ -278,12 +279,12 @@ const createInvoice = async (req, res) => {
         onAccount: onAccount || null,
         accountOf: accountOf || null,
         time: time || agreementTime || null,
-        cashAmount: cashAmount || null,
+        cashAmount: cashAmount !== undefined && cashAmount !== null ? String(cashAmount) : null,
         statusBoxNotes: statusBoxNotes || null,
 
         // Transaction Agreement
-        agreedAmount: parseFloat(agreedAmount) || numericTotalPrice,
-        agreedAmountHalf: parseFloat(agreedAmountHalf) || (numericTotalPrice / 2),
+        agreedAmount: agreedAmount !== undefined && agreedAmount !== null ? String(agreedAmount) : String(numericTotalPrice),
+        agreedAmountHalf: agreedAmountHalf !== undefined && agreedAmountHalf !== null ? String(agreedAmountHalf) : String(numericTotalPrice / 2),
         agreedAmountWords: agreedAmountWords || null,
         agreementTime: agreementTime || null,
         agreementDay: agreementDay || null,
@@ -296,9 +297,9 @@ const createInvoice = async (req, res) => {
         importerName: importerName || null,
 
         // Financials & Balances
-        totalPrice: numericTotalPrice,
-        advanceAmount: numericAdvance,
-        remainingAmount: numericRemaining,
+        totalPrice: totalPrice !== undefined && totalPrice !== null ? String(totalPrice) : String(numericTotalPrice),
+        advanceAmount: advanceAmount !== undefined && advanceAmount !== null ? String(advanceAmount) : String(numericAdvance),
+        remainingAmount: remainingAmount !== undefined && remainingAmount !== null ? String(remainingAmount) : String(numericRemaining),
         paymentDuration: paymentDuration || null,
         dated: dated || new Date().toISOString().slice(0, 10),
 
@@ -310,10 +311,10 @@ const createInvoice = async (req, res) => {
         carModel: finalVehicleModel,
         carYear: carYear ? String(carYear) : String(new Date().getFullYear()),
         carRegNumber: registrationNo || carRegNumber || null,
-        saleAmount: numericTotalPrice,
-        commissionPercent: numericCommPercent,
-        commissionAmount,
-        totalAmount: totalAmountCalculated,
+        saleAmount: saleAmount !== undefined && saleAmount !== null ? String(saleAmount) : String(numericTotalPrice),
+        commissionPercent: commissionPercent !== undefined && commissionPercent !== null ? String(commissionPercent) : String(numericCommPercent),
+        commissionAmount: String(commissionAmount),
+        totalAmount: String(totalAmountCalculated),
         paymentStatus: paymentStatus || 'PAID',
         remarks: remarks || null,
 
@@ -451,8 +452,8 @@ const updateInvoice = async (req, res) => {
         regFatherName: regFatherName !== undefined ? regFatherName : existing.regFatherName,
         regAddress: regAddress !== undefined ? regAddress : existing.regAddress,
 
-        agreedAmount: parseFloat(agreedAmount) || numericTotalPrice,
-        agreedAmountHalf: parseFloat(agreedAmountHalf) || (numericTotalPrice / 2),
+        agreedAmount: agreedAmount !== undefined ? String(agreedAmount) : (existing.agreedAmount || String(numericTotalPrice)),
+        agreedAmountHalf: agreedAmountHalf !== undefined ? String(agreedAmountHalf) : (existing.agreedAmountHalf || String(numericTotalPrice / 2)),
         agreedAmountWords: agreedAmountWords !== undefined ? agreedAmountWords : existing.agreedAmountWords,
         agreementTime: agreementTime !== undefined ? agreementTime : existing.agreementTime,
         agreementDay: agreementDay !== undefined ? agreementDay : existing.agreementDay,
@@ -466,12 +467,12 @@ const updateInvoice = async (req, res) => {
         onAccount: onAccount !== undefined ? onAccount : existing.onAccount,
         accountOf: accountOf !== undefined ? accountOf : existing.accountOf,
         time: time !== undefined ? time : existing.time,
-        cashAmount: cashAmount !== undefined ? cashAmount : existing.cashAmount,
+        cashAmount: cashAmount !== undefined ? (cashAmount !== null ? String(cashAmount) : null) : existing.cashAmount,
         statusBoxNotes: statusBoxNotes !== undefined ? statusBoxNotes : existing.statusBoxNotes,
 
-        totalPrice: numericTotalPrice,
-        advanceAmount: numericAdvance,
-        remainingAmount: numericRemaining,
+        totalPrice: totalPrice !== undefined ? String(totalPrice) : (existing.totalPrice || String(numericTotalPrice)),
+        advanceAmount: advanceAmount !== undefined ? String(advanceAmount) : (existing.advanceAmount || String(numericAdvance)),
+        remainingAmount: remainingAmount !== undefined ? String(remainingAmount) : (existing.remainingAmount || String(numericRemaining)),
         paymentDuration: paymentDuration !== undefined ? paymentDuration : existing.paymentDuration,
         dated: dated !== undefined ? dated : existing.dated,
 

@@ -61,7 +61,7 @@ export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
       await api.createDeal({
         buyerId: selectedBuyerId,
         sellerId: selectedSellerId,
-        dealPrice: parseFloat(dealPrice),
+        dealPrice: String(dealPrice),
         remarks
       });
 
@@ -79,10 +79,12 @@ export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
 
   // Profit calculation helper for live preview in modal
   const selectedSeller = sellersList.find(s => s.id === selectedSellerId);
-  const calculatedProfit = selectedSeller && dealPrice ? parseFloat(dealPrice) - selectedSeller.demandPrice : null;
+  const calculatedProfit = selectedSeller && dealPrice 
+    ? ((parseFloat(String(dealPrice).replace(/[^0-9.]/g, '')) || 0) - (parseFloat(String(selectedSeller.demandPrice || 0).replace(/[^0-9.]/g, '')) || 0))
+    : null;
 
-  const totalVolume = deals.reduce((sum, d) => sum + d.dealPrice, 0);
-  const totalProfit = deals.reduce((sum, d) => sum + d.profit, 0);
+  const totalVolume = deals.reduce((sum, d) => sum + (parseFloat(String(d.dealPrice || 0).replace(/[^0-9.]/g, '')) || 0), 0);
+  const totalProfit = deals.reduce((sum, d) => sum + (parseFloat(String(d.profit || 0).replace(/[^0-9.]/g, '')) || 0), 0);
 
   return (
     <div className="p-4 sm:p-8 space-y-6 max-w-7xl mx-auto">
@@ -260,9 +262,9 @@ export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
               <div>
                 <label className="block text-xs font-mono text-slate-400 mb-1">Final Sale / Deal Price (PKR / Rs.) *</label>
                 <input
-                  type="number"
+                  type="text"
                   required
-                  placeholder="e.g. 49500000"
+                  placeholder="e.g. 49500000, 4.95 Crore, 95 Lac"
                   value={dealPrice}
                   onChange={(e) => setDealPrice(e.target.value)}
                   className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-cyan-400 font-mono font-bold focus:outline-none focus:border-cyan-500 font-mono"

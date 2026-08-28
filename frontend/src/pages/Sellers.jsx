@@ -813,8 +813,8 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">Demand Price (PKR / Rs.)</label>
                   <input
-                    type="number"
-                    placeholder="19800000"
+                    type="text"
+                    placeholder="e.g. 19800000, 1.98 Crore, 95 Lac"
                     value={formData.demandPrice}
                     onChange={(e) => setFormData({ ...formData, demandPrice: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-cyan-400 font-mono font-bold focus:outline-none focus:border-cyan-500 font-mono"

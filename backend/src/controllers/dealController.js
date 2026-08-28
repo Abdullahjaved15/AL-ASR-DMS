@@ -76,8 +76,9 @@ const createDeal = async (req, res) => {
       return res.status(404).json({ message: 'Seller vehicle not found' });
     }
 
-    const numericDealPrice = parseFloat(dealPrice);
-    const calculatedProfit = numericDealPrice - seller.demandPrice;
+    const numericDealPrice = parseFloat(String(dealPrice).replace(/[^0-9.]/g, '')) || 0;
+    const numericSellerDemand = parseFloat(String(seller.demandPrice || 0).replace(/[^0-9.]/g, '')) || 0;
+    const calculatedProfit = numericDealPrice - numericSellerDemand;
     const salesmanToCredit = (req.user.role === 'ADMIN' && seller.assignedTo) ? seller.assignedTo : req.user.id;
 
     const newDeal = await prisma.deal.create({
@@ -85,8 +86,8 @@ const createDeal = async (req, res) => {
         buyerId,
         sellerId,
         salesmanId: salesmanToCredit,
-        dealPrice: numericDealPrice,
-        profit: calculatedProfit,
+        dealPrice: dealPrice !== undefined && dealPrice !== null ? String(dealPrice) : '',
+        profit: String(calculatedProfit),
         closingDate: closingDate ? new Date(closingDate) : new Date(),
         remarks: remarks || null
       },

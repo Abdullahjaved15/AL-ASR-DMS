@@ -221,7 +221,7 @@ const createSeller = async (req, res) => {
         color: color || 'N/A',
         mileage: parseInt(mileage) || 0,
         numberPlate: numberPlate ? numberPlate.trim() : null,
-        demandPrice: demandPrice !== undefined && demandPrice !== '' ? parseFloat(demandPrice) : 0,
+        demandPrice: demandPrice !== undefined && demandPrice !== null ? String(demandPrice) : '',
         carCondition: carCondition || 'Used',
         zeroMeterType: carCondition === 'Zero Meter' ? zeroMeterType || 'Cash' : null,
         isCommercial: commercialFlag,
@@ -304,7 +304,7 @@ const updateSeller = async (req, res) => {
     if (color !== undefined) updateData.color = color;
     if (mileage !== undefined) updateData.mileage = parseInt(mileage) || 0;
     if (numberPlate !== undefined) updateData.numberPlate = numberPlate ? numberPlate.trim() : null;
-    if (demandPrice !== undefined) updateData.demandPrice = demandPrice !== '' ? parseFloat(demandPrice) : 0;
+    if (demandPrice !== undefined) updateData.demandPrice = demandPrice !== null ? String(demandPrice) : '';
     if (carCondition !== undefined) updateData.carCondition = carCondition;
     if (zeroMeterType !== undefined) updateData.zeroMeterType = carCondition === 'Zero Meter' ? zeroMeterType : null;
     if (isCommercial !== undefined) {

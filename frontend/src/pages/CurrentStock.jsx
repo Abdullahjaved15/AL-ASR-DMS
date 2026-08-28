@@ -592,8 +592,8 @@ export default function CurrentStock() {
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">Asking Price (PKR)</label>
                   <input
-                    type="number"
-                    placeholder="E.g., 7500000"
+                    type="text"
+                    placeholder="E.g., 7500000, 75 Lac, 1.2 Crore"
                     value={formData.askingPrice}
                     onChange={(e) => setFormData({ ...formData, askingPrice: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none font-mono"

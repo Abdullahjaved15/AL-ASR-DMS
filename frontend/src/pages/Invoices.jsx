@@ -2100,12 +2100,12 @@ export default function Invoices() {
                       <div>
                         <label className="block text-xs font-semibold text-slate-300 mb-1">Total Deal (Rs.) <span className="text-rose-400">*</span></label>
                         <input
-                          type="number"
-                          placeholder="e.g. 5000000"
+                          type="text"
+                          placeholder="e.g. 5000000, 50 Lac"
                           value={formData.totalPrice}
                           onChange={(e) => {
-                            const tot = parseFloat(e.target.value) || 0;
-                            const adv = parseFloat(formData.advanceAmount) || 0;
+                            const tot = parseFloat(String(e.target.value).replace(/[^0-9.]/g, '')) || 0;
+                            const adv = parseFloat(String(formData.advanceAmount).replace(/[^0-9.]/g, '')) || 0;
                             handleInputChange('totalPrice', e.target.value);
                             handleInputChange('remainingAmount', Math.max(0, tot - adv));
                           }}
@@ -2116,12 +2116,12 @@ export default function Invoices() {
                       <div>
                         <label className="block text-xs font-semibold text-slate-300 mb-1">Advance (Rs.) <span className="text-rose-400">*</span></label>
                         <input
-                          type="number"
-                          placeholder="e.g. 500000"
+                          type="text"
+                          placeholder="e.g. 500000, 5 Lac"
                           value={formData.advanceAmount}
                           onChange={(e) => {
-                            const adv = parseFloat(e.target.value) || 0;
-                            const tot = parseFloat(formData.totalPrice) || 0;
+                            const adv = parseFloat(String(e.target.value).replace(/[^0-9.]/g, '')) || 0;
+                            const tot = parseFloat(String(formData.totalPrice).replace(/[^0-9.]/g, '')) || 0;
                             handleInputChange('advanceAmount', e.target.value);
                             handleInputChange('remainingAmount', Math.max(0, tot - adv));
                           }}
@@ -2132,9 +2132,9 @@ export default function Invoices() {
                       <div>
                         <label className="block text-xs font-semibold text-slate-300 mb-1">Balance (Rs.) (بقایا)</label>
                         <input
-                          type="number"
+                          type="text"
                           readOnly
-                          value={formData.totalPrice && formData.advanceAmount ? Math.max(0, (parseFloat(formData.totalPrice) || 0) - (parseFloat(formData.advanceAmount) || 0)) : (formData.remainingAmount || '')}
+                          value={formData.totalPrice && formData.advanceAmount ? Math.max(0, (parseFloat(String(formData.totalPrice).replace(/[^0-9.]/g, '')) || 0) - (parseFloat(String(formData.advanceAmount).replace(/[^0-9.]/g, '')) || 0)) : (formData.remainingAmount || '')}
                           className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-rose-400 text-xs font-bold font-mono cursor-not-allowed"
                         />
                       </div>
@@ -2294,8 +2294,8 @@ export default function Invoices() {
                           Amount (Rs. / روپے) <span className="text-rose-400">*</span>
                         </label>
                         <input
-                          type="number"
-                          placeholder="e.g. 250000"
+                          type="text"
+                          placeholder="e.g. 250000, 2.5 Lac"
                           value={formData.totalPrice || ''}
                           onChange={(e) => handleInputChange('totalPrice', e.target.value)}
                           className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-amber-500 font-mono"
@@ -2686,11 +2686,11 @@ export default function Invoices() {
                             All docs & rights sum of (جملہ کاغذات و دیگر حقوق بعوض مبلغ) (PKR) <span className="text-rose-400">*</span>
                           </label>
                           <input
-                            type="number"
-                            placeholder="e.g. 4500000"
+                            type="text"
+                            placeholder="e.g. 4500000, 45 Lac"
                             value={formData.agreedAmount}
                             onChange={(e) => handleInputChange('agreedAmount', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
                             required
                           />
                         </div>
@@ -2700,11 +2700,11 @@ export default function Invoices() {
                             Rupees, half of which (روپے جن کے نصف) (PKR)
                           </label>
                           <input
-                            type="number"
-                            placeholder="Half sum"
+                            type="text"
+                            placeholder="e.g. 2250000, 22.5 Lac"
                             value={formData.agreedAmountHalf}
                             onChange={(e) => handleInputChange('agreedAmountHalf', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
                           />
                         </div>
 
@@ -2760,11 +2760,11 @@ export default function Invoices() {
                             Total Price of Vehicle (کل قیمت گاڑی) (PKR) <span className="text-rose-400">*</span>
                           </label>
                           <input
-                            type="number"
-                            placeholder="e.g. 4500000"
+                            type="text"
+                            placeholder="e.g. 4500000, 45 Lac"
                             value={formData.totalPrice}
                             onChange={(e) => handleInputChange('totalPrice', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
                             required
                           />
                         </div>
@@ -2774,11 +2774,11 @@ export default function Invoices() {
                             Advance / Earnest Money (بیعانہ رقم) (PKR)
                           </label>
                           <input
-                            type="number"
-                            placeholder="e.g. 500000"
+                            type="text"
+                            placeholder="e.g. 500000, 5 Lac"
                             value={formData.advanceAmount}
                             onChange={(e) => handleInputChange('advanceAmount', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
                           />
                         </div>
 
@@ -2787,11 +2787,11 @@ export default function Invoices() {
                             Remaining Amount (بقایا رقم) (PKR)
                           </label>
                           <input
-                            type="number"
-                            placeholder="Auto-calculated"
+                            type="text"
+                            placeholder="e.g. 4000000, 40 Lac"
                             value={formData.remainingAmount}
                             onChange={(e) => handleInputChange('remainingAmount', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
                           />
                         </div>
 

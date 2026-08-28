@@ -46,7 +46,7 @@ const getCurrentStock = async (req, res) => {
     });
 
     const totalUnits = stock.length;
-    const totalValuation = stock.reduce((sum, item) => sum + (item.askingPrice || 0), 0);
+    const totalValuation = stock.reduce((sum, item) => sum + (parseFloat(String(item.askingPrice || 0).replace(/[^0-9.]/g, '')) || 0), 0);
     const availableUnits = stock.filter(item => item.status === 'AVAILABLE').length;
     const reservedUnits = stock.filter(item => item.status === 'RESERVED').length;
     const atCustomerUnits = stock.filter(item => item.status === 'AT_CUSTOMER' || item.status === 'At Customer').length;
@@ -80,8 +80,8 @@ const createStockItem = async (req, res) => {
         year: year ? String(year) : String(new Date().getFullYear()),
         color: color || 'White',
         mileage: safeInt(mileage, 0),
-        askingPrice: safeFloat(askingPrice, 0),
-        purchasePrice: purchasePrice ? safeFloat(purchasePrice, null) : null,
+        askingPrice: askingPrice !== undefined && askingPrice !== null ? String(askingPrice) : '',
+        purchasePrice: purchasePrice !== undefined && purchasePrice !== null ? String(purchasePrice) : '',
         status: status || 'AVAILABLE',
         location: location || 'Main Showroom',
         notes: notes || null,
@@ -136,8 +136,8 @@ const updateStockItem = async (req, res) => {
       year: year !== undefined ? String(year) : existing.year,
       color: color !== undefined ? String(color) : existing.color,
       mileage: mileage !== undefined ? safeInt(mileage, existing.mileage) : existing.mileage,
-      askingPrice: askingPrice !== undefined ? safeFloat(askingPrice, existing.askingPrice) : existing.askingPrice,
-      purchasePrice: purchasePrice !== undefined ? (purchasePrice ? safeFloat(purchasePrice, null) : null) : existing.purchasePrice,
+      askingPrice: askingPrice !== undefined ? (askingPrice !== null ? String(askingPrice) : '') : existing.askingPrice,
+      purchasePrice: purchasePrice !== undefined ? (purchasePrice !== null ? String(purchasePrice) : '') : existing.purchasePrice,
       status: status !== undefined ? status : existing.status,
       location: location !== undefined ? location : existing.location,
       notes: notes !== undefined ? notes : existing.notes,

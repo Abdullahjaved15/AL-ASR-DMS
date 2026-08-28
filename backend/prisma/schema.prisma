@@ -48,7 +48,7 @@ model Seller {
   mileage          Int?          @default(0)
 
   numberPlate      String?       // Unique Vehicle Registration / License Plate Number
-  demandPrice      Float?        @default(0)
+  demandPrice      String?       @default("")
   carCondition     String?       @default("Used") // Used, Zero Meter
   zeroMeterType    String?       // Cash, Booking
   isCommercial     Boolean       @default(false)
@@ -112,7 +112,7 @@ model Buyer {
   color            String?  @default("")
   mileage          Int?     @default(0)
 
-  budget           Float?   @default(0)
+  budget           String?  @default("")
   carCondition     String?  @default("Used") // Used, Zero Meter
   zeroMeterType    String?  // Cash, Booking
   isCommercial     Boolean  @default(false)
@@ -123,10 +123,10 @@ model Buyer {
   bankCaseStatus   String?  @default("Not Confirmed") // Confirmed, Not Confirmed
   bankCaseNo       Int?     // Sequential Case # assigned when confirmed
   bankChecklist    Json?    // Detailed 12-item Bank Case Requirement Checklist
-  processingFees   Float?   @default(0)
-  downpaymentPercent Float? @default(0)
-  downpaymentAmount Float?  @default(0)
-  dueAmount        Float?   @default(0)
+  processingFees   String?  @default("")
+  downpaymentPercent String? @default("")
+  downpaymentAmount String?  @default("")
+  dueAmount        String?  @default("")
 
   buyerName        String?  @default("")
   buyerPhone       String?  @default("")
@@ -200,8 +200,8 @@ model Invoice {
   regAddress       String?
 
   // Transaction Agreement (ٹرانزیکشن معاہدہ)
-  agreedAmount     Float?
-  agreedAmountHalf Float?
+  agreedAmount     String?  @default("")
+  agreedAmountHalf String?  @default("")
   agreedAmountWords String?
   agreementTime    String?
   agreementDay     String?
@@ -227,9 +227,9 @@ model Invoice {
   importerName     String?
 
   // Financials & Balances
-  totalPrice       Float?
-  advanceAmount    Float?
-  remainingAmount  Float?
+  totalPrice       String?  @default("")
+  advanceAmount    String?  @default("")
+  remainingAmount  String?  @default("")
   paymentDuration  String?
   dated            String?
 
@@ -241,10 +241,10 @@ model Invoice {
   carModel         String?
   carYear          String?
   carRegNumber     String?
-  saleAmount       Float    @default(0)
-  commissionPercent Float   @default(0)
-  commissionAmount Float    @default(0)
-  totalAmount      Float    @default(0)
+  saleAmount       String?  @default("")
+  commissionPercent String? @default("")
+  commissionAmount String?  @default("")
+  totalAmount      String?  @default("")
   paymentStatus    String   @default("PAID") // PAID, PENDING, CANCELLED
   remarks          String?
 
@@ -284,8 +284,8 @@ model Deal {
   salesmanId  String
   salesman    User     @relation("UserDeals", fields: [salesmanId], references: [id])
 
-  dealPrice   Float
-  profit      Float
+  dealPrice   String?  @default("")
+  profit      String?  @default("")
   closingDate DateTime @default(now())
   remarks     String?
 
@@ -338,8 +338,8 @@ model CurrentStock {
   year          String
   color         String   @default("White")
   mileage       Int      @default(0)
-  askingPrice   Float
-  purchasePrice Float?
+  askingPrice   String?  @default("")
+  purchasePrice String?  @default("")
   status        String   @default("AVAILABLE") // AVAILABLE, RESERVED, AT_CUSTOMER, SOLD
   location      String   @default("Main Showroom")
   notes         String?
