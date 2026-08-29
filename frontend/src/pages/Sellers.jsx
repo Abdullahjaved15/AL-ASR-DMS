@@ -8,7 +8,7 @@ import FilterBar from '../components/FilterBar';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { logoBase64 } from '../utils/logoBase64';
-import { formatPKR, parsePakistaniPrice, getPriceHint } from '../utils/priceFormatter';
+import { formatPKR, parsePakistaniPrice, getPriceHint, normalizePriceInput, formatPKRShort } from '../utils/priceFormatter';
 
 const leadStatuses = ['New Lead', 'Contacted', 'Follow Up', 'Interested', 'Negotiation', 'Deal Closed', 'Lost', 'Cancelled', 'Incomplete'];
 
@@ -198,7 +198,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
       const payload = {
         ...formData,
         demandPrice: formData.demandPrice !== '' && formData.demandPrice !== null && formData.demandPrice !== undefined
-          ? String(parsePakistaniPrice(formData.demandPrice))
+          ? normalizePriceInput(formData.demandPrice)
           : ''
       };
       await api.createSeller(payload);
@@ -216,7 +216,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
       const payload = {
         ...formData,
         demandPrice: formData.demandPrice !== '' && formData.demandPrice !== null && formData.demandPrice !== undefined
-          ? String(parsePakistaniPrice(formData.demandPrice))
+          ? normalizePriceInput(formData.demandPrice)
           : ''
       };
       const res = await api.updateSeller(selectedSeller.id, payload);
@@ -253,7 +253,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
       color: seller.color || '',
       mileage: seller.mileage || 0,
       numberPlate: seller.numberPlate || '',
-      demandPrice: seller.demandPrice || '',
+      demandPrice: formatPKRShort(seller.demandPrice) || '',
       carCondition: seller.carCondition || 'Used',
       zeroMeterType: seller.zeroMeterType || 'Cash',
       isCommercial: Boolean(seller.isCommercial),

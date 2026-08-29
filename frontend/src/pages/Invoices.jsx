@@ -24,7 +24,7 @@ import {
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { logoBase64 } from '../utils/logoBase64';
-import { formatPKR, parsePakistaniPrice, getPriceHint } from '../utils/priceFormatter';
+import { formatPKR, parsePakistaniPrice, getPriceHint, normalizePriceInput, formatPKRShort } from '../utils/priceFormatter';
 
 const CameraCaptureWidget = ({ label, currentPhoto, onPhotoCaptured, onPhotoRemoved }) => {
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -380,8 +380,8 @@ export default function Invoices() {
       regName: inv.regName || '',
       regFatherName: inv.regFatherName || '',
       regAddress: inv.regAddress || '',
-      agreedAmount: inv.agreedAmount ? inv.agreedAmount.toString() : '',
-      agreedAmountHalf: inv.agreedAmountHalf ? inv.agreedAmountHalf.toString() : '',
+      agreedAmount: formatPKRShort(inv.agreedAmount) || '',
+      agreedAmountHalf: formatPKRShort(inv.agreedAmountHalf) || '',
       agreedAmountWords: inv.agreedAmountWords || '',
       agreementTime: inv.agreementTime || '',
       agreementDay: inv.agreementDay || '',
@@ -394,16 +394,16 @@ export default function Invoices() {
       onAccount: inv.onAccount || '',
       accountOf: inv.accountOf || '',
       time: inv.time || '',
-      cashAmount: inv.cashAmount || '',
+      cashAmount: formatPKRShort(inv.cashAmount) || '',
       statusBoxNotes: inv.statusBoxNotes || '',
       isImported: Boolean(inv.isImported),
       billOfEntryNo: inv.billOfEntryNo || '',
       portName: inv.portName || '',
       clearanceDate: inv.clearanceDate || '',
       importerName: inv.importerName || '',
-      totalPrice: inv.totalPrice ? inv.totalPrice.toString() : '',
-      advanceAmount: inv.advanceAmount ? inv.advanceAmount.toString() : '0',
-      remainingAmount: inv.remainingAmount !== undefined && inv.remainingAmount !== null ? inv.remainingAmount.toString() : '',
+      totalPrice: formatPKRShort(inv.totalPrice) || '',
+      advanceAmount: formatPKRShort(inv.advanceAmount) || '0',
+      remainingAmount: formatPKRShort(inv.remainingAmount) || '',
       paymentDuration: inv.paymentDuration || '',
       dated: inv.dated || new Date(inv.createdAt || Date.now()).toISOString().slice(0, 10),
       witness1Name: inv.witness1Name || '',
@@ -482,7 +482,7 @@ export default function Invoices() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const cleanPrice = (v) => (v !== '' && v !== null && v !== undefined ? String(parsePakistaniPrice(v)) : '');
+      const cleanPrice = (v) => (v !== '' && v !== null && v !== undefined ? normalizePriceInput(v) : '');
       const payload = {
         ...formData,
         totalPrice: cleanPrice(formData.totalPrice || formData.agreedAmount || formData.saleAmount),

@@ -88,7 +88,6 @@ function parsePakistaniPrice(input) {
   }
 
   // In Pakistani automotive market context, values < 500 (e.g. 40, 55, 120, 3.5) represent Lacs
-  // (e.g. 40 means 40 Lacs = 4,000,000 PKR; 3.5 means 3.5 Lacs = 350,000 PKR)
   if (parsedVal > 0 && parsedVal < 500) {
     return Math.round(parsedVal * 100000);
   }
@@ -97,56 +96,93 @@ function parsePakistaniPrice(input) {
 }
 
 /**
- * Format a number to standard Pakistani / South Asian Lac & Crore formatted text
- * e.g. 4000000 -> "Rs. 4,000,000 (40.00 Lac)"
+ * Normalizes user-entered price to human Pakistani notation (e.g. "5 Lac", "40 Lac", "1.5 Crore", "50k")
+ * so that "5 lac" is preserved and stored as "5 Lac" instead of expanding into "500000".
  */
-function formatPakistaniPrice(val, includeLacsWords = true) {
-  const num = parsePakistaniPrice(val);
-  if (!num) return 'Rs. 0';
+function normalizePriceInput(val) {
+  if (val === null || val === undefined || val === '') return '';
+  const str = String(val).trim();
+  if (str === '') return '';
 
-  const standardFormatted = 'Rs. ' + num.toLocaleString();
-
-  if (!includeLacsWords) {
-    return standardFormatted;
+  if (/^[\d.]+\s*(?:lac|lacs|lakh|lakhs|crore|cror|cr|k|thousand)\b/i.test(str)) {
+    return str
+      .replace(/\b(lac|lacs|lakh|lakhs)\b/gi, 'Lac')
+      .replace(/\b(crore|cror|cr)\b/gi, 'Crore')
+      .replace(/\b(k|thousand)\b/gi, 'k');
   }
 
-  if (num >= 10000000) {
-    const cr = (num / 10000000).toFixed(2).replace(/\.00$/, '');
-    return `${standardFormatted} (${cr} Crore)`;
-  } else if (num >= 100000) {
-    const lac = (num / 100000).toFixed(2).replace(/\.00$/, '');
-    return `${standardFormatted} (${lac} Lac)`;
-  } else if (num >= 1000) {
-    const k = (num / 1000).toFixed(1).replace(/\.0$/, '');
-    return `${standardFormatted} (${k}k)`;
+  const cleanNum = parseFloat(str.replace(/,/g, '').replace(/[^\d.]/g, ''));
+  if (!isNaN(cleanNum) && cleanNum > 0) {
+    if (cleanNum < 500) {
+      return `${cleanNum} Lac`;
+    }
+    if (cleanNum >= 10000000) {
+      const cr = (cleanNum / 10000000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+      return `${cr} Crore`;
+    }
+    if (cleanNum >= 100000) {
+      const lac = (cleanNum / 100000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+      return `${lac} Lac`;
+    }
+    if (cleanNum >= 1000) {
+      const k = (cleanNum / 1000).toFixed(1).replace(/\.0$/, '');
+      return `${k}k`;
+    }
   }
 
-  return standardFormatted;
+  return str;
 }
 
 /**
- * Short representation for cards and chips e.g. "40 Lac", "1.5 Crore", "500k"
+ * Format a number/string to human Pakistani Lac & Crore formatted text
+ * e.g. 500000 / "5 lac" -> "Rs. 5 Lac"
  */
-function formatPriceShort(val) {
-  const num = parsePakistaniPrice(val);
-  if (!num) return 'Rs. 0';
-
-  if (num >= 10000000) {
-    const cr = (num / 10000000).toFixed(2).replace(/\.00$/, '');
-    return `Rs. ${cr} Crore`;
-  } else if (num >= 100000) {
-    const lac = (num / 100000).toFixed(2).replace(/\.00$/, '');
-    return `Rs. ${lac} Lac`;
-  } else if (num >= 1000) {
-    const k = (num / 1000).toFixed(1).replace(/\.0$/, '');
-    return `Rs. ${k}k`;
+function formatPakistaniPrice(val, withPrefix = true) {
+  if (val === null || val === undefined || val === '' || val === 0 || val === '0') {
+    return withPrefix ? 'Rs. 0' : '0';
   }
 
-  return `Rs. ${num.toLocaleString()}`;
+  const prefix = withPrefix ? 'Rs. ' : '';
+
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (/^\s*(rs\.?|pkr)?\s*[\d.]+\s*(?:lac|lacs|lakh|lakhs|crore|cror|cr|k|thousand)\b/i.test(trimmed)) {
+      const cleanWithoutPrefix = trimmed.replace(/^(rs\.?|pkr)\s*/i, '').trim();
+      const formatted = cleanWithoutPrefix
+        .replace(/\b(lac|lacs|lakh|lakhs)\b/gi, 'Lac')
+        .replace(/\b(crore|cror|cr)\b/gi, 'Crore')
+        .replace(/\b(k|thousand)\b/gi, 'k');
+      return `${prefix}${formatted}`;
+    }
+  }
+
+  const num = parsePakistaniPrice(val);
+  if (!num || num <= 0) return `${prefix}0`;
+
+  if (num >= 10000000) {
+    const cr = (num / 10000000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+    return `${prefix}${cr} Crore`;
+  } else if (num >= 100000) {
+    const lac = (num / 100000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+    return `${prefix}${lac} Lac`;
+  } else if (num >= 1000) {
+    const k = (num / 1000).toFixed(1).replace(/\.0$/, '');
+    return `${prefix}${k}k`;
+  }
+
+  return `${prefix}${num.toLocaleString()}`;
+}
+
+/**
+ * Short representation for cards and chips e.g. "5 Lac", "40 Lac", "1.5 Crore", "50k"
+ */
+function formatPriceShort(val) {
+  return formatPakistaniPrice(val, true);
 }
 
 module.exports = {
   parsePakistaniPrice,
+  normalizePriceInput,
   formatPakistaniPrice,
   formatPriceShort
 };

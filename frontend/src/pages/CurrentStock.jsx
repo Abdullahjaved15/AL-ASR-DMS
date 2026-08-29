@@ -3,7 +3,7 @@ import { Package, Plus, Search, Filter, Edit, Trash2, Download, ShieldAlert, Che
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { logoBase64 } from '../utils/logoBase64';
-import { formatPKR, parsePakistaniPrice, getPriceHint } from '../utils/priceFormatter';
+import { formatPKR, parsePakistaniPrice, getPriceHint, normalizePriceInput, formatPKRShort } from '../utils/priceFormatter';
 
 export default function CurrentStock() {
   const { user, isAdmin } = useAuth();
@@ -55,8 +55,8 @@ export default function CurrentStock() {
 
   const cleanStockPayload = (data) => ({
     ...data,
-    askingPrice: data.askingPrice !== '' && data.askingPrice !== null && data.askingPrice !== undefined ? String(parsePakistaniPrice(data.askingPrice)) : '',
-    purchasePrice: data.purchasePrice !== '' && data.purchasePrice !== null && data.purchasePrice !== undefined ? String(parsePakistaniPrice(data.purchasePrice)) : '',
+    askingPrice: data.askingPrice !== '' && data.askingPrice !== null && data.askingPrice !== undefined ? normalizePriceInput(data.askingPrice) : '',
+    purchasePrice: data.purchasePrice !== '' && data.purchasePrice !== null && data.purchasePrice !== undefined ? normalizePriceInput(data.purchasePrice) : '',
     mileage: data.mileage ? parseInt(data.mileage, 10) || 0 : 0
   });
 
@@ -116,8 +116,8 @@ export default function CurrentStock() {
       year: item.year || new Date().getFullYear(),
       color: item.color || 'White',
       mileage: item.mileage || 0,
-      askingPrice: item.askingPrice || '',
-      purchasePrice: item.purchasePrice || '',
+      askingPrice: formatPKRShort(item.askingPrice) || '',
+      purchasePrice: formatPKRShort(item.purchasePrice) || '',
       status: item.status || 'AVAILABLE',
       location: item.location || 'Main Showroom',
       notes: item.notes || '',

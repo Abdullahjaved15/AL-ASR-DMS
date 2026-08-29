@@ -3,7 +3,7 @@ import { Handshake, Plus, DollarSign, TrendingUp, Calendar, UserCheck, CheckCirc
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import ImageViewerModal from '../components/ImageViewerModal';
-import { formatPKR, parsePakistaniPrice, getPriceHint } from '../utils/priceFormatter';
+import { formatPKR, parsePakistaniPrice, getPriceHint, normalizePriceInput } from '../utils/priceFormatter';
 
 export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
   const { user, isAdmin } = useAuth();
@@ -59,11 +59,10 @@ export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
     }
 
     try {
-      const parsedDealPrice = parsePakistaniPrice(dealPrice);
       await api.createDeal({
         buyerId: selectedBuyerId,
         sellerId: selectedSellerId,
-        dealPrice: String(parsedDealPrice),
+        dealPrice: normalizePriceInput(dealPrice),
         remarks
       });
 
@@ -107,7 +106,7 @@ export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
         <div className="glass-card rounded-2xl p-5 flex items-center justify-between">
           <div>
             <p className="text-xs font-mono uppercase tracking-wider text-slate-400">Total Closed Volume</p>
-            <h3 className="text-2xl font-extrabold text-cyan-400 mt-0.5">PKR {totalVolume.toLocaleString()}</h3>
+            <h3 className="text-2xl font-extrabold text-cyan-400 mt-0.5">{formatPKR(totalVolume)}</h3>
           </div>
           <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center">
             <DollarSign className="w-5 h-5" />
@@ -117,7 +116,7 @@ export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
         <div className="glass-card rounded-2xl p-5 flex items-center justify-between">
           <div>
             <p className="text-xs font-mono uppercase tracking-wider text-slate-400">Net Profit Generated</p>
-            <h3 className="text-2xl font-extrabold text-emerald-400 mt-0.5">+PKR {totalProfit.toLocaleString()}</h3>
+            <h3 className="text-2xl font-extrabold text-emerald-400 mt-0.5">+{formatPKR(totalProfit)}</h3>
           </div>
           <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
             <TrendingUp className="w-5 h-5" />

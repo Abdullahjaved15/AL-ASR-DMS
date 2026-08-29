@@ -7,7 +7,7 @@ import FilterBar from '../components/FilterBar';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { logoBase64 } from '../utils/logoBase64';
-import { formatPKR, parsePakistaniPrice, getPriceHint } from '../utils/priceFormatter';
+import { formatPKR, parsePakistaniPrice, getPriceHint, normalizePriceInput, formatPKRShort } from '../utils/priceFormatter';
 
 const leadStatuses = ['New Lead', 'Contacted', 'Follow Up', 'Interested', 'Negotiation', 'Deal Closed', 'Lost', 'Cancelled', 'Incomplete'];
 
@@ -212,12 +212,10 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
   const handleCreateBuyer = async (e) => {
     e.preventDefault();
     try {
-      const numBudget = formData.budget !== '' && formData.budget !== null && formData.budget !== undefined ? parsePakistaniPrice(formData.budget) : 0;
-      const numProcessingFees = formData.processingFees ? parsePakistaniPrice(formData.processingFees) : 0;
       const payload = {
         ...formData,
-        budget: numBudget ? String(numBudget) : '',
-        processingFees: numProcessingFees ? String(numProcessingFees) : ''
+        budget: formData.budget !== '' && formData.budget !== null && formData.budget !== undefined ? normalizePriceInput(formData.budget) : '',
+        processingFees: formData.processingFees ? normalizePriceInput(formData.processingFees) : ''
       };
       await api.createBuyer(payload);
       setIsAddModalOpen(false);
@@ -231,12 +229,10 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
   const handleUpdateBuyer = async (e) => {
     e.preventDefault();
     try {
-      const numBudget = formData.budget !== '' && formData.budget !== null && formData.budget !== undefined ? parsePakistaniPrice(formData.budget) : 0;
-      const numProcessingFees = formData.processingFees ? parsePakistaniPrice(formData.processingFees) : 0;
       const payload = {
         ...formData,
-        budget: numBudget ? String(numBudget) : '',
-        processingFees: numProcessingFees ? String(numProcessingFees) : ''
+        budget: formData.budget !== '' && formData.budget !== null && formData.budget !== undefined ? normalizePriceInput(formData.budget) : '',
+        processingFees: formData.processingFees ? normalizePriceInput(formData.processingFees) : ''
       };
       const res = await api.updateBuyer(selectedBuyer.id, payload);
       if (res?.requiresApproval) {
@@ -271,7 +267,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
       year: buyer.year || '',
       color: buyer.color || '',
       mileage: buyer.mileage || 0,
-      budget: buyer.budget || '',
+      budget: formatPKRShort(buyer.budget) || '',
       carCondition: buyer.carCondition || 'Used',
       zeroMeterType: buyer.zeroMeterType || 'Cash',
       isCommercial: Boolean(buyer.isCommercial),
@@ -279,7 +275,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
       isBankCase: Boolean(buyer.isBankCase),
       bankName: buyer.bankName || '',
       bankCaseStatus: buyer.bankCaseStatus || 'Not Confirmed',
-      processingFees: buyer.processingFees || 0,
+      processingFees: formatPKRShort(buyer.processingFees) || '',
       downpaymentPercent: buyer.downpaymentPercent || 20,
       buyerName: buyer.buyerName || '',
       buyerPhone: buyer.buyerPhone || '',

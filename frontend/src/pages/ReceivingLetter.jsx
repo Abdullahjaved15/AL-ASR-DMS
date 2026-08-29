@@ -3,7 +3,7 @@ import { FileCheck, Plus, Search, Printer, Edit, Trash2, Car, User, Calendar, Cl
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { logoBase64 } from '../utils/logoBase64';
-import { formatPKR, parsePakistaniPrice, getPriceHint } from '../utils/priceFormatter';
+import { formatPKR, parsePakistaniPrice, getPriceHint, normalizePriceInput, formatPKRShort } from '../utils/priceFormatter';
 
 export default function ReceivingLetterPage() {
   const { user } = useAuth();
@@ -124,8 +124,8 @@ export default function ReceivingLetterPage() {
       regNumber: rl.regNumber || '',
       color: rl.color || '',
       mileage: rl.mileage || '',
-      demandAmount: rl.demandAmount || rl.fullFinalAmount || '',
-      fullFinalAmount: rl.demandAmount || rl.fullFinalAmount || '',
+      demandAmount: formatPKRShort(rl.demandAmount || rl.fullFinalAmount) || '',
+      fullFinalAmount: formatPKRShort(rl.demandAmount || rl.fullFinalAmount) || '',
       ownerName: rl.ownerName || '',
       receiverName: rl.receiverName || user?.name || '',
       fileStatus: rl.fileStatus || 'Complete Original File',
@@ -152,13 +152,13 @@ export default function ReceivingLetterPage() {
     setSubmitting(true);
     try {
       const rawDemand = formData.demandAmount || formData.fullFinalAmount;
-      const parsedDemand = (rawDemand !== '' && rawDemand !== null && rawDemand !== undefined)
-        ? String(parsePakistaniPrice(rawDemand))
+      const normalizedDemand = (rawDemand !== '' && rawDemand !== null && rawDemand !== undefined)
+        ? normalizePriceInput(rawDemand)
         : '';
       const payload = {
         ...formData,
-        demandAmount: parsedDemand,
-        fullFinalAmount: parsedDemand
+        demandAmount: normalizedDemand,
+        fullFinalAmount: normalizedDemand
       };
 
       let savedLetter = null;

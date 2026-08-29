@@ -1,7 +1,7 @@
 /**
  * Frontend Pakistani Rupee (PKR) Price Parser and Formatter Utility
- * Parses strings like "40 lac", "1.5 crore", "500k", "40", "4000000" into numeric PKR,
- * and formats values for display across tables, cards, exports, and forms.
+ * Parses strings like "5 lac", "40 lac", "1.5 crore", "500k", "40", "4000000" into numeric PKR,
+ * and formats values for display across tables, cards, exports, and forms in human Pakistani notation (e.g. 5 Lac, 40 Lac, 1.5 Crore).
  */
 
 export function parsePakistaniPrice(input) {
@@ -12,7 +12,7 @@ export function parsePakistaniPrice(input) {
   // If already a valid number
   if (typeof input === 'number') {
     if (isNaN(input) || input <= 0) return 0;
-    // In Pakistani car market shorthand, a small number (e.g. 40) means 40 Lacs
+    // In Pakistani car market shorthand, a small number (e.g. 5 or 40) means 5 Lac or 40 Lacs
     if (input > 0 && input < 500) {
       return Math.round(input * 100000);
     }
@@ -86,7 +86,7 @@ export function parsePakistaniPrice(input) {
     return 0;
   }
 
-  // In Pakistani automotive market context, values < 500 (e.g. 40, 55, 120, 3.5) represent Lacs
+  // In Pakistani automotive market context, values < 500 represent Lacs (e.g. 5 = 500,000 PKR, 40 = 4,000,000 PKR)
   if (parsedVal > 0 && parsedVal < 500) {
     return Math.round(parsedVal * 100000);
   }
@@ -95,74 +95,111 @@ export function parsePakistaniPrice(input) {
 }
 
 /**
- * Format any input (number or string) to standard PKR display
- * e.g. "Rs. 4,000,000" or with words: "Rs. 4,000,000 (40.00 Lac)"
+ * Normalizes user-entered price to human Pakistani notation (e.g. "5 Lac", "40 Lac", "1.5 Crore", "50k")
+ * so that "5 lac" is preserved and stored as "5 Lac" instead of expanding into "500000".
  */
-export function formatPKR(val, includeWords = false) {
-  const num = parsePakistaniPrice(val);
-  if (!num) return 'Rs. 0';
+export function normalizePriceInput(val) {
+  if (val === null || val === undefined || val === '') return '';
+  const str = String(val).trim();
+  if (str === '') return '';
 
-  const standardFormatted = 'Rs. ' + num.toLocaleString();
-
-  if (!includeWords) {
-    return standardFormatted;
+  // If user already typed "5 lac", "40 lac", "1.5 crore", "50k", preserve and capitalize cleanly
+  if (/^[\d.]+\s*(?:lac|lacs|lakh|lakhs|crore|cror|cr|k|thousand)\b/i.test(str)) {
+    return str
+      .replace(/\b(lac|lacs|lakh|lakhs)\b/gi, 'Lac')
+      .replace(/\b(crore|cror|cr)\b/gi, 'Crore')
+      .replace(/\b(k|thousand)\b/gi, 'k');
   }
+
+  const cleanNum = parseFloat(str.replace(/,/g, '').replace(/[^\d.]/g, ''));
+  if (!isNaN(cleanNum) && cleanNum > 0) {
+    if (cleanNum < 500) {
+      return `${cleanNum} Lac`;
+    }
+    if (cleanNum >= 10000000) {
+      const cr = (cleanNum / 10000000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+      return `${cr} Crore`;
+    }
+    if (cleanNum >= 100000) {
+      const lac = (cleanNum / 100000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+      return `${lac} Lac`;
+    }
+    if (cleanNum >= 1000) {
+      const k = (cleanNum / 1000).toFixed(1).replace(/\.0$/, '');
+      return `${k}k`;
+    }
+  }
+
+  return str;
+}
+
+/**
+ * Format any input (number or string) to standard Pakistani Lac/Crore display
+ * e.g. 500000 -> "Rs. 5 Lac", 4000000 -> "Rs. 40 Lac", "5 lac" -> "Rs. 5 Lac"
+ */
+export function formatPKR(val, withPrefix = true) {
+  if (val === null || val === undefined || val === '' || val === 0 || val === '0') {
+    return withPrefix ? 'Rs. 0' : '0';
+  }
+
+  const prefix = withPrefix ? 'Rs. ' : '';
+
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (/^\s*(rs\.?|pkr)?\s*[\d.]+\s*(?:lac|lacs|lakh|lakhs|crore|cror|cr|k|thousand)\b/i.test(trimmed)) {
+      const cleanWithoutPrefix = trimmed.replace(/^(rs\.?|pkr)\s*/i, '').trim();
+      const formatted = cleanWithoutPrefix
+        .replace(/\b(lac|lacs|lakh|lakhs)\b/gi, 'Lac')
+        .replace(/\b(crore|cror|cr)\b/gi, 'Crore')
+        .replace(/\b(k|thousand)\b/gi, 'k');
+      return `${prefix}${formatted}`;
+    }
+  }
+
+  const num = parsePakistaniPrice(val);
+  if (!num || num <= 0) return `${prefix}0`;
 
   if (num >= 10000000) {
-    const cr = (num / 10000000).toFixed(2).replace(/\.00$/, '');
-    return `${standardFormatted} (${cr} Crore)`;
+    const cr = (num / 10000000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+    return `${prefix}${cr} Crore`;
   } else if (num >= 100000) {
-    const lac = (num / 100000).toFixed(2).replace(/\.00$/, '');
-    return `${standardFormatted} (${lac} Lac)`;
+    const lac = (num / 100000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+    return `${prefix}${lac} Lac`;
   } else if (num >= 1000) {
     const k = (num / 1000).toFixed(1).replace(/\.0$/, '');
-    return `${standardFormatted} (${k}k)`;
+    return `${prefix}${k}k`;
   }
 
-  return standardFormatted;
+  return `${prefix}${num.toLocaleString()}`;
 }
 
 /**
  * Returns clean formatted Lacs / Crore words for live helpers
- * e.g. "Rs. 4,000,000 (40 Lac)"
+ * e.g. "5 Lac" or "1.5 Crore"
  */
 export function getPriceHint(val) {
   if (!val || String(val).trim() === '') return '';
   const num = parsePakistaniPrice(val);
   if (!num || num <= 0) return '';
 
-  let words = '';
   if (num >= 10000000) {
-    const cr = (num / 10000000).toFixed(2).replace(/\.00$/, '');
-    words = `${cr} Crore`;
+    const cr = (num / 10000000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+    return `Calculated: ${cr} Crore (PKR ${num.toLocaleString()})`;
   } else if (num >= 100000) {
-    const lac = (num / 100000).toFixed(2).replace(/\.00$/, '');
-    words = `${lac} Lac`;
+    const lac = (num / 100000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+    return `Calculated: ${lac} Lac (PKR ${num.toLocaleString()})`;
   } else if (num >= 1000) {
     const k = (num / 1000).toFixed(1).replace(/\.0$/, '');
-    words = `${k}k`;
+    return `Calculated: ${k}k (PKR ${num.toLocaleString()})`;
   }
 
-  return `Rs. ${num.toLocaleString()}${words ? ` (${words})` : ''}`;
+  return `Calculated: PKR ${num.toLocaleString()}`;
 }
 
 /**
- * Compact display for badges / cards e.g. "Rs. 40 Lac", "Rs. 1.50 Crore"
+ * Compact display without Rs prefix e.g. "5 Lac", "40 Lac", "1.5 Crore"
  */
 export function formatPKRShort(val) {
-  const num = parsePakistaniPrice(val);
-  if (!num) return 'Rs. 0';
-
-  if (num >= 10000000) {
-    const cr = (num / 10000000).toFixed(2).replace(/\.00$/, '');
-    return `Rs. ${cr} Crore`;
-  } else if (num >= 100000) {
-    const lac = (num / 100000).toFixed(2).replace(/\.00$/, '');
-    return `Rs. ${lac} Lac`;
-  } else if (num >= 1000) {
-    const k = (num / 1000).toFixed(1).replace(/\.0$/, '');
-    return `Rs. ${k}k`;
-  }
-
-  return `Rs. ${num.toLocaleString()}`;
+  return formatPKR(val, false);
 }
+
