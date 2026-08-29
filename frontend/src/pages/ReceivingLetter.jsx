@@ -32,6 +32,7 @@ export default function ReceivingLetterPage() {
     date: new Date().toISOString().slice(0, 10),
     receivingTime: getCurrentTimeFormatted(),
     vehicleName: '',
+    modelYear: '',
     chassisNumber: '',
     regNumber: '',
     color: '',
@@ -78,14 +79,18 @@ export default function ReceivingLetterPage() {
     if (s) {
       setFormData(prev => ({
         ...prev,
-        vehicleName: `${s.vehicle} ${s.model}`,
+        vehicleName: `${s.vehicle || ''} ${s.model || ''}`.trim(),
+        modelYear: s.year ? String(s.year) : '',
         regNumber: s.numberPlate || '',
         color: s.color || '',
-        mileage: s.mileage ? s.mileage.toString() : '',
-        demandAmount: s.demandPrice ? s.demandPrice.toString() : '',
-        fullFinalAmount: s.demandPrice ? s.demandPrice.toString() : '',
+        mileage: s.mileage ? `${s.mileage} km` : '',
+        demandAmount: formatPKRShort(s.demandPrice) || '',
+        fullFinalAmount: formatPKRShort(s.demandPrice) || '',
         ownerName: s.sellerName || '',
-        chassisNumber: prev.chassisNumber || ''
+        chassisNumber: prev.chassisNumber || '',
+        fileStatus: 'Complete Original File',
+        keyStatus: '2 Keys (Master + Spare)',
+        smartCardStatus: 'Smart Card Available'
       }));
     }
   };
@@ -97,6 +102,7 @@ export default function ReceivingLetterPage() {
       date: new Date().toISOString().slice(0, 10),
       receivingTime: getCurrentTimeFormatted(),
       vehicleName: '',
+      modelYear: '',
       chassisNumber: '',
       regNumber: '',
       color: '',
@@ -120,6 +126,7 @@ export default function ReceivingLetterPage() {
       date: rl.date ? new Date(rl.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
       receivingTime: rl.receivingTime || getCurrentTimeFormatted(),
       vehicleName: rl.vehicleName || '',
+      modelYear: rl.modelYear ? String(rl.modelYear) : '',
       chassisNumber: rl.chassisNumber || '',
       regNumber: rl.regNumber || '',
       color: rl.color || '',
@@ -297,17 +304,25 @@ export default function ReceivingLetterPage() {
               </tr>
             </table>
 
-            <div class="doc-title">VEHICLE RECEIVING LETTER</div>
-
-            <table class="grid-table">
+            <div class="doc-title">VEHICLE RECEIVING LETTER</div>            <table class="grid-table">
               <tr>
                 <td style="width: 50%;">
                   <div class="label">Date & Time Received</div>
                   <div class="val">${new Date(letter.date || letter.createdAt).toLocaleDateString()} ${letter.receivingTime ? '• at ' + letter.receivingTime : ''}</div>
                 </td>
                 <td style="width: 50%;">
-                  <div class="label">Vehicle Name & Model</div>
-                  <div class="val" style="color: #0284c7; font-size: 14px;">${letter.vehicleName}</div>
+                  <div class="label">Vehicle Name & Make</div>
+                  <div class="val" style="color: #0284c7; font-size: 14px; font-weight: 800;">${letter.vehicleName}</div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="label">Model Year (ماڈل سال)</div>
+                  <div class="val" style="font-family: monospace; font-weight: bold; color: #0284c7;">${letter.modelYear || 'N/A'}</div>
+                </td>
+                <td>
+                  <div class="label">Registration Number (Reg#)</div>
+                  <div class="val" style="font-family: monospace; color: #b45309; font-weight: bold;">${letter.regNumber || 'N/A'}</div>
                 </td>
               </tr>
               <tr>
@@ -316,150 +331,143 @@ export default function ReceivingLetterPage() {
                   <div class="val" style="font-family: monospace;">${letter.chassisNumber || 'N/A'}</div>
                 </td>
                 <td>
-                  <div class="label">Registration Number (Reg#)</div>
-                  <div class="val" style="font-family: monospace; color: #b45309;">${letter.regNumber || 'N/A'}</div>
-                </td>
-              </tr>
-              <tr>
-                <td>
                   <div class="label">Vehicle Color</div>
                   <div class="val">${letter.color || 'N/A'}</div>
                 </td>
+              </tr>
+              <tr>
                 <td>
                   <div class="label">Vehicle Mileage</div>
                   <div class="val" style="font-family: monospace; color: #0284c7; font-weight: bold;">${letter.mileage ? letter.mileage + (String(letter.mileage).toLowerCase().includes('km') ? '' : ' KM') : 'N/A'}</div>
                 </td>
-              </tr>
-              <tr>
                 <td>
                   <div class="label">Vehicle Demand (PKR)</div>
                   <div class="val" style="color: #047857; font-size: 14px; font-weight: 800;">${formattedDemand}</div>
                 </td>
+              </tr>
+              <tr>
                 <td>
                   <div class="label">Owner Name (Vehicle Handover By)</div>
                   <div class="val">${letter.ownerName}</div>
                 </td>
-              </tr>
-              <tr>
                 <td>
                   <div class="label">Receiver Name (AL-ASR Representative)</div>
                   <div class="val" style="color: #047857;">${letter.receiverName}</div>
                 </td>
+              </tr>
+              <tr>
                 <td>
                   <div class="label">Registration File Status</div>
                   <div class="val">${letter.fileStatus || 'N/A'}</div>
                 </td>
-              </tr>
-              <tr>
                 <td>
                   <div class="label">Vehicle Keys Status</div>
                   <div class="val">${letter.keyStatus || 'N/A'}</div>
                 </td>
+              </tr>
+              <tr>
                 <td>
                   <div class="label">Smart Card Status</div>
                   <div class="val">${letter.smartCardStatus || 'N/A'}</div>
                 </td>
-              </tr>
-              <tr>
-                <td colspan="2">
-                  <div class="label">Accessories & Spare Tools Handed Over</div>
-                  <div class="val">${letter.anyOtherAccessory || 'None'}</div>
+                <td>
+                  <div class="label">Any Other Accessory</div>
+                  <div class="val">${letter.anyOtherAccessory || 'N/A'}</div>
                 </td>
               </tr>
             </table>
 
-            <div class="notes-box">
-              <div class="label" style="color: #0f172a; margin-bottom: 4px;">Receiving Details & Vehicle Condition Notes:</div>
-              <div style="font-size: 11px; color: #334155; white-space: pre-wrap;">${letter.notes || `Vehicle received in good condition at ${letter.receivingTime || 'the designated time'} with listed accessories and documents as per AL-ASR Motors receiving policy.`}</div>
+            <div style="margin-top: 15px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; background: #f8fafc;">
+              <div style="font-size: 10px; font-weight: bold; color: #047857; text-transform: uppercase; margin-bottom: 3px;">Vehicle Condition Notes & Specific Observations:</div>
+              <div style="font-size: 11px; color: #1e293b; min-height: 28px;">${letter.notes || 'Vehicle received in inspected condition with all above documents and accessories verified.'}</div>
             </div>
 
-            <div class="signatures">
+            <div class="sig-grid">
               <div class="sig-box">
-                Vehicle Owner / Seller Signature<br/>
-                <span style="font-size: 10px; color: #64748b; font-weight: normal;">(${letter.ownerName})</span>
+                <div class="sig-line"></div>
+                <div class="sig-title">Vehicle Owner Signature</div>
+                <div class="sig-name">${letter.ownerName}</div>
               </div>
               <div class="sig-box">
-                Receiver Signature & Stamp<br/>
-                <span style="font-size: 10px; color: #0284c7; font-weight: normal;">(${letter.receiverName} — AL-ASR MOTORS)</span>
+                <div class="sig-line"></div>
+                <div class="sig-title">AL ASR MOTORS Authorized Receiver</div>
+                <div class="sig-name">${letter.receiverName}</div>
               </div>
             </div>
 
-            <div class="footer-text">
-              AL-ASR MOTORS • Official Vehicle Handover Receiving Copy • Generated on ${new Date().toLocaleString()}
+            <div class="footer">
+              AL ASR MOTORS • Receiving Letter Document Ref: ${letter.letterNumber} • Printed on ${new Date().toLocaleDateString()}
             </div>
-          </div>
-          <script>
-            window.onload = function() { window.print(); }
-          </script>
-        </body>
-      </html>
-    `;
+          </body>
+        </html>
+      `;
 
     printWindow.document.write(htmlContent);
     printWindow.document.close();
+    setTimeout(() => {
+      printWindow.print();
+    }, 350);
   };
 
   return (
-    <div className="space-y-6">
-      {/* Top Header & Actions Bar */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 glass-card p-6 rounded-3xl border border-white/10 shadow-2xl">
+    <div className="p-4 sm:p-8 space-y-6 max-w-7xl mx-auto">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center space-x-2">
-            <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full font-mono text-xs font-semibold">
-              Vehicle Inventory Management
-            </span>
-            <span className="text-xs text-slate-400 font-mono">Official Documentation</span>
+          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono mb-2">
+            <FileCheck className="w-3.5 h-3.5" />
+            <span>Receiving Letter & Inspection Protocol</span>
           </div>
-          <h1 className="text-2xl font-black text-white mt-1 tracking-tight flex items-center gap-2">
-            <FileCheck className="w-7 h-7 text-emerald-400" />
-            Showroom Vehicle Receiving Letters
-          </h1>
+          <h1 className="text-2xl font-extrabold text-white">Receiving Letters (وصولی لیٹر)</h1>
           <p className="text-xs text-slate-400 font-mono mt-0.5">
-            Create, manage, attach pictures, and print official vehicle receiving letters for AL-ASR Motors.
+            Official vehicle receiving receipts, physical condition records, file & key checklists.
           </p>
         </div>
 
-        <button
-          onClick={() => { resetForm(); setIsAddModalOpen(true); }}
-          className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black font-bold font-mono text-xs rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center space-x-2 flex-shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Receiving Letter</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => { resetForm(); setIsAddModalOpen(true); }}
+            className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black font-bold rounded-xl text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center space-x-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Receiving Letter</span>
+          </button>
+        </div>
       </div>
 
       {/* Search Bar */}
-      <div className="glass-card rounded-2xl p-3 border border-white/10 flex items-center space-x-3">
-        <Search className="w-4 h-4 text-slate-400 ml-2" />
+      <div className="glass-card rounded-2xl p-4 border border-white/10 flex items-center space-x-3">
+        <Search className="w-4 h-4 text-slate-400" />
         <input
           type="text"
-          placeholder="Search receiving letters by Vehicle, Owner, Receiver, Reg #, Chassis #, Mileage, Demand..."
+          placeholder="Search by Letter Ref #, Vehicle Make, Model Year, Reg #, Chassis #, Owner..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-transparent text-xs text-white placeholder-slate-400 focus:outline-none font-mono"
+          className="w-full bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none font-mono"
         />
       </div>
 
-      {/* Data Table of Receiving Letters */}
+      {/* Letters Table */}
       <div className="glass-card rounded-2xl overflow-hidden border border-white/10">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-900/80 border-b border-white/10 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
-                <th className="py-3.5 px-4">Ref #, Date & Time</th>
+                <th className="py-3.5 px-4">Letter Ref / Date</th>
                 <th className="py-3.5 px-4">Vehicle Details</th>
                 <th className="py-3.5 px-4">Mileage & Demand</th>
-                <th className="py-3.5 px-4">Owner Name</th>
-                <th className="py-3.5 px-4">Receiver Name</th>
-                <th className="py-3.5 px-4">File / Key / Smart Card</th>
+                <th className="py-3.5 px-4">Handed Over By</th>
+                <th className="py-3.5 px-4">Received By</th>
+                <th className="py-3.5 px-4">Checklist (File/Key)</th>
                 <th className="py-3.5 px-4">Pictures</th>
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-xs">
               {letters.map((rl) => {
-                const imgCount = rl.images?.length || 0;
                 const effectiveDemand = rl.demandAmount || rl.fullFinalAmount || '';
+                const imgCount = rl.images?.length || 0;
+
                 return (
                   <tr key={rl.id} className="hover:bg-white/5 transition-colors">
                     <td className="py-4 px-4 font-mono">
@@ -471,7 +479,9 @@ export default function ReceivingLetterPage() {
                     </td>
 
                     <td className="py-4 px-4">
-                      <p className="font-extrabold text-white text-sm">{rl.vehicleName}</p>
+                      <p className="font-extrabold text-white text-sm">
+                        {rl.vehicleName} {rl.modelYear ? <span className="text-cyan-400 font-mono font-bold">({rl.modelYear})</span> : ''}
+                      </p>
                       <p className="text-[11px] text-slate-400 font-mono">
                         Reg: <span className="text-amber-300 font-bold">{rl.regNumber || 'N/A'}</span> • Color: {rl.color || 'N/A'}
                       </p>
@@ -564,18 +574,24 @@ export default function ReceivingLetterPage() {
 
       {/* CREATE / EDIT RECEIVING LETTER MODAL */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="glass-modal rounded-3xl p-6 w-full max-w-3xl border border-white/10 shadow-2xl my-8">
-            <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-5">
-              <div className="flex items-center space-x-2">
-                <FileCheck className="w-6 h-6 text-emerald-400" />
-                <h3 className="text-xl font-bold text-white">
-                  {editingLetter ? `Edit Receiving Letter (${editingLetter.letterNumber})` : 'Create Receiving Letter – AL-ASR MOTORS'}
-                </h3>
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto">
+          <div className="glass-modal rounded-3xl p-5 sm:p-6 w-full max-w-4xl border border-white/10 shadow-2xl my-auto max-h-[92vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-white/10 flex-shrink-0 mb-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+                  <FileCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white leading-tight">
+                    {editingLetter ? `Edit Receiving Letter (${editingLetter.letterNumber})` : 'Create Vehicle Receiving Letter'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-mono">AL-ASR MOTORS • Vehicle Handover & Physical Inspection Receipt</p>
+                </div>
               </div>
               <button
                 onClick={() => { setIsAddModalOpen(false); resetForm(); }}
-                className="text-slate-400 hover:text-white"
+                className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
               >
                 ✕
               </button>
@@ -583,226 +599,253 @@ export default function ReceivingLetterPage() {
 
             {/* Quick fill selector from current seller stock */}
             {sellers.length > 0 && !editingLetter && (
-              <div className="mb-4 p-3 bg-slate-900/90 rounded-2xl border border-white/10 flex items-center space-x-3">
+              <div className="mb-3 p-2.5 bg-slate-900/90 rounded-xl border border-white/10 flex items-center space-x-2.5 flex-shrink-0">
                 <Car className="w-4 h-4 text-cyan-400 flex-shrink-0" />
                 <span className="text-xs text-slate-300 font-mono flex-shrink-0">Quick Fill from Inventory:</span>
                 <select
                   onChange={(e) => handleSelectSellerQuickFill(e.target.value)}
-                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none font-mono"
+                  className="w-full bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
                 >
                   <option value="">Select vehicle to auto-populate...</option>
                   {sellers.map(s => (
                     <option key={s.id} value={s.id}>
-                      {s.vehicle} {s.model} ({s.numberPlate || 'No Plate'}) - Owner: {s.sellerName}
+                      {s.vehicle} {s.model} {s.year ? `(${s.year})` : ''} - Plate: {s.numberPlate || 'No Plate'} - Owner: {s.sellerName}
                     </option>
                   ))}
                 </select>
               </div>
             )}
 
-            <form onSubmit={handleSaveLetter} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={formData.date}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
-                  />
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-mono text-emerald-400 font-bold">Receiving Time *</label>
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, receivingTime: getCurrentTimeFormatted() })}
-                      className="text-[10px] font-mono text-cyan-400 hover:text-white underline"
-                    >
-                      Set Now
-                    </button>
+            {/* Form Body - Smoothly Scrollable with fixed footer */}
+            <form onSubmit={handleSaveLetter} className="overflow-y-auto flex-1 pr-1 space-y-4">
+              {/* Section 1: Basic & Receiving Info */}
+              <div className="space-y-3">
+                <h4 className="text-xs uppercase font-mono text-emerald-400 tracking-wider font-bold border-b border-white/5 pb-1">
+                  1. Receiving Details & Staff Assignment
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono text-slate-400 mb-1">Date Received *</label>
+                    <input
+                      type="date"
+                      required
+                      value={formData.date}
+                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    />
                   </div>
-                  <div className="relative">
-                    <Clock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-mono text-emerald-400 font-bold">Receiving Time *</label>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, receivingTime: getCurrentTimeFormatted() })}
+                        className="text-[10px] font-mono text-cyan-400 hover:text-white underline"
+                      >
+                        Set Now
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <Clock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. 03:45 PM"
+                        value={formData.receivingTime}
+                        onChange={(e) => setFormData({ ...formData, receivingTime: e.target.value })}
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl pl-8 pr-3 py-2 text-xs text-emerald-300 focus:outline-none focus:border-emerald-500 font-mono font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono text-slate-400 mb-1">Receiver Name (Staff) *</label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. 11:30 AM"
-                      value={formData.receivingTime}
-                      onChange={(e) => setFormData({ ...formData, receivingTime: e.target.value })}
-                      className="w-full bg-slate-900 border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm text-emerald-300 focus:outline-none focus:border-emerald-500 font-mono font-bold"
+                      placeholder="Staff / Receiver Name"
+                      value={formData.receiverName}
+                      onChange={(e) => setFormData({ ...formData, receiverName: e.target.value })}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-cyan-300 font-semibold focus:outline-none focus:border-emerald-500"
                     />
                   </div>
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Vehicle Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Toyota Civic Oriel"
-                    value={formData.vehicleName}
-                    onChange={(e) => setFormData({ ...formData, vehicleName: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
+              {/* Section 2: Vehicle Specs & Financials */}
+              <div className="space-y-3">
+                <h4 className="text-xs uppercase font-mono text-cyan-400 tracking-wider font-bold border-b border-white/5 pb-1">
+                  2. Vehicle Specifications & Pricing
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono text-slate-400 mb-1">Vehicle Name / Make *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Toyota Civic, Honda City"
+                      value={formData.vehicleName}
+                      onChange={(e) => setFormData({ ...formData, vehicleName: e.target.value })}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Ch# (Chassis Number)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. CH-992810"
-                    value={formData.chassisNumber}
-                    onChange={(e) => setFormData({ ...formData, chassisNumber: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
-                  />
+                  <div>
+                    <label className="block text-xs font-mono text-cyan-400 font-bold mb-1">Model Year (ماڈل سال) *</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 2022, 2024, 2018"
+                      value={formData.modelYear}
+                      onChange={(e) => setFormData({ ...formData, modelYear: e.target.value })}
+                      className="w-full bg-slate-900 border border-cyan-500/40 rounded-xl px-3 py-2 text-xs text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono text-slate-400 mb-1">Reg # (Number Plate)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. LEC-1234 / Applied For"
+                      value={formData.regNumber}
+                      onChange={(e) => setFormData({ ...formData, regNumber: e.target.value })}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-500 uppercase"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono text-slate-400 mb-1">Color</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. White, Black, Silver"
+                      value={formData.color}
+                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono text-slate-400 mb-1">Chassis Number (Ch#)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. CH-992810"
+                      value={formData.chassisNumber}
+                      onChange={(e) => setFormData({ ...formData, chassisNumber: e.target.value })}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono text-slate-400 mb-1">Mileage (KM)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 45,000 km"
+                      value={formData.mileage}
+                      onChange={(e) => setFormData({ ...formData, mileage: e.target.value })}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-cyan-300 font-mono font-semibold focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-mono text-emerald-400 font-bold mb-1">Demand Amount (PKR / Rs.) *</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 40 lac, 1.5 crore, 4500000"
+                      value={formData.demandAmount || formData.fullFinalAmount}
+                      onChange={(e) => setFormData({ ...formData, demandAmount: e.target.value, fullFinalAmount: e.target.value })}
+                      className="w-full bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-2 text-xs text-emerald-300 font-mono font-bold focus:outline-none focus:border-emerald-400"
+                    />
+                    {Boolean(formData.demandAmount || formData.fullFinalAmount) && Boolean(getPriceHint(formData.demandAmount || formData.fullFinalAmount)) && (
+                      <div className="mt-1 px-2.5 py-0.5 bg-emerald-950/70 border border-emerald-500/30 rounded text-[11px] font-mono text-emerald-300 flex items-center justify-between">
+                        <span>{getPriceHint(formData.demandAmount || formData.fullFinalAmount)}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="sm:col-span-4">
+                    <label className="block text-xs font-mono text-slate-400 mb-1">Owner / Seller Name (Vehicle Handover By) *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Muhammad Ahmad"
+                      value={formData.ownerName}
+                      onChange={(e) => setFormData({ ...formData, ownerName: e.target.value })}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Reg # (Registration Number)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. LEC-1234"
-                    value={formData.regNumber}
-                    onChange={(e) => setFormData({ ...formData, regNumber: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-500 uppercase"
-                  />
-                </div>
+              {/* Section 3: Document & Accessory Checklist */}
+              <div className="space-y-3">
+                <h4 className="text-xs uppercase font-mono text-amber-400 tracking-wider font-bold border-b border-white/5 pb-1">
+                  3. Document & Accessory Checklist
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono text-slate-400 mb-1">File Status</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Complete Original File / Duplicate"
+                      value={formData.fileStatus}
+                      onChange={(e) => setFormData({ ...formData, fileStatus: e.target.value })}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Color</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Black / White / Silver"
-                    value={formData.color}
-                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
+                  <div>
+                    <label className="block text-xs font-mono text-slate-400 mb-1">Key Status</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 2 Keys (Master + Spare) / 1 Key"
+                      value={formData.keyStatus}
+                      onChange={(e) => setFormData({ ...formData, keyStatus: e.target.value })}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Mileage (KM)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 45,000 km"
-                    value={formData.mileage}
-                    onChange={(e) => setFormData({ ...formData, mileage: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-cyan-300 font-mono font-semibold focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
+                  <div>
+                    <label className="block text-xs font-mono text-slate-400 mb-1">Smart Card Status</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Smart Card Available / Handed Over"
+                      value={formData.smartCardStatus}
+                      onChange={(e) => setFormData({ ...formData, smartCardStatus: e.target.value })}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-mono text-emerald-400 font-bold mb-1">Demand (PKR / Rs.)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 40 lac, 1.5 crore, 4000000"
-                    value={formData.demandAmount || formData.fullFinalAmount}
-                    onChange={(e) => setFormData({ ...formData, demandAmount: e.target.value, fullFinalAmount: e.target.value })}
-                    className="w-full bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-2 text-sm text-emerald-300 font-mono font-bold focus:outline-none focus:border-emerald-400"
-                  />
-                  {Boolean(formData.demandAmount || formData.fullFinalAmount) && Boolean(getPriceHint(formData.demandAmount || formData.fullFinalAmount)) && (
-                    <div className="mt-1 px-2.5 py-1 bg-emerald-950/70 border border-emerald-500/30 rounded-lg text-xs font-mono text-emerald-300 flex items-center justify-between animate-fadeIn">
-                      <span className="text-[11px] text-emerald-400/70">Calculated:</span>
-                      <span className="font-bold text-white text-xs">{getPriceHint(formData.demandAmount || formData.fullFinalAmount)}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Owner Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Muhammad Ahmad"
-                    value={formData.ownerName}
-                    onChange={(e) => setFormData({ ...formData, ownerName: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Receiver Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Staff / Receiver Name"
-                    value={formData.receiverName}
-                    onChange={(e) => setFormData({ ...formData, receiverName: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-cyan-300 font-semibold focus:outline-none focus:border-emerald-500"
-                  />
+                  <div className="sm:col-span-3">
+                    <label className="block text-xs font-mono text-slate-400 mb-1">Any Other Accessory</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Spare Wheel, Jack, Toolkit, Floor Mats, Navigation SD"
+                      value={formData.anyOtherAccessory}
+                      onChange={(e) => setFormData({ ...formData, anyOtherAccessory: e.target.value })}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">File Status</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Original Complete File / Duplicate"
-                    value={formData.fileStatus}
-                    onChange={(e) => setFormData({ ...formData, fileStatus: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Key Status</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 2 Keys / 1 Key / Remote Key"
-                    value={formData.keyStatus}
-                    onChange={(e) => setFormData({ ...formData, keyStatus: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Smart Card Status</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Handed Over / Yes / No"
-                    value={formData.smartCardStatus}
-                    onChange={(e) => setFormData({ ...formData, smartCardStatus: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-mono text-slate-400 mb-1">Any Other Accessory</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Spare Wheel, Jack, Toolkit, Navigation, Audio"
-                  value={formData.anyOtherAccessory}
-                  onChange={(e) => setFormData({ ...formData, anyOtherAccessory: e.target.value })}
-                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              {/* Notes / Detail Section at the end */}
+              {/* Section 4: Notes & Condition Observations */}
               <div>
                 <label className="block text-xs font-mono text-emerald-400 font-bold mb-1">
-                  Notes / Details Section (Appears at the bottom of letter)
+                  Notes / Details Section (Appears at bottom of letter)
                 </label>
                 <textarea
-                  rows="3"
+                  rows="2"
                   placeholder="Enter any additional vehicle condition details, inspection observations, scratch marks, or special handover instructions..."
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full bg-slate-900 border border-emerald-500/30 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-400"
+                  className="w-full bg-slate-900 border border-emerald-500/30 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-400"
                 ></textarea>
               </div>
 
-              {/* IMAGE UPLOAD ATTACHMENTS SECTION */}
+              {/* Section 5: Image Uploads */}
               <div className="pt-2 border-t border-white/10">
                 <label className="block text-xs font-mono text-amber-400 font-bold mb-1">
-                  Attach Receiving Letter Pictures & Scanned Documents (Optional)
+                  Attach Vehicle & Document Pictures (Optional)
                 </label>
                 <div className="border-2 border-dashed border-white/10 rounded-xl p-3 bg-slate-900/60 hover:bg-slate-900 transition-colors">
                   <input
@@ -813,7 +856,7 @@ export default function ReceivingLetterPage() {
                     id="receiving-letter-photo-input"
                     className="hidden"
                   />
-                  <label htmlFor="receiving-letter-photo-input" className="cursor-pointer flex flex-col items-center justify-center py-2 space-y-1">
+                  <label htmlFor="receiving-letter-photo-input" className="cursor-pointer flex flex-col items-center justify-center py-1.5 space-y-1">
                     <Upload className="w-5 h-5 text-amber-400" />
                     <span className="text-xs font-mono text-slate-300 font-bold">Click or drag photos of vehicle, keys, smart card, or scanned letter</span>
                     <span className="text-[10px] text-slate-500 font-mono">Supports JPG, PNG, WEBP files</span>
@@ -835,7 +878,8 @@ export default function ReceivingLetterPage() {
                 )}
               </div>
 
-              <div className="flex justify-end space-x-3 pt-4 border-t border-white/10">
+              {/* Modal Action Footer - Always visible and accessible */}
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-white/10 flex-shrink-0 bg-slate-950/80 p-2 rounded-xl">
                 <button
                   type="button"
                   onClick={() => { setIsAddModalOpen(false); resetForm(); }}
@@ -849,9 +893,7 @@ export default function ReceivingLetterPage() {
                   className="px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black font-bold font-mono text-xs rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center space-x-1.5"
                 >
                   <FileCheck className="w-4 h-4" />
-                  <span>
-                    {submitting ? 'Saving...' : editingLetter ? 'Update Receiving Letter' : 'Save & Print Receiving Letter'}
-                  </span>
+                  <span>{submitting ? 'Saving Letter...' : (editingLetter ? 'Update & Save Changes' : 'Save & Print Receiving Letter')}</span>
                 </button>
               </div>
             </form>

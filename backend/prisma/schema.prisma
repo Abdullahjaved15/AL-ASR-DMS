@@ -358,6 +358,7 @@ model ReceivingLetter {
   date              DateTime @default(now())
   receivingTime     String?  // Time of receiving vehicle (e.g. 11:30 AM)
   vehicleName       String
+  modelYear         String?  // Model / Year of vehicle (e.g. 2022, 2024)
   chassisNumber     String?
   regNumber         String?
   color             String?

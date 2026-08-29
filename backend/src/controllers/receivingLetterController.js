@@ -20,6 +20,7 @@ const createReceivingLetter = async (req, res) => {
       receivingTime,
       time,
       vehicleName,
+      modelYear,
       chassisNumber,
       regNumber,
       color,
@@ -51,6 +52,7 @@ const createReceivingLetter = async (req, res) => {
         date: date ? new Date(date) : new Date(),
         receivingTime: effectiveTime,
         vehicleName,
+        modelYear: modelYear ? String(modelYear).trim() : null,
         chassisNumber: chassisNumber || null,
         regNumber: regNumber || null,
         color: color || null,
@@ -78,10 +80,10 @@ const createReceivingLetter = async (req, res) => {
     try {
       let vehicleMake = 'Vehicle';
       let modelName = vehicleName;
-      let yearStr = String(new Date().getFullYear());
+      let yearStr = modelYear || String(new Date().getFullYear());
 
       const yearMatch = vehicleName.match(/\b(19\d\d|20\d\d)\b/);
-      if (yearMatch) {
+      if (yearMatch && !modelYear) {
         yearStr = yearMatch[0];
       }
 
@@ -131,6 +133,7 @@ const getReceivingLetters = async (req, res) => {
       where.OR = [
         { letterNumber: { contains: search, mode: 'insensitive' } },
         { vehicleName: { contains: search, mode: 'insensitive' } },
+        { modelYear: { contains: search, mode: 'insensitive' } },
         { ownerName: { contains: search, mode: 'insensitive' } },
         { receiverName: { contains: search, mode: 'insensitive' } },
         { regNumber: { contains: search, mode: 'insensitive' } },
@@ -192,6 +195,7 @@ const updateReceivingLetter = async (req, res) => {
       receivingTime,
       time,
       vehicleName,
+      modelYear,
       chassisNumber,
       regNumber,
       color,
@@ -230,6 +234,7 @@ const updateReceivingLetter = async (req, res) => {
       date: date ? new Date(date) : undefined,
       receivingTime: effectiveTime !== undefined ? effectiveTime : existing.receivingTime,
       vehicleName,
+      modelYear: modelYear !== undefined ? (modelYear ? String(modelYear).trim() : null) : existing.modelYear,
       chassisNumber: chassisNumber || null,
       regNumber: regNumber || null,
       color: color || null,
