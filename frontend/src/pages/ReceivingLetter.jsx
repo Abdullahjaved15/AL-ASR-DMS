@@ -252,10 +252,9 @@ export default function ReceivingLetterPage() {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
     const effectiveDemand = letter.demandAmount || letter.fullFinalAmount || '';
-    const formattedDemand = effectiveDemand 
-      ? (String(effectiveDemand).toLowerCase().includes('rs') || String(effectiveDemand).includes('pkr') 
-          ? effectiveDemand 
-          : 'Rs. ' + Number(String(effectiveDemand).replace(/[^0-9.]/g, '') || 0).toLocaleString()) 
+    const formattedDemand = effectiveDemand ? formatPKR(effectiveDemand) : 'N/A';
+    const formattedMileage = letter.mileage 
+      ? (String(letter.mileage).toLowerCase().includes('km') ? letter.mileage : `${letter.mileage} KM`) 
       : 'N/A';
 
     const htmlContent = `
@@ -279,10 +278,6 @@ export default function ReceivingLetterPage() {
             .grid-table td { padding: 8px 10px; border: 1px solid #cbd5e1; vertical-align: top; }
             .label { font-weight: 700; color: #475569; font-size: 10px; text-transform: uppercase; margin-bottom: 2px; }
             .val { font-size: 12px; font-weight: 700; color: #0f172a; }
-            .notes-box { border: 1.5px solid #0f172a; border-radius: 6px; padding: 10px; margin-top: 15px; background: #f8fafc; min-height: 80px; }
-            .signatures { margin-top: 45px; display: flex; justify-content: space-between; align-items: flex-end; }
-            .sig-box { width: 220px; text-align: center; border-top: 1.5px solid #0f172a; padding-top: 5px; font-weight: 700; font-size: 11px; }
-            .footer-text { margin-top: 30px; text-align: center; font-size: 9px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 5px; }
           </style>
         </head>
         <body>
@@ -304,7 +299,9 @@ export default function ReceivingLetterPage() {
               </tr>
             </table>
 
-            <div class="doc-title">VEHICLE RECEIVING LETTER</div>            <table class="grid-table">
+            <div class="doc-title">VEHICLE RECEIVING LETTER</div>
+
+            <table class="grid-table">
               <tr>
                 <td style="width: 50%;">
                   <div class="label">Date & Time Received</div>
@@ -338,7 +335,7 @@ export default function ReceivingLetterPage() {
               <tr>
                 <td>
                   <div class="label">Vehicle Mileage</div>
-                  <div class="val" style="font-family: monospace; color: #0284c7; font-weight: bold;">${letter.mileage ? letter.mileage + (String(letter.mileage).toLowerCase().includes('km') ? '' : ' KM') : 'N/A'}</div>
+                  <div class="val" style="font-family: monospace; color: #0284c7; font-weight: bold;">${formattedMileage}</div>
                 </td>
                 <td>
                   <div class="label">Vehicle Demand (PKR)</div>
@@ -377,30 +374,39 @@ export default function ReceivingLetterPage() {
               </tr>
             </table>
 
-            <div style="margin-top: 15px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; background: #f8fafc;">
-              <div style="font-size: 10px; font-weight: bold; color: #047857; text-transform: uppercase; margin-bottom: 3px;">Vehicle Condition Notes & Specific Observations:</div>
-              <div style="font-size: 11px; color: #1e293b; min-height: 28px;">${letter.notes || 'Vehicle received in inspected condition with all above documents and accessories verified.'}</div>
+            <div style="margin-top: 15px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 14px; background: #f8fafc;">
+              <div style="font-size: 10px; font-weight: bold; color: #047857; text-transform: uppercase; margin-bottom: 4px;">Vehicle Condition Notes & Specific Observations:</div>
+              <div style="font-size: 11px; color: #1e293b; min-height: 35px; white-space: pre-wrap;">${letter.notes || 'Vehicle received in inspected condition with all above documents and accessories verified.'}</div>
             </div>
 
-            <div class="sig-grid">
-              <div class="sig-box">
-                <div class="sig-line"></div>
-                <div class="sig-title">Vehicle Owner Signature</div>
-                <div class="sig-name">${letter.ownerName}</div>
-              </div>
-              <div class="sig-box">
-                <div class="sig-line"></div>
-                <div class="sig-title">AL ASR MOTORS Authorized Receiver</div>
-                <div class="sig-name">${letter.receiverName}</div>
-              </div>
-            </div>
+            <!-- Clean side-by-side signature section -->
+            <table style="width: 100%; margin-top: 40px; border-collapse: collapse;">
+              <tr>
+                <td style="width: 45%; text-align: center; vertical-align: top; border: none; padding: 0;">
+                  <div style="border-top: 1.5px solid #0f172a; padding-top: 8px; width: 85%; margin: 0 auto;">
+                    <div style="font-size: 11px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px;">Vehicle Owner Signature</div>
+                    <div style="font-size: 10px; color: #64748b; margin-top: 2px;">(دستخط مالک گاڑی)</div>
+                    <div style="font-size: 12px; font-weight: 700; color: #0284c7; margin-top: 4px;">${letter.ownerName}</div>
+                  </div>
+                </td>
+                <td style="width: 10%; border: none;"></td>
+                <td style="width: 45%; text-align: center; vertical-align: top; border: none; padding: 0;">
+                  <div style="border-top: 1.5px solid #0f172a; padding-top: 8px; width: 85%; margin: 0 auto;">
+                    <div style="font-size: 11px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px;">AL ASR MOTORS Authorized Receiver</div>
+                    <div style="font-size: 10px; color: #64748b; margin-top: 2px;">(دستخط و مہر وصول کنندہ)</div>
+                    <div style="font-size: 12px; font-weight: 700; color: #047857; margin-top: 4px;">${letter.receiverName}</div>
+                  </div>
+                </td>
+              </tr>
+            </table>
 
-            <div class="footer">
+            <div style="margin-top: 30px; text-align: center; font-size: 9px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 6px; font-family: monospace;">
               AL ASR MOTORS • Receiving Letter Document Ref: ${letter.letterNumber} • Printed on ${new Date().toLocaleDateString()}
             </div>
-          </body>
-        </html>
-      `;
+          </div>
+        </body>
+      </html>
+    `;
 
     printWindow.document.write(htmlContent);
     printWindow.document.close();
