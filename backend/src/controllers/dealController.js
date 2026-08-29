@@ -1,4 +1,5 @@
 const prisma = require('../config/db');
+const { parsePakistaniPrice } = require('../utils/priceParser');
 
 const getDeals = async (req, res) => {
   try {
@@ -18,12 +19,6 @@ const getDeals = async (req, res) => {
 
     if (model) {
       where.seller = { ...where.seller, model: { contains: model, mode: 'insensitive' } };
-    }
-
-    if (minPrice || maxPrice) {
-      where.dealPrice = {};
-      if (minPrice) where.dealPrice.gte = parseFloat(minPrice);
-      if (maxPrice) where.dealPrice.lte = parseFloat(maxPrice);
     }
 
     if (search) {
@@ -48,7 +43,20 @@ const getDeals = async (req, res) => {
       orderBy: { closingDate: 'desc' }
     });
 
-    return res.json(deals);
+    let minPriceNum = minPrice ? parsePakistaniPrice(minPrice) : null;
+    let maxPriceNum = maxPrice ? parsePakistaniPrice(maxPrice) : null;
+
+    let filteredDeals = deals;
+    if (minPriceNum !== null || maxPriceNum !== null) {
+      filteredDeals = deals.filter(d => {
+        const p = parsePakistaniPrice(d.dealPrice);
+        if (minPriceNum !== null && p < minPriceNum) return false;
+        if (maxPriceNum !== null && p > maxPriceNum) return false;
+        return true;
+      });
+    }
+
+    return res.json(filteredDeals);
   } catch (error) {
     return res.status(500).json({ message: 'Failed to fetch deals', error: error.message });
   }
@@ -76,8 +84,8 @@ const createDeal = async (req, res) => {
       return res.status(404).json({ message: 'Seller vehicle not found' });
     }
 
-    const numericDealPrice = parseFloat(String(dealPrice).replace(/[^0-9.]/g, '')) || 0;
-    const numericSellerDemand = parseFloat(String(seller.demandPrice || 0).replace(/[^0-9.]/g, '')) || 0;
+    const numericDealPrice = parsePakistaniPrice(dealPrice);
+    const numericSellerDemand = parsePakistaniPrice(seller.demandPrice);
     const calculatedProfit = numericDealPrice - numericSellerDemand;
     const salesmanToCredit = (req.user.role === 'ADMIN' && seller.assignedTo) ? seller.assignedTo : req.user.id;
 
@@ -86,7 +94,7 @@ const createDeal = async (req, res) => {
         buyerId,
         sellerId,
         salesmanId: salesmanToCredit,
-        dealPrice: dealPrice !== undefined && dealPrice !== null ? String(dealPrice) : '',
+        dealPrice: numericDealPrice ? String(numericDealPrice) : '',
         profit: String(calculatedProfit),
         closingDate: closingDate ? new Date(closingDate) : new Date(),
         remarks: remarks || null
@@ -113,7 +121,7 @@ const createDeal = async (req, res) => {
       data: {
         userId: req.user.id,
         action: 'CLOSE_DEAL',
-        details: `Closed deal for vehicle ${seller.vehicle} ${seller.model}. Price: $${numericDealPrice}, Profit: $${calculatedProfit}`
+        details: `Closed deal for vehicle ${seller.vehicle} ${seller.model}. Price: Rs. ${numericDealPrice.toLocaleString()}, Profit: Rs. ${calculatedProfit.toLocaleString()}`
       }
     });
 

@@ -18,6 +18,7 @@ import PipelineBar from '../components/PipelineBar';
 import StatusBadge from '../components/StatusBadge';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { formatPKR, parsePakistaniPrice } from '../utils/priceFormatter';
 
 export default function Dashboard({ onNavigate, onOpenModal }) {
   const { user, isAdmin } = useAuth();
@@ -200,10 +201,12 @@ export default function Dashboard({ onNavigate, onOpenModal }) {
                         <td className="py-3 px-3 text-slate-300">{deal.buyer?.buyerName}</td>
                         <td className="py-3 px-3 text-slate-300 font-mono">{deal.salesman?.name}</td>
                         <td className="py-3 px-3 font-mono font-bold text-cyan-400">
-                          Rs. {deal.dealPrice?.toLocaleString()}
+                          {formatPKR(deal.dealPrice)}
                         </td>
                         <td className="py-3 px-3 font-mono font-semibold text-emerald-400">
-                          +Rs. {deal.profit?.toLocaleString()}
+                          {deal.profit !== null && deal.profit !== undefined && deal.profit !== ''
+                            ? (parsePakistaniPrice(deal.profit) >= 0 ? `+${formatPKR(deal.profit)}` : `-${formatPKR(Math.abs(parsePakistaniPrice(deal.profit)))}`)
+                            : 'Rs. 0'}
                         </td>
                       </tr>
                     ))}
@@ -241,7 +244,7 @@ export default function Dashboard({ onNavigate, onOpenModal }) {
                           <p className="text-[10px] text-slate-400 font-mono">{sm.dealsCount} deal(s)</p>
                         </div>
                       </div>
-                      <span className="text-xs font-mono font-bold text-cyan-400">PKR {sm.revenue?.toLocaleString()}</span>
+                      <span className="text-xs font-mono font-bold text-cyan-400">{formatPKR(sm.revenue)}</span>
                     </div>
                   ))}
                   {(!stats?.topSalesmenList || stats.topSalesmenList.length === 0) && (
@@ -363,9 +366,13 @@ export default function Dashboard({ onNavigate, onOpenModal }) {
                         {deal.seller?.vehicle} {deal.seller?.model} ({deal.seller?.year})
                       </td>
                       <td className="py-3 px-3 text-slate-300">{deal.buyer?.buyerName}</td>
-                      <td className="py-3 px-3 text-slate-400 font-mono">Rs. {deal.seller?.demandPrice?.toLocaleString()}</td>
-                      <td className="py-3 px-3 font-mono font-bold text-cyan-400">Rs. {deal.dealPrice?.toLocaleString()}</td>
-                      <td className="py-3 px-3 font-mono font-semibold text-emerald-400">+Rs. {deal.profit?.toLocaleString()}</td>
+                      <td className="py-3 px-3 text-slate-400 font-mono">{formatPKR(deal.seller?.demandPrice)}</td>
+                      <td className="py-3 px-3 font-mono font-bold text-cyan-400">{formatPKR(deal.dealPrice)}</td>
+                      <td className="py-3 px-3 font-mono font-semibold text-emerald-400">
+                        {deal.profit !== null && deal.profit !== undefined && deal.profit !== ''
+                          ? (parsePakistaniPrice(deal.profit) >= 0 ? `+${formatPKR(deal.profit)}` : `-${formatPKR(Math.abs(parsePakistaniPrice(deal.profit)))}`)
+                          : 'Rs. 0'}
+                      </td>
                     </tr>
                   ))}
                   {(!stats?.recentDeals || stats.recentDeals.length === 0) && (

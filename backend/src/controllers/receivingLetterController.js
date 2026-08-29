@@ -3,6 +3,7 @@ const prisma = new PrismaClient();
 const fs = require('fs');
 const path = require('path');
 const cloudinary = require('../config/cloudinary');
+const { parsePakistaniPrice } = require('../utils/priceParser');
 
 // Helper to generate unique letter number (e.g. RL-20260807-4819)
 const generateLetterNumber = () => {
@@ -40,7 +41,8 @@ const createReceivingLetter = async (req, res) => {
     }
 
     const letterNumber = generateLetterNumber();
-    const effectiveDemand = (demandAmount || demand || fullFinalAmount) ? String(demandAmount || demand || fullFinalAmount).trim() : null;
+    const parsedDemandPrice = (demandAmount || demand || fullFinalAmount) ? parsePakistaniPrice(demandAmount || demand || fullFinalAmount) : null;
+    const effectiveDemand = parsedDemandPrice ? String(parsedDemandPrice) : '';
     const effectiveTime = (receivingTime || time) ? String(receivingTime || time).trim() : null;
 
     const newLetter = await prisma.receivingLetter.create({
@@ -74,9 +76,9 @@ const createReceivingLetter = async (req, res) => {
 
     // Automatically add received vehicle into Showroom Current Stock
     try {
-      let vehicleMake = vehicleName;
-      let modelName = '';
-      let yearStr = new Date().getFullYear().toString();
+      let vehicleMake = 'Vehicle';
+      let modelName = vehicleName;
+      let yearStr = String(new Date().getFullYear());
 
       const yearMatch = vehicleName.match(/\b(19\d\d|20\d\d)\b/);
       if (yearMatch) {
@@ -91,7 +93,7 @@ const createReceivingLetter = async (req, res) => {
       if (!modelName) modelName = vehicleName;
 
       const parsedMileage = mileage ? (parseInt(String(mileage).replace(/[^0-9]/g, '')) || 0) : 0;
-      const parsedPrice = fullFinalAmount ? (parseFloat(String(fullFinalAmount).replace(/[^0-9.]/g, '')) || 0) : 0;
+      const parsedPrice = parsedDemandPrice ? String(parsedDemandPrice) : '';
 
       await prisma.currentStock.create({
         data: {
@@ -105,7 +107,7 @@ const createReceivingLetter = async (req, res) => {
           askingPrice: parsedPrice,
           status: 'AVAILABLE',
           location: 'Main Showroom',
-          notes: `Auto-added from Receiving Letter Ref: ${letterNumber}. Owner: ${ownerName}.${fullFinalAmount ? ' F&F Amount: Rs. ' + fullFinalAmount + '.' : ''}${notes ? ' Notes: ' + notes : ''}`
+          notes: `Auto-added from Receiving Letter Ref: ${letterNumber}. Owner: ${ownerName}.${parsedPrice ? ' Demand: Rs. ' + Number(parsedPrice).toLocaleString() + '.' : ''}${notes ? ' Notes: ' + notes : ''}`
         }
       });
     } catch (stockErr) {
@@ -215,9 +217,10 @@ const updateReceivingLetter = async (req, res) => {
       return res.status(404).json({ error: 'Receiving Letter not found' });
     }
 
-    const effectiveDemand = (demandAmount !== undefined || demand !== undefined || fullFinalAmount !== undefined)
-      ? ((demandAmount || demand || fullFinalAmount) ? String(demandAmount || demand || fullFinalAmount).trim() : null)
+    const parsedDemandPrice = (demandAmount !== undefined || demand !== undefined || fullFinalAmount !== undefined)
+      ? ((demandAmount || demand || fullFinalAmount) ? parsePakistaniPrice(demandAmount || demand || fullFinalAmount) : null)
       : undefined;
+    const effectiveDemand = parsedDemandPrice !== undefined ? (parsedDemandPrice ? String(parsedDemandPrice) : '') : undefined;
 
     const effectiveTime = (receivingTime !== undefined || time !== undefined)
       ? ((receivingTime || time) ? String(receivingTime || time).trim() : null)

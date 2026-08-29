@@ -1,4 +1,5 @@
 const prisma = require('../config/db');
+const { parsePakistaniPrice } = require('../utils/priceParser');
 
 let dashboardCache = {};
 const DASHBOARD_CACHE_TTL = 10000; // 10 seconds
@@ -72,8 +73,8 @@ const getDashboardStats = async (req, res) => {
       ]);
 
       const monthlyDeals = myDeals.filter(d => new Date(d.closingDate) >= startOfMonth);
-      const monthlyRevenue = monthlyDeals.reduce((sum, d) => sum + (parseFloat(String(d.dealPrice || 0).replace(/[^0-9.]/g, '')) || 0), 0);
-      const monthlyProfit = monthlyDeals.reduce((sum, d) => sum + (parseFloat(String(d.profit || 0).replace(/[^0-9.]/g, '')) || 0), 0);
+      const monthlyRevenue = monthlyDeals.reduce((sum, d) => sum + parsePakistaniPrice(d.dealPrice), 0);
+      const monthlyProfit = monthlyDeals.reduce((sum, d) => sum + parsePakistaniPrice(d.profit), 0);
 
       const recentActivity = await prisma.activityLog.findMany({
         where: { userId },
@@ -145,8 +146,8 @@ const getDashboardStats = async (req, res) => {
         })
       ]);
 
-      const totalRevenue = allDeals.reduce((sum, d) => sum + (parseFloat(String(d.dealPrice || 0).replace(/[^0-9.]/g, '')) || 0), 0);
-      const totalProfit = allDeals.reduce((sum, d) => sum + (parseFloat(String(d.profit || 0).replace(/[^0-9.]/g, '')) || 0), 0);
+      const totalRevenue = allDeals.reduce((sum, d) => sum + parsePakistaniPrice(d.dealPrice), 0);
+      const totalProfit = allDeals.reduce((sum, d) => sum + parsePakistaniPrice(d.profit), 0);
 
       // Calculate Top Salesman
       const salesmanSalesMap = {};
@@ -156,7 +157,7 @@ const getDashboardStats = async (req, res) => {
         if (!salesmanSalesMap[smId]) {
           salesmanSalesMap[smId] = { id: smId, name: smName, revenue: 0, dealsCount: 0 };
         }
-        const dealPriceNum = parseFloat(String(deal.dealPrice || 0).replace(/[^0-9.]/g, '')) || 0;
+        const dealPriceNum = parsePakistaniPrice(deal.dealPrice);
         salesmanSalesMap[smId].revenue += dealPriceNum;
         salesmanSalesMap[smId].dealsCount += 1;
       });

@@ -158,19 +158,19 @@ export default function FilterBar({
           <div className="space-y-1.5">
             <label className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider flex items-center space-x-1">
               <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{priceLabel} ($)</span>
+              <span>{priceLabel} (PKR / Rs.)</span>
             </label>
             <div className="grid grid-cols-2 gap-2">
               <input
-                type="number"
-                placeholder="Min Price"
+                type="text"
+                placeholder="Min (e.g. 20 Lac)"
                 value={filters.minPrice || ''}
                 onChange={(e) => handleInputChange('minPrice', e.target.value)}
                 className="w-full bg-slate-900/90 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all font-mono"
               />
               <input
-                type="number"
-                placeholder="Max Price"
+                type="text"
+                placeholder="Max (e.g. 1.5 Cr)"
                 value={filters.maxPrice || ''}
                 onChange={(e) => handleInputChange('maxPrice', e.target.value)}
                 className="w-full bg-slate-900/90 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all font-mono"

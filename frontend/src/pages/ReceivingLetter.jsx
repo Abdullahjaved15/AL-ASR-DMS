@@ -3,6 +3,7 @@ import { FileCheck, Plus, Search, Printer, Edit, Trash2, Car, User, Calendar, Cl
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { logoBase64 } from '../utils/logoBase64';
+import { formatPKR, parsePakistaniPrice, getPriceHint } from '../utils/priceFormatter';
 
 export default function ReceivingLetterPage() {
   const { user } = useAuth();
@@ -150,14 +151,24 @@ export default function ReceivingLetterPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
+      const rawDemand = formData.demandAmount || formData.fullFinalAmount;
+      const parsedDemand = (rawDemand !== '' && rawDemand !== null && rawDemand !== undefined)
+        ? String(parsePakistaniPrice(rawDemand))
+        : '';
+      const payload = {
+        ...formData,
+        demandAmount: parsedDemand,
+        fullFinalAmount: parsedDemand
+      };
+
       let savedLetter = null;
       if (editingLetter) {
-        savedLetter = await api.updateReceivingLetter(editingLetter.id, formData);
+        savedLetter = await api.updateReceivingLetter(editingLetter.id, payload);
         if (selectedFilesForUpload.length > 0) {
           await api.uploadReceivingLetterImages(editingLetter.id, selectedFilesForUpload);
         }
       } else {
-        savedLetter = await api.createReceivingLetter(formData);
+        savedLetter = await api.createReceivingLetter(payload);
         if (selectedFilesForUpload.length > 0 && savedLetter?.id) {
           await api.uploadReceivingLetterImages(savedLetter.id, selectedFilesForUpload);
         }
@@ -474,7 +485,7 @@ export default function ReceivingLetterPage() {
                         {rl.mileage ? `${rl.mileage}${String(rl.mileage).toLowerCase().includes('km') ? '' : ' KM'}` : '—'}
                       </p>
                       <p className="text-[11px] font-bold text-emerald-400 mt-0.5">
-                        {effectiveDemand ? (String(effectiveDemand).toLowerCase().includes('rs') ? effectiveDemand : `Rs. ${effectiveDemand}`) : '—'}
+                        {effectiveDemand ? formatPKR(effectiveDemand) : '—'}
                       </p>
                     </td>
 
@@ -688,11 +699,17 @@ export default function ReceivingLetterPage() {
                   <label className="block text-xs font-mono text-emerald-400 font-bold mb-1">Demand (PKR / Rs.)</label>
                   <input
                     type="text"
-                    placeholder="e.g. 3,500,000"
+                    placeholder="e.g. 40 lac, 1.5 crore, 4000000"
                     value={formData.demandAmount || formData.fullFinalAmount}
                     onChange={(e) => setFormData({ ...formData, demandAmount: e.target.value, fullFinalAmount: e.target.value })}
                     className="w-full bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-2 text-sm text-emerald-300 font-mono font-bold focus:outline-none focus:border-emerald-400"
                   />
+                  {Boolean(formData.demandAmount || formData.fullFinalAmount) && Boolean(getPriceHint(formData.demandAmount || formData.fullFinalAmount)) && (
+                    <div className="mt-1 px-2.5 py-1 bg-emerald-950/70 border border-emerald-500/30 rounded-lg text-xs font-mono text-emerald-300 flex items-center justify-between animate-fadeIn">
+                      <span className="text-[11px] text-emerald-400/70">Calculated:</span>
+                      <span className="font-bold text-white text-xs">{getPriceHint(formData.demandAmount || formData.fullFinalAmount)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

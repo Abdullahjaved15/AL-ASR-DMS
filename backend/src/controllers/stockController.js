@@ -1,4 +1,5 @@
 const prisma = require('../config/db');
+const { parsePakistaniPrice } = require('../utils/priceParser');
 
 const safeFloat = (val, fallback = 0) => {
   if (val === undefined || val === null || val === '') return fallback;
@@ -46,7 +47,7 @@ const getCurrentStock = async (req, res) => {
     });
 
     const totalUnits = stock.length;
-    const totalValuation = stock.reduce((sum, item) => sum + (parseFloat(String(item.askingPrice || 0).replace(/[^0-9.]/g, '')) || 0), 0);
+    const totalValuation = stock.reduce((sum, item) => sum + parsePakistaniPrice(item.askingPrice), 0);
     const availableUnits = stock.filter(item => item.status === 'AVAILABLE').length;
     const reservedUnits = stock.filter(item => item.status === 'RESERVED').length;
     const atCustomerUnits = stock.filter(item => item.status === 'AT_CUSTOMER' || item.status === 'At Customer').length;
@@ -73,6 +74,9 @@ const createStockItem = async (req, res) => {
   try {
     const { vehicle, model, year, color, mileage, askingPrice, purchasePrice, status, location, notes, careOf, regNumber } = req.body;
 
+    const parsedAskingPrice = askingPrice !== undefined && askingPrice !== null && String(askingPrice).trim() !== '' ? parsePakistaniPrice(askingPrice) : null;
+    const parsedPurchasePrice = purchasePrice !== undefined && purchasePrice !== null && String(purchasePrice).trim() !== '' ? parsePakistaniPrice(purchasePrice) : null;
+
     const newStock = await prisma.currentStock.create({
       data: {
         vehicle: (vehicle && String(vehicle).trim()) ? String(vehicle).trim() : 'Vehicle',
@@ -80,8 +84,8 @@ const createStockItem = async (req, res) => {
         year: year ? String(year) : String(new Date().getFullYear()),
         color: color || 'White',
         mileage: safeInt(mileage, 0),
-        askingPrice: askingPrice !== undefined && askingPrice !== null ? String(askingPrice) : '',
-        purchasePrice: purchasePrice !== undefined && purchasePrice !== null ? String(purchasePrice) : '',
+        askingPrice: parsedAskingPrice ? String(parsedAskingPrice) : '',
+        purchasePrice: parsedPurchasePrice ? String(parsedPurchasePrice) : '',
         status: status || 'AVAILABLE',
         location: location || 'Main Showroom',
         notes: notes || null,
@@ -94,7 +98,7 @@ const createStockItem = async (req, res) => {
       data: {
         userId: req.user.id,
         action: 'CREATE_CURRENT_STOCK',
-        details: `Added Showroom Stock: ${year} ${vehicle || 'Vehicle'} ${model || 'Car'} (Rs. ${askingPrice || 0})`
+        details: `Added Showroom Stock: ${year} ${vehicle || 'Vehicle'} ${model || 'Car'} (Rs. ${parsedAskingPrice ? parsedAskingPrice.toLocaleString() : 0})`
       }
     });
 
@@ -130,14 +134,17 @@ const updateStockItem = async (req, res) => {
       regNumber
     } = req.body;
 
+    const parsedAskingPrice = askingPrice !== undefined ? (askingPrice !== null && String(askingPrice).trim() !== '' ? String(parsePakistaniPrice(askingPrice)) : '') : existing.askingPrice;
+    const parsedPurchasePrice = purchasePrice !== undefined ? (purchasePrice !== null && String(purchasePrice).trim() !== '' ? String(parsePakistaniPrice(purchasePrice)) : '') : existing.purchasePrice;
+
     const updateData = {
       vehicle: (vehicle !== undefined && vehicle !== null && String(vehicle).trim()) ? String(vehicle).trim() : existing.vehicle,
       model: (model !== undefined && model !== null && String(model).trim()) ? String(model).trim() : existing.model,
       year: year !== undefined ? String(year) : existing.year,
       color: color !== undefined ? String(color) : existing.color,
       mileage: mileage !== undefined ? safeInt(mileage, existing.mileage) : existing.mileage,
-      askingPrice: askingPrice !== undefined ? (askingPrice !== null ? String(askingPrice) : '') : existing.askingPrice,
-      purchasePrice: purchasePrice !== undefined ? (purchasePrice !== null ? String(purchasePrice) : '') : existing.purchasePrice,
+      askingPrice: parsedAskingPrice,
+      purchasePrice: parsedPurchasePrice,
       status: status !== undefined ? status : existing.status,
       location: location !== undefined ? location : existing.location,
       notes: notes !== undefined ? notes : existing.notes,

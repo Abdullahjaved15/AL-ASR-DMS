@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const cloudinary = require('../config/cloudinary');
 const { formatPakistaniPhone } = require('../utils/phoneFormatter');
+const { parsePakistaniPrice } = require('../utils/priceParser');
 
 let sellersCache = null;
 let sellersCacheTime = 0;
@@ -87,11 +88,8 @@ const getSellers = async (req, res) => {
     }
 
     // Price Filter
-    if (minPrice || maxPrice) {
-      where.demandPrice = {};
-      if (minPrice) where.demandPrice.gte = parseFloat(minPrice);
-      if (maxPrice) where.demandPrice.lte = parseFloat(maxPrice);
-    }
+    let minPriceNum = minPrice ? parsePakistaniPrice(minPrice) : null;
+    let maxPriceNum = maxPrice ? parsePakistaniPrice(maxPrice) : null;
 
     if (search) {
       const searchOR = [
@@ -136,12 +134,22 @@ const getSellers = async (req, res) => {
       ]
     });
 
+    let filteredSellers = sellers;
+    if (minPriceNum !== null || maxPriceNum !== null) {
+      filteredSellers = sellers.filter(s => {
+        const p = parsePakistaniPrice(s.demandPrice);
+        if (minPriceNum !== null && p < minPriceNum) return false;
+        if (maxPriceNum !== null && p > maxPriceNum) return false;
+        return true;
+      });
+    }
+
     if (!hasFilters && (req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN')) {
-      sellersCache = sellers;
+      sellersCache = filteredSellers;
       sellersCacheTime = Date.now();
     }
 
-    return res.json(sellers);
+    return res.json(filteredSellers);
   } catch (error) {
     return res.status(500).json({ message: 'Failed to fetch seller leads', error: error.message });
   }
@@ -221,7 +229,7 @@ const createSeller = async (req, res) => {
         color: color || 'N/A',
         mileage: parseInt(mileage) || 0,
         numberPlate: numberPlate ? numberPlate.trim() : null,
-        demandPrice: demandPrice !== undefined && demandPrice !== null ? String(demandPrice) : '',
+        demandPrice: demandPrice !== undefined && demandPrice !== null && String(demandPrice).trim() !== '' ? String(parsePakistaniPrice(demandPrice)) : '',
         carCondition: carCondition || 'Used',
         zeroMeterType: carCondition === 'Zero Meter' ? zeroMeterType || 'Cash' : null,
         isCommercial: commercialFlag,
@@ -304,7 +312,7 @@ const updateSeller = async (req, res) => {
     if (color !== undefined) updateData.color = color;
     if (mileage !== undefined) updateData.mileage = parseInt(mileage) || 0;
     if (numberPlate !== undefined) updateData.numberPlate = numberPlate ? numberPlate.trim() : null;
-    if (demandPrice !== undefined) updateData.demandPrice = demandPrice !== null ? String(demandPrice) : '';
+    if (demandPrice !== undefined) updateData.demandPrice = (demandPrice !== null && String(demandPrice).trim() !== '') ? String(parsePakistaniPrice(demandPrice)) : '';
     if (carCondition !== undefined) updateData.carCondition = carCondition;
     if (zeroMeterType !== undefined) updateData.zeroMeterType = carCondition === 'Zero Meter' ? zeroMeterType : null;
     if (isCommercial !== undefined) {

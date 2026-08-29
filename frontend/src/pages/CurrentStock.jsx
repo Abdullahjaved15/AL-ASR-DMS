@@ -3,6 +3,7 @@ import { Package, Plus, Search, Filter, Edit, Trash2, Download, ShieldAlert, Che
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { logoBase64 } from '../utils/logoBase64';
+import { formatPKR, parsePakistaniPrice, getPriceHint } from '../utils/priceFormatter';
 
 export default function CurrentStock() {
   const { user, isAdmin } = useAuth();
@@ -54,8 +55,8 @@ export default function CurrentStock() {
 
   const cleanStockPayload = (data) => ({
     ...data,
-    askingPrice: data.askingPrice ? parseFloat(data.askingPrice) || 0 : 0,
-    purchasePrice: data.purchasePrice ? parseFloat(data.purchasePrice) || null : null,
+    askingPrice: data.askingPrice !== '' && data.askingPrice !== null && data.askingPrice !== undefined ? String(parsePakistaniPrice(data.askingPrice)) : '',
+    purchasePrice: data.purchasePrice !== '' && data.purchasePrice !== null && data.purchasePrice !== undefined ? String(parsePakistaniPrice(data.purchasePrice)) : '',
     mileage: data.mileage ? parseInt(data.mileage, 10) || 0 : 0
   });
 
@@ -256,7 +257,7 @@ export default function CurrentStock() {
                           <td>${item.year || 'N/A'}</td>
                           <td>${item.color || 'N/A'}</td>
                           <td>${item.mileage ? item.mileage.toLocaleString() + ' km' : '0 km'}</td>
-                          <td><strong style="color: #0f172a;">Rs. ${(item.askingPrice || 0).toLocaleString()}</strong></td>
+                          <td><strong style="color: #0f172a;">${formatPKR(item.askingPrice)}</strong></td>
                           <td><span class="badge badge-care">${item.careOf || 'AL Asr'}</span></td>
                           <td><strong style="color: #0284c7; font-family: monospace;">${item.regNumber || 'UNREGISTERED'}</strong></td>
                           <td><span class="badge ${badgeClass}">${item.status}</span></td>
@@ -446,7 +447,7 @@ export default function CurrentStock() {
                   </td>
 
                   <td className="py-4 px-4 font-mono font-extrabold text-emerald-400 text-sm">
-                    Rs. {item.askingPrice?.toLocaleString()}
+                    {formatPKR(item.askingPrice)}
                   </td>
 
                   <td className="py-4 px-4 font-mono">
@@ -593,11 +594,16 @@ export default function CurrentStock() {
                   <label className="block text-xs font-mono text-slate-400 mb-1">Asking Price (PKR)</label>
                   <input
                     type="text"
-                    placeholder="E.g., 7500000, 75 Lac, 1.2 Crore"
+                    placeholder="E.g., 40 lac, 1.5 crore, 4000000"
                     value={formData.askingPrice}
                     onChange={(e) => setFormData({ ...formData, askingPrice: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none font-mono"
                   />
+                  {Boolean(formData.askingPrice) && Boolean(getPriceHint(formData.askingPrice)) && (
+                    <div className="mt-1 px-2 py-0.5 bg-emerald-950/70 border border-emerald-500/30 rounded text-[10px] font-mono text-emerald-300 flex items-center justify-between">
+                      <span>{getPriceHint(formData.askingPrice)}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div>

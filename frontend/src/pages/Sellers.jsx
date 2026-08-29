@@ -8,6 +8,7 @@ import FilterBar from '../components/FilterBar';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { logoBase64 } from '../utils/logoBase64';
+import { formatPKR, parsePakistaniPrice, getPriceHint } from '../utils/priceFormatter';
 
 const leadStatuses = ['New Lead', 'Contacted', 'Follow Up', 'Interested', 'Negotiation', 'Deal Closed', 'Lost', 'Cancelled', 'Incomplete'];
 
@@ -194,7 +195,13 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
   const handleCreateSeller = async (e) => {
     e.preventDefault();
     try {
-      await api.createSeller(formData);
+      const payload = {
+        ...formData,
+        demandPrice: formData.demandPrice !== '' && formData.demandPrice !== null && formData.demandPrice !== undefined
+          ? String(parsePakistaniPrice(formData.demandPrice))
+          : ''
+      };
+      await api.createSeller(payload);
       setIsAddModalOpen(false);
       resetForm();
       fetchSellers();
@@ -206,7 +213,13 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
   const handleUpdateSeller = async (e) => {
     e.preventDefault();
     try {
-      const res = await api.updateSeller(selectedSeller.id, formData);
+      const payload = {
+        ...formData,
+        demandPrice: formData.demandPrice !== '' && formData.demandPrice !== null && formData.demandPrice !== undefined
+          ? String(parsePakistaniPrice(formData.demandPrice))
+          : ''
+      };
+      const res = await api.updateSeller(selectedSeller.id, payload);
       if (res?.requiresApproval) {
         alert(res.message || 'Edit request submitted to Super Admin for approval.');
       }
@@ -271,7 +284,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
   const exportSellersPDF = () => {
     const printWindow = window.open('', '_blank');
     const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
-    const totalValuation = sellers.reduce((acc, s) => acc + (s.demandPrice || 0), 0);
+    const totalValuation = sellers.reduce((acc, s) => acc + parsePakistaniPrice(s.demandPrice), 0);
 
     const pageSize = 25;
     const pageChunks = [];
@@ -370,7 +383,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                           </td>
                           <td><strong>${s.sellerName || ''}</strong><br/><span style="color:#64748b; font-size:7.5px;">${s.sellerPhone || ''} ${s.sellerCity ? '• ' + s.sellerCity : ''}</span></td>
                           <td><strong>${s.carCondition || 'Used'}</strong> ${s.carCondition === 'Zero Meter' ? `(${s.zeroMeterType || 'Cash'})` : ''}</td>
-                          <td><strong style="color:#0f172a;">Rs. ${(s.demandPrice || 0).toLocaleString()}</strong></td>
+                          <td><strong style="color:#0f172a;">${formatPKR(s.demandPrice)}</strong></td>
                           <td>${s.assignedUser?.name || 'Unassigned'}</td>
                           <td><strong>${s.leadStatus || 'New'}</strong></td>
                         </tr>
@@ -517,7 +530,7 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                   </td>
 
                   <td className="py-4 px-4 font-mono font-extrabold text-cyan-400 text-sm">
-                    Rs. {seller.demandPrice?.toLocaleString()}
+                    {formatPKR(seller.demandPrice)}
                   </td>
 
                   <td className="py-4 px-4 font-mono text-slate-300">
@@ -814,11 +827,17 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
                   <label className="block text-xs font-mono text-slate-400 mb-1">Demand Price (PKR / Rs.)</label>
                   <input
                     type="text"
-                    placeholder="e.g. 19800000, 1.98 Crore, 95 Lac"
+                    placeholder="e.g. 40 lac, 1.5 crore, 4000000"
                     value={formData.demandPrice}
                     onChange={(e) => setFormData({ ...formData, demandPrice: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-cyan-400 font-mono font-bold focus:outline-none focus:border-cyan-500 font-mono"
                   />
+                  {Boolean(formData.demandPrice) && Boolean(getPriceHint(formData.demandPrice)) && (
+                    <div className="mt-1 px-2.5 py-1 bg-cyan-950/70 border border-cyan-500/30 rounded-lg text-xs font-mono text-cyan-300 flex items-center justify-between animate-fadeIn">
+                      <span className="text-[11px] text-cyan-400/70">Calculated:</span>
+                      <span className="font-bold text-white text-xs">{getPriceHint(formData.demandPrice)}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div>

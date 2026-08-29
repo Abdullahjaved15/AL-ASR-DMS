@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Car, Phone, MapPin, Calendar, Tag, UserCheck, Edit, Upload, ExternalLink, ChevronLeft, ChevronRight, FileText, Truck } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import ImageDropzone from './ImageDropzone';
+import { formatPKR } from '../utils/priceFormatter';
 
 const categories = ['All', 'Front', 'Back', 'Interior', 'Engine', 'Dashboard', 'Documents', 'Other'];
 
@@ -175,7 +176,7 @@ export default function SellerDetailModal({ seller, onClose, onEdit, onImagesUpd
                   <div className="flex justify-between">
                     <span className="text-slate-400 font-mono">Demand Price:</span>
                     <span className="font-mono font-extrabold text-cyan-400 text-base">
-                      Rs. {seller.demandPrice?.toLocaleString()}
+                      {formatPKR(seller.demandPrice)}
                     </span>
                   </div>
                   <div className="flex justify-between">

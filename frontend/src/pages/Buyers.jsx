@@ -7,6 +7,7 @@ import FilterBar from '../components/FilterBar';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { logoBase64 } from '../utils/logoBase64';
+import { formatPKR, parsePakistaniPrice, getPriceHint } from '../utils/priceFormatter';
 
 const leadStatuses = ['New Lead', 'Contacted', 'Follow Up', 'Interested', 'Negotiation', 'Deal Closed', 'Lost', 'Cancelled', 'Incomplete'];
 
@@ -211,7 +212,14 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
   const handleCreateBuyer = async (e) => {
     e.preventDefault();
     try {
-      await api.createBuyer(formData);
+      const numBudget = formData.budget !== '' && formData.budget !== null && formData.budget !== undefined ? parsePakistaniPrice(formData.budget) : 0;
+      const numProcessingFees = formData.processingFees ? parsePakistaniPrice(formData.processingFees) : 0;
+      const payload = {
+        ...formData,
+        budget: numBudget ? String(numBudget) : '',
+        processingFees: numProcessingFees ? String(numProcessingFees) : ''
+      };
+      await api.createBuyer(payload);
       setIsAddModalOpen(false);
       resetForm();
       fetchBuyers();
@@ -223,7 +231,14 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
   const handleUpdateBuyer = async (e) => {
     e.preventDefault();
     try {
-      const res = await api.updateBuyer(selectedBuyer.id, formData);
+      const numBudget = formData.budget !== '' && formData.budget !== null && formData.budget !== undefined ? parsePakistaniPrice(formData.budget) : 0;
+      const numProcessingFees = formData.processingFees ? parsePakistaniPrice(formData.processingFees) : 0;
+      const payload = {
+        ...formData,
+        budget: numBudget ? String(numBudget) : '',
+        processingFees: numProcessingFees ? String(numProcessingFees) : ''
+      };
+      const res = await api.updateBuyer(selectedBuyer.id, payload);
       if (res?.requiresApproval) {
         alert(res.message || 'Edit request submitted to Super Admin for approval.');
       }
@@ -355,7 +370,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
   const exportBuyersPDF = () => {
     const printWindow = window.open('', '_blank');
     const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
-    const totalValuation = displayBuyers.reduce((acc, b) => acc + (b.budget || 0), 0);
+    const totalValuation = displayBuyers.reduce((acc, b) => acc + parsePakistaniPrice(b.budget), 0);
 
     const pageSize = 25;
     const pageChunks = [];
@@ -452,7 +467,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                           <td style="color:#0284c7; font-family:monospace; font-weight:600;">${formatDateStr(b.registrationDate || b.createdAt)}</td>
                           <td><strong>${b.buyerName}</strong><br/><span style="color:#64748b; font-size:7.5px;">${b.buyerPhone || ''} ${b.buyerCity ? '• ' + b.buyerCity : ''}</span></td>
                           <td><strong>${b.vehicle} ${b.model}</strong> (${b.year})<br/><span style="color:#64748b; font-size:7.5px;">${b.carCondition || 'Used'} ${b.carCondition === 'Zero Meter' ? `(${b.zeroMeterType || 'Cash'})` : ''}</span></td>
-                          <td><strong style="color:#0f172a;">Rs. ${b.budget?.toLocaleString()}</strong></td>
+                          <td><strong style="color:#0f172a;">${formatPKR(b.budget)}</strong></td>
                           <td>
                             ${b.isBankCase 
                               ? `<span class="badge bank-badge">CASE #${caseNo || globalIdx} • ${b.bankName || 'Bank Case'}</span>` 
@@ -604,12 +619,12 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                     <td className="py-4 px-4 font-mono" onClick={() => openDetailModal(buyer)}>
                       {buyer.isBankCase && isAdmin ? (
                         <div className="space-y-0.5">
-                          <div className="text-emerald-400 font-bold">Total: Rs. {(buyer.budget + (buyer.processingFees || 0))?.toLocaleString()}</div>
-                          <div className="text-amber-300 text-[10px]">Down ({buyer.downpaymentPercent || 0}%): Rs. {(buyer.downpaymentAmount || 0).toLocaleString()}</div>
-                          <div className="text-cyan-300 text-[10px] font-bold">Due: Rs. {(buyer.dueAmount || 0).toLocaleString()}</div>
+                          <div className="text-emerald-400 font-bold">Total: {formatPKR(parsePakistaniPrice(buyer.budget) + parsePakistaniPrice(buyer.processingFees))}</div>
+                          <div className="text-amber-300 text-[10px]">Down ({buyer.downpaymentPercent || 0}%): {formatPKR(buyer.downpaymentAmount)}</div>
+                          <div className="text-cyan-300 text-[10px] font-bold">Due: {formatPKR(buyer.dueAmount)}</div>
                         </div>
                       ) : (
-                        <div className="text-emerald-400 font-bold">Rs. {buyer.budget?.toLocaleString()}</div>
+                        <div className="text-emerald-400 font-bold">{formatPKR(buyer.budget)}</div>
                       )}
                     </td>
 
@@ -892,11 +907,17 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. 20000000, 2 Crore, 85 Lac"
+                    placeholder="e.g. 40 lac, 1.5 crore, 4000000"
                     value={formData.budget}
                     onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-emerald-400 font-mono font-bold focus:outline-none focus:border-cyan-500"
                   />
+                  {Boolean(formData.budget) && Boolean(getPriceHint(formData.budget)) && (
+                    <div className="mt-1 px-2.5 py-1 bg-emerald-950/70 border border-emerald-500/30 rounded-lg text-xs font-mono text-emerald-300 flex items-center justify-between animate-fadeIn">
+                      <span className="text-[11px] text-emerald-400/70">Calculated:</span>
+                      <span className="font-bold text-white text-xs">{getPriceHint(formData.budget)}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -999,32 +1020,44 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                           onChange={(e) => setFormData({ ...formData, processingFees: e.target.value })}
                           className="w-full bg-slate-950 border border-purple-500/30 rounded-xl px-3 py-2 text-sm text-purple-300 focus:outline-none focus:border-purple-400 font-mono font-bold"
                         />
+                        {Boolean(formData.processingFees) && Boolean(getPriceHint(formData.processingFees)) && (
+                          <div className="mt-1 px-2 py-0.5 bg-purple-950/70 border border-purple-500/30 rounded text-[10px] font-mono text-purple-300 flex items-center justify-between">
+                            <span>{getPriceHint(formData.processingFees)}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     {/* Calculated Summary Box */}
-                    {Boolean(formData.budget) && (
-                      <div className="bg-slate-950/80 p-3.5 rounded-xl border border-sky-500/20 text-xs space-y-1.5 font-mono">
-                        <div className="flex justify-between text-slate-300">
-                          <span>Vehicle Target Budget / Price:</span>
-                          <span className="font-bold text-white">Rs. {parseFloat(formData.budget || 0).toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between text-amber-300">
-                          <span>Downpayment ({formData.downpaymentPercent || 0}% of Vehicle Price):</span>
-                          <span className="font-bold">- Rs. {(parseFloat(formData.budget || 0) * ((parseFloat(formData.downpaymentPercent) || 0) / 100)).toLocaleString()}</span>
-                        </div>
-                        {Boolean(parseFloat(formData.processingFees)) && (
-                          <div className="flex justify-between text-purple-300">
-                            <span>Processing Fees (Added After Downpayment):</span>
-                            <span>+ Rs. {parseFloat(formData.processingFees || 0).toLocaleString()}</span>
+                    {Boolean(parsePakistaniPrice(formData.budget)) && (() => {
+                      const modalBudget = parsePakistaniPrice(formData.budget);
+                      const modalDownPercent = parseFloat(formData.downpaymentPercent) || 0;
+                      const modalFees = parsePakistaniPrice(formData.processingFees);
+                      const modalDownAmount = Math.round(modalBudget * (modalDownPercent / 100));
+                      const modalDue = Math.round((modalBudget - modalDownAmount) + modalFees);
+                      return (
+                        <div className="bg-slate-950/80 p-3.5 rounded-xl border border-sky-500/20 text-xs space-y-1.5 font-mono">
+                          <div className="flex justify-between text-slate-300">
+                            <span>Vehicle Target Budget / Price:</span>
+                            <span className="font-bold text-white">Rs. {modalBudget.toLocaleString()}</span>
                           </div>
-                        )}
-                        <div className="flex justify-between text-cyan-300 font-bold text-sm pt-1.5 border-t border-white/10">
-                          <span>Calculated Due Amount (Bank Loan Balance + Fees):</span>
-                          <span>Rs. {((parseFloat(formData.budget || 0) - (parseFloat(formData.budget || 0) * ((parseFloat(formData.downpaymentPercent) || 0) / 100))) + (parseFloat(formData.processingFees) || 0)).toLocaleString()}</span>
+                          <div className="flex justify-between text-amber-300">
+                            <span>Downpayment ({modalDownPercent}% of Vehicle Price):</span>
+                            <span className="font-bold">- Rs. {modalDownAmount.toLocaleString()}</span>
+                          </div>
+                          {modalFees > 0 && (
+                            <div className="flex justify-between text-purple-300">
+                              <span>Processing Fees (Added After Downpayment):</span>
+                              <span>+ Rs. {modalFees.toLocaleString()}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-cyan-300 font-bold text-sm pt-1.5 border-t border-white/10">
+                            <span>Calculated Due Amount (Bank Loan Balance + Fees):</span>
+                            <span>Rs. {modalDue.toLocaleString()}</span>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 )}
               </div>

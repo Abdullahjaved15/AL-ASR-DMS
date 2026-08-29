@@ -3,6 +3,7 @@ import { Handshake, Plus, DollarSign, TrendingUp, Calendar, UserCheck, CheckCirc
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import ImageViewerModal from '../components/ImageViewerModal';
+import { formatPKR, parsePakistaniPrice, getPriceHint } from '../utils/priceFormatter';
 
 export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
   const { user, isAdmin } = useAuth();
@@ -58,10 +59,11 @@ export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
     }
 
     try {
+      const parsedDealPrice = parsePakistaniPrice(dealPrice);
       await api.createDeal({
         buyerId: selectedBuyerId,
         sellerId: selectedSellerId,
-        dealPrice: String(dealPrice),
+        dealPrice: String(parsedDealPrice),
         remarks
       });
 
@@ -79,12 +81,14 @@ export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
 
   // Profit calculation helper for live preview in modal
   const selectedSeller = sellersList.find(s => s.id === selectedSellerId);
-  const calculatedProfit = selectedSeller && dealPrice 
-    ? ((parseFloat(String(dealPrice).replace(/[^0-9.]/g, '')) || 0) - (parseFloat(String(selectedSeller.demandPrice || 0).replace(/[^0-9.]/g, '')) || 0))
+  const numericDealPrice = dealPrice ? parsePakistaniPrice(dealPrice) : 0;
+  const numericSellerDemand = selectedSeller ? parsePakistaniPrice(selectedSeller.demandPrice) : 0;
+  const calculatedProfit = (selectedSeller && dealPrice)
+    ? (numericDealPrice - numericSellerDemand)
     : null;
 
-  const totalVolume = deals.reduce((sum, d) => sum + (parseFloat(String(d.dealPrice || 0).replace(/[^0-9.]/g, '')) || 0), 0);
-  const totalProfit = deals.reduce((sum, d) => sum + (parseFloat(String(d.profit || 0).replace(/[^0-9.]/g, '')) || 0), 0);
+  const totalVolume = deals.reduce((sum, d) => sum + parsePakistaniPrice(d.dealPrice), 0);
+  const totalProfit = deals.reduce((sum, d) => sum + parsePakistaniPrice(d.profit), 0);
 
   return (
     <div className="p-4 sm:p-8 space-y-6 max-w-7xl mx-auto">
@@ -169,15 +173,17 @@ export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
                   </td>
 
                   <td className="py-4 px-4 font-mono text-slate-400">
-                    Rs. {deal.seller?.demandPrice?.toLocaleString()}
+                    {formatPKR(deal.seller?.demandPrice)}
                   </td>
 
                   <td className="py-4 px-4 font-mono font-extrabold text-cyan-400 text-sm">
-                    Rs. {deal.dealPrice?.toLocaleString()}
+                    {formatPKR(deal.dealPrice)}
                   </td>
 
                   <td className="py-4 px-4 font-mono font-bold text-emerald-400">
-                    +Rs. {deal.profit?.toLocaleString()}
+                    {deal.profit !== null && deal.profit !== undefined && deal.profit !== '' 
+                      ? (parsePakistaniPrice(deal.profit) >= 0 ? `+${formatPKR(deal.profit)}` : `-${formatPKR(Math.abs(parsePakistaniPrice(deal.profit)))}`)
+                      : 'Rs. 0'}
                   </td>
 
                   <td className="py-4 px-4 font-mono text-slate-300">
@@ -236,7 +242,7 @@ export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
                   <option value="">-- Choose Vehicle Inventory --</option>
                   {sellersList.map(s => (
                     <option key={s.id} value={s.id}>
-                      {s.vehicle} {s.model} ({s.year}) - Demand: Rs. {s.demandPrice?.toLocaleString()} [Seller: {s.sellerName}]
+                      {s.vehicle} {s.model} ({s.year}) - Demand: {formatPKR(s.demandPrice)} [Seller: {s.sellerName}]
                     </option>
                   ))}
                 </select>
@@ -253,7 +259,7 @@ export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
                   <option value="">-- Choose Buyer Inquiry --</option>
                   {buyersList.map(b => (
                     <option key={b.id} value={b.id}>
-                      {b.buyerName} ({b.vehicle} {b.model}) - Budget: Rs. {b.budget?.toLocaleString()}
+                      {b.buyerName} ({b.vehicle} {b.model}) - Budget: {formatPKR(b.budget)}
                     </option>
                   ))}
                 </select>
@@ -264,11 +270,17 @@ export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. 49500000, 4.95 Crore, 95 Lac"
+                  placeholder="e.g. 40 lac, 1.5 crore, 4000000"
                   value={dealPrice}
                   onChange={(e) => setDealPrice(e.target.value)}
                   className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-cyan-400 font-mono font-bold focus:outline-none focus:border-cyan-500 font-mono"
                 />
+                {Boolean(dealPrice) && Boolean(getPriceHint(dealPrice)) && (
+                  <div className="mt-1 px-2.5 py-1 bg-cyan-950/70 border border-cyan-500/30 rounded-lg text-xs font-mono text-cyan-300 flex items-center justify-between animate-fadeIn">
+                    <span className="text-[11px] text-cyan-400/70">Calculated:</span>
+                    <span className="font-bold text-white text-xs">{getPriceHint(dealPrice)}</span>
+                  </div>
+                )}
               </div>
 
               {/* Profit Live Calculation Preview */}
@@ -278,7 +290,7 @@ export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
                 }`}>
                   <span>Estimated Profit Calculation:</span>
                   <span className="font-bold text-sm">
-                    {calculatedProfit >= 0 ? `+Rs. ${calculatedProfit.toLocaleString()}` : `-Rs. ${Math.abs(calculatedProfit).toLocaleString()}`}
+                    {calculatedProfit >= 0 ? `+${formatPKR(calculatedProfit)}` : `-${formatPKR(Math.abs(calculatedProfit))}`}
                   </span>
                 </div>
               )}

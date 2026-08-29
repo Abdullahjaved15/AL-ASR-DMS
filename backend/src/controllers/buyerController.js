@@ -1,5 +1,6 @@
 const prisma = require('../config/db');
 const { formatPakistaniPhone } = require('../utils/phoneFormatter');
+const { parsePakistaniPrice } = require('../utils/priceParser');
 
 const getBuyers = async (req, res) => {
   try {
@@ -74,11 +75,8 @@ const getBuyers = async (req, res) => {
     }
 
     // Price Filter (budget for buyers)
-    if (minPrice || maxPrice) {
-      where.budget = {};
-      if (minPrice) where.budget.gte = parseFloat(minPrice);
-      if (maxPrice) where.budget.lte = parseFloat(maxPrice);
-    }
+    let minPriceNum = minPrice ? parsePakistaniPrice(minPrice) : null;
+    let maxPriceNum = maxPrice ? parsePakistaniPrice(maxPrice) : null;
 
     if (search) {
       const searchFilter = [
@@ -114,7 +112,17 @@ const getBuyers = async (req, res) => {
       ]
     });
 
-    return res.json(buyers);
+    let filteredBuyers = buyers;
+    if (minPriceNum !== null || maxPriceNum !== null) {
+      filteredBuyers = buyers.filter(b => {
+        const p = parsePakistaniPrice(b.budget);
+        if (minPriceNum !== null && p < minPriceNum) return false;
+        if (maxPriceNum !== null && p > maxPriceNum) return false;
+        return true;
+      });
+    }
+
+    return res.json(filteredBuyers);
   } catch (error) {
     return res.status(500).json({ message: 'Failed to fetch buyers', error: error.message });
   }
@@ -170,15 +178,15 @@ const createBuyer = async (req, res) => {
       leadSource, leadReference, leadReferredBy, assignedTo, leadStatus, comments
     } = req.body;
 
-    const numBudget = budget !== undefined && budget !== '' ? (parseFloat(budget) || 0) : 0;
+    const numBudget = budget !== undefined && budget !== '' && budget !== null ? parsePakistaniPrice(budget) : 0;
     const numDownPercent = parseFloat(downpaymentPercent) || 0;
-    const numProcessingFees = parseFloat(processingFees) || 0;
+    const numProcessingFees = processingFees ? parsePakistaniPrice(processingFees) : 0;
     
     // Downpayment calculated on Vehicle Price
-    const numDownAmount = isBankCase ? (numBudget * (numDownPercent / 100)) : 0;
+    const numDownAmount = isBankCase ? Math.round(numBudget * (numDownPercent / 100)) : 0;
     
     // Processing fees added AFTER subtracting downpayment
-    const calculatedDueAmount = isBankCase ? ((numBudget - numDownAmount) + numProcessingFees) : 0;
+    const calculatedDueAmount = isBankCase ? Math.round((numBudget - numDownAmount) + numProcessingFees) : 0;
 
     const assignedSalesman = assignedTo || req.user.id;
     const commercialFlag = Boolean(isCommercial) || vehicleType === 'Commercial';
@@ -198,7 +206,7 @@ const createBuyer = async (req, res) => {
         year: year ? String(year) : String(new Date().getFullYear()),
         color: color || 'Any',
         mileage: parseInt(mileage) || 0,
-        budget: budget !== undefined && budget !== null ? String(budget) : '',
+        budget: numBudget ? String(numBudget) : '',
         carCondition: carCondition || 'Used',
         zeroMeterType: carCondition === 'Zero Meter' ? zeroMeterType || 'Cash' : null,
         isCommercial: commercialFlag,
@@ -208,10 +216,10 @@ const createBuyer = async (req, res) => {
         bankCaseStatus: targetBankCaseStatus,
         bankCaseNo: assignedCaseNo,
         bankChecklist: isBankCase ? bankChecklist || null : null,
-        processingFees: isBankCase ? String(numProcessingFees) : '',
-        downpaymentPercent: isBankCase ? String(numDownPercent) : '',
-        downpaymentAmount: isBankCase ? String(numDownAmount) : '',
-        dueAmount: isBankCase ? String(calculatedDueAmount) : '',
+        processingFees: isBankCase && numProcessingFees ? String(numProcessingFees) : '',
+        downpaymentPercent: isBankCase && numDownPercent ? String(numDownPercent) : '',
+        downpaymentAmount: isBankCase && numDownAmount ? String(numDownAmount) : '',
+        dueAmount: isBankCase && calculatedDueAmount ? String(calculatedDueAmount) : '',
         buyerName: buyerName || '',
         buyerPhone: buyerPhone ? formatPakistaniPhone(buyerPhone) : '',
         buyerCity: buyerCity || '',
@@ -282,21 +290,21 @@ const updateBuyer = async (req, res) => {
     const targetIsBankCase = isBankCase !== undefined ? Boolean(isBankCase) : existingBuyer.isBankCase;
 
     if (budget !== undefined || isBankCase !== undefined || downpaymentPercent !== undefined || processingFees !== undefined) {
-      const budgetStr = budget !== undefined ? (budget !== null ? String(budget) : '') : (existingBuyer.budget || '');
-      const targetBudget = parseFloat(String(budgetStr).replace(/[^0-9.]/g, '')) || 0;
+      const budgetRaw = budget !== undefined ? (budget !== null ? budget : '') : (existingBuyer.budget || '');
+      const targetBudget = parsePakistaniPrice(budgetRaw);
       const targetDownPercent = downpaymentPercent !== undefined ? (parseFloat(downpaymentPercent) || 0) : (parseFloat(existingBuyer.downpaymentPercent) || 0);
-      const targetProcessingFees = processingFees !== undefined ? (parseFloat(processingFees) || 0) : (parseFloat(existingBuyer.processingFees) || 0);
+      const targetProcessingFees = processingFees !== undefined ? parsePakistaniPrice(processingFees) : parsePakistaniPrice(existingBuyer.processingFees);
 
-      updateData.budget = budgetStr;
+      updateData.budget = targetBudget ? String(targetBudget) : '';
       updateData.isBankCase = targetIsBankCase;
-      updateData.processingFees = targetIsBankCase ? String(targetProcessingFees) : '';
-      updateData.downpaymentPercent = targetIsBankCase ? String(targetDownPercent) : '';
+      updateData.processingFees = targetIsBankCase && targetProcessingFees ? String(targetProcessingFees) : '';
+      updateData.downpaymentPercent = targetIsBankCase && targetDownPercent ? String(targetDownPercent) : '';
       
-      const computedDownAmount = targetIsBankCase ? (targetBudget * (targetDownPercent / 100)) : 0;
-      const computedDueAmount = targetIsBankCase ? ((targetBudget - computedDownAmount) + targetProcessingFees) : 0;
+      const computedDownAmount = targetIsBankCase ? Math.round(targetBudget * (targetDownPercent / 100)) : 0;
+      const computedDueAmount = targetIsBankCase ? Math.round((targetBudget - computedDownAmount) + targetProcessingFees) : 0;
 
-      updateData.downpaymentAmount = targetIsBankCase ? String(computedDownAmount) : '';
-      updateData.dueAmount = targetIsBankCase ? String(computedDueAmount) : '';
+      updateData.downpaymentAmount = targetIsBankCase && computedDownAmount ? String(computedDownAmount) : '';
+      updateData.dueAmount = targetIsBankCase && computedDueAmount ? String(computedDueAmount) : '';
     }
 
     // Handle Bank Case Status & Case # updates

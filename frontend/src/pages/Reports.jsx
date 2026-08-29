@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { logoBase64 } from '../utils/logoBase64';
+import { formatPKR, parsePakistaniPrice } from '../utils/priceFormatter';
 
 const dateRanges = ['Today', 'Yesterday', 'This Week', 'This Month', 'All Time', 'Custom'];
 const bankCaseStatuses = [
@@ -505,7 +506,7 @@ export default function Reports({ defaultTab = 'salesmen' }) {
               <div>
                 <p className="text-[11px] font-mono uppercase tracking-wider text-slate-400">Closed Revenue (PKR)</p>
                 <h3 className="text-xl font-extrabold text-emerald-400 mt-0.5">
-                  Rs. {reportData.reduce((sum, r) => sum + r.totalRevenue, 0).toLocaleString()}
+                  Rs. {reportData.reduce((sum, r) => sum + (parsePakistaniPrice(r.totalRevenue) || 0), 0).toLocaleString()}
                 </h3>
               </div>
               <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
@@ -576,7 +577,7 @@ export default function Reports({ defaultTab = 'salesmen' }) {
                       </td>
 
                       <td className="py-4 px-4 font-mono font-extrabold text-cyan-400 text-sm">
-                        Rs. {sm.totalRevenue?.toLocaleString()}
+                        {formatPKR(sm.totalRevenue)}
                       </td>
 
                       <td className="py-4 px-4">

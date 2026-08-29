@@ -24,6 +24,7 @@ import {
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { logoBase64 } from '../utils/logoBase64';
+import { formatPKR, parsePakistaniPrice, getPriceHint } from '../utils/priceFormatter';
 
 const CameraCaptureWidget = ({ label, currentPhoto, onPhotoCaptured, onPhotoRemoved }) => {
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -481,11 +482,22 @@ export default function Invoices() {
     e.preventDefault();
     setSubmitting(true);
     try {
+      const cleanPrice = (v) => (v !== '' && v !== null && v !== undefined ? String(parsePakistaniPrice(v)) : '');
+      const payload = {
+        ...formData,
+        totalPrice: cleanPrice(formData.totalPrice || formData.agreedAmount || formData.saleAmount),
+        advanceAmount: cleanPrice(formData.advanceAmount),
+        remainingAmount: cleanPrice(formData.remainingAmount),
+        agreedAmount: cleanPrice(formData.agreedAmount || formData.totalPrice),
+        agreedAmountHalf: cleanPrice(formData.agreedAmountHalf),
+        saleAmount: cleanPrice(formData.saleAmount || formData.totalPrice)
+      };
+
       let savedResult;
       if (selectedInvoice) {
-        savedResult = await api.updateInvoice(selectedInvoice.id, formData);
+        savedResult = await api.updateInvoice(selectedInvoice.id, payload);
       } else {
-        savedResult = await api.createInvoice(formData);
+        savedResult = await api.createInvoice(payload);
       }
       setIsAddModalOpen(false);
       resetForm();
@@ -1546,7 +1558,7 @@ export default function Invoices() {
                         )}
                       </td>
                       <td className="p-3.5 font-mono text-emerald-400 font-bold">
-                        PKR {Number(total).toLocaleString()}
+                        {formatPKR(total)}
                       </td>
                       <td className="p-3.5 font-mono text-xs">
                         <button
@@ -2101,40 +2113,50 @@ export default function Invoices() {
                         <label className="block text-xs font-semibold text-slate-300 mb-1">Total Deal (Rs.) <span className="text-rose-400">*</span></label>
                         <input
                           type="text"
-                          placeholder="e.g. 5000000, 50 Lac"
+                          placeholder="e.g. 40 lac, 1.5 crore, 4000000"
                           value={formData.totalPrice}
                           onChange={(e) => {
-                            const tot = parseFloat(String(e.target.value).replace(/[^0-9.]/g, '')) || 0;
-                            const adv = parseFloat(String(formData.advanceAmount).replace(/[^0-9.]/g, '')) || 0;
+                            const tot = parsePakistaniPrice(e.target.value);
+                            const adv = parsePakistaniPrice(formData.advanceAmount);
                             handleInputChange('totalPrice', e.target.value);
                             handleInputChange('remainingAmount', Math.max(0, tot - adv));
                           }}
                           className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
                           required
                         />
+                        {Boolean(formData.totalPrice) && Boolean(getPriceHint(formData.totalPrice)) && (
+                          <div className="mt-1 px-2 py-0.5 bg-cyan-950/70 border border-cyan-500/30 rounded text-[10px] font-mono text-cyan-300 flex items-center justify-between">
+                            <span>{getPriceHint(formData.totalPrice)}</span>
+                          </div>
+                        )}
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-slate-300 mb-1">Advance (Rs.) <span className="text-rose-400">*</span></label>
                         <input
                           type="text"
-                          placeholder="e.g. 500000, 5 Lac"
+                          placeholder="e.g. 5 lac, 500000"
                           value={formData.advanceAmount}
                           onChange={(e) => {
-                            const adv = parseFloat(String(e.target.value).replace(/[^0-9.]/g, '')) || 0;
-                            const tot = parseFloat(String(formData.totalPrice).replace(/[^0-9.]/g, '')) || 0;
+                            const adv = parsePakistaniPrice(e.target.value);
+                            const tot = parsePakistaniPrice(formData.totalPrice);
                             handleInputChange('advanceAmount', e.target.value);
                             handleInputChange('remainingAmount', Math.max(0, tot - adv));
                           }}
                           className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
                           required
                         />
+                        {Boolean(formData.advanceAmount) && Boolean(getPriceHint(formData.advanceAmount)) && (
+                          <div className="mt-1 px-2 py-0.5 bg-cyan-950/70 border border-cyan-500/30 rounded text-[10px] font-mono text-cyan-300 flex items-center justify-between">
+                            <span>{getPriceHint(formData.advanceAmount)}</span>
+                          </div>
+                        )}
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-slate-300 mb-1">Balance (Rs.) (بقایا)</label>
                         <input
                           type="text"
                           readOnly
-                          value={formData.totalPrice && formData.advanceAmount ? Math.max(0, (parseFloat(String(formData.totalPrice).replace(/[^0-9.]/g, '')) || 0) - (parseFloat(String(formData.advanceAmount).replace(/[^0-9.]/g, '')) || 0)) : (formData.remainingAmount || '')}
+                          value={formData.totalPrice && formData.advanceAmount ? `Rs. ${Math.max(0, parsePakistaniPrice(formData.totalPrice) - parsePakistaniPrice(formData.advanceAmount)).toLocaleString()}` : (formData.remainingAmount ? `Rs. ${parsePakistaniPrice(formData.remainingAmount).toLocaleString()}` : '')}
                           className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-rose-400 text-xs font-bold font-mono cursor-not-allowed"
                         />
                       </div>
@@ -2295,12 +2317,17 @@ export default function Invoices() {
                         </label>
                         <input
                           type="text"
-                          placeholder="e.g. 250000, 2.5 Lac"
+                          placeholder="e.g. 40 lac, 1.5 crore, 250000"
                           value={formData.totalPrice || ''}
                           onChange={(e) => handleInputChange('totalPrice', e.target.value)}
                           className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-amber-500 font-mono"
                           required
                         />
+                        {Boolean(formData.totalPrice) && Boolean(getPriceHint(formData.totalPrice)) && (
+                          <div className="mt-1 px-2 py-0.5 bg-amber-950/70 border border-amber-500/30 rounded text-[10px] font-mono text-amber-300 flex items-center justify-between">
+                            <span>{getPriceHint(formData.totalPrice)}</span>
+                          </div>
+                        )}
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-slate-300 mb-1">
@@ -2687,12 +2714,24 @@ export default function Invoices() {
                           </label>
                           <input
                             type="text"
-                            placeholder="e.g. 4500000, 45 Lac"
+                            placeholder="e.g. 40 lac, 1.5 crore, 4500000"
                             value={formData.agreedAmount}
-                            onChange={(e) => handleInputChange('agreedAmount', e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              handleInputChange('agreedAmount', val);
+                              const parsed = parsePakistaniPrice(val);
+                              if (parsed > 0) {
+                                handleInputChange('agreedAmountHalf', String(Math.round(parsed / 2)));
+                              }
+                            }}
                             className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
                             required
                           />
+                          {Boolean(formData.agreedAmount) && Boolean(getPriceHint(formData.agreedAmount)) && (
+                            <div className="mt-1 px-2 py-0.5 bg-cyan-950/70 border border-cyan-500/30 rounded text-[10px] font-mono text-cyan-300 flex items-center justify-between">
+                              <span>{getPriceHint(formData.agreedAmount)}</span>
+                            </div>
+                          )}
                         </div>
 
                         <div>
@@ -2701,11 +2740,16 @@ export default function Invoices() {
                           </label>
                           <input
                             type="text"
-                            placeholder="e.g. 2250000, 22.5 Lac"
+                            placeholder="e.g. 20 lac, 2250000"
                             value={formData.agreedAmountHalf}
                             onChange={(e) => handleInputChange('agreedAmountHalf', e.target.value)}
                             className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
                           />
+                          {Boolean(formData.agreedAmountHalf) && Boolean(getPriceHint(formData.agreedAmountHalf)) && (
+                            <div className="mt-1 px-2 py-0.5 bg-cyan-950/70 border border-cyan-500/30 rounded text-[10px] font-mono text-cyan-300 flex items-center justify-between">
+                              <span>{getPriceHint(formData.agreedAmountHalf)}</span>
+                            </div>
+                          )}
                         </div>
 
                         <div className="sm:col-span-2">
@@ -2761,12 +2805,23 @@ export default function Invoices() {
                           </label>
                           <input
                             type="text"
-                            placeholder="e.g. 4500000, 45 Lac"
+                            placeholder="e.g. 40 lac, 1.5 crore, 4500000"
                             value={formData.totalPrice}
-                            onChange={(e) => handleInputChange('totalPrice', e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const tot = parsePakistaniPrice(val);
+                              const adv = parsePakistaniPrice(formData.advanceAmount);
+                              handleInputChange('totalPrice', val);
+                              handleInputChange('remainingAmount', Math.max(0, tot - adv));
+                            }}
                             className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
                             required
                           />
+                          {Boolean(formData.totalPrice) && Boolean(getPriceHint(formData.totalPrice)) && (
+                            <div className="mt-1 px-2 py-0.5 bg-cyan-950/70 border border-cyan-500/30 rounded text-[10px] font-mono text-cyan-300 flex items-center justify-between">
+                              <span>{getPriceHint(formData.totalPrice)}</span>
+                            </div>
+                          )}
                         </div>
 
                         <div>
@@ -2775,11 +2830,22 @@ export default function Invoices() {
                           </label>
                           <input
                             type="text"
-                            placeholder="e.g. 500000, 5 Lac"
+                            placeholder="e.g. 5 lac, 500000"
                             value={formData.advanceAmount}
-                            onChange={(e) => handleInputChange('advanceAmount', e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const adv = parsePakistaniPrice(val);
+                              const tot = parsePakistaniPrice(formData.totalPrice);
+                              handleInputChange('advanceAmount', val);
+                              handleInputChange('remainingAmount', Math.max(0, tot - adv));
+                            }}
                             className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
                           />
+                          {Boolean(formData.advanceAmount) && Boolean(getPriceHint(formData.advanceAmount)) && (
+                            <div className="mt-1 px-2 py-0.5 bg-cyan-950/70 border border-cyan-500/30 rounded text-[10px] font-mono text-cyan-300 flex items-center justify-between">
+                              <span>{getPriceHint(formData.advanceAmount)}</span>
+                            </div>
+                          )}
                         </div>
 
                         <div>
@@ -2788,11 +2854,16 @@ export default function Invoices() {
                           </label>
                           <input
                             type="text"
-                            placeholder="e.g. 4000000, 40 Lac"
+                            placeholder="e.g. 35 lac, 4000000"
                             value={formData.remainingAmount}
                             onChange={(e) => handleInputChange('remainingAmount', e.target.value)}
                             className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
                           />
+                          {Boolean(formData.remainingAmount) && Boolean(getPriceHint(formData.remainingAmount)) && (
+                            <div className="mt-1 px-2 py-0.5 bg-cyan-950/70 border border-cyan-500/30 rounded text-[10px] font-mono text-cyan-300 flex items-center justify-between">
+                              <span>{getPriceHint(formData.remainingAmount)}</span>
+                            </div>
+                          )}
                         </div>
 
                         <div>

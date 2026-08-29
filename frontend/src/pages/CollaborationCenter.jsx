@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Handshake, Plus, Search, Filter, UserCheck, Car, DollarSign, Award, CheckCircle, XCircle, Trash2, Clock, MessageSquare, ArrowRight } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { formatPKR } from '../utils/priceFormatter';
 
 export default function CollaborationCenter() {
   const { user, isAdmin } = useAuth();
@@ -283,7 +284,7 @@ export default function CollaborationCenter() {
                       <span>{leadObj.vehicle} {leadObj.model} ({leadObj.year})</span>
                     </p>
                     <p className="text-xs font-mono font-extrabold text-emerald-400">
-                      Rs. {priceValue?.toLocaleString()}
+                      {formatPKR(priceValue)}
                     </p>
                   </div>
                   <p className="text-[11px] font-mono text-slate-400">
@@ -319,32 +320,31 @@ export default function CollaborationCenter() {
             </p>
 
             <form onSubmit={handleCreateCollaboration} className="space-y-4">
-              {/* Select Lead Type */}
+              {/* Lead Type Switcher */}
               <div>
-                <label className="block text-xs font-mono text-slate-400 mb-1.5">Select Lead Type</label>
+                <label className="block text-xs font-mono text-slate-400 mb-1">Choose Lead Type</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => { setLeadType('seller'); setFormData({ ...formData, buyerId: '' }); }}
-                    className={`py-2 px-3 rounded-xl font-mono text-xs transition-all ${
+                    onClick={() => { setLeadType('seller'); setFormData(p => ({ ...p, buyerId: '' })); }}
+                    className={`py-2 text-xs font-mono font-bold rounded-xl border transition-all ${
                       leadType === 'seller'
-                        ? 'bg-cyan-500 text-black font-bold'
-                        : 'bg-slate-900 border border-white/10 text-slate-400'
+                        ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500'
+                        : 'bg-slate-900 text-slate-400 border-white/10 hover:text-white'
                     }`}
                   >
-                    Seller Inventory Lead
+                    🚗 Seller Vehicle Lead
                   </button>
-
                   <button
                     type="button"
-                    onClick={() => { setLeadType('buyer'); setFormData({ ...formData, sellerId: '' }); }}
-                    className={`py-2 px-3 rounded-xl font-mono text-xs transition-all ${
+                    onClick={() => { setLeadType('buyer'); setFormData(p => ({ ...p, sellerId: '' })); }}
+                    className={`py-2 text-xs font-mono font-bold rounded-xl border transition-all ${
                       leadType === 'buyer'
-                        ? 'bg-cyan-500 text-black font-bold'
-                        : 'bg-slate-900 border border-white/10 text-slate-400'
+                        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500'
+                        : 'bg-slate-900 text-slate-400 border-white/10 hover:text-white'
                     }`}
                   >
-                    Buyer Inquiry Lead
+                    👤 Buyer Inquiry Lead
                   </button>
                 </div>
               </div>
@@ -362,7 +362,7 @@ export default function CollaborationCenter() {
                     <option value="">-- Choose Seller Inventory Item --</option>
                     {sellersList.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.vehicle} {s.model} ({s.year}) - Rs. {s.demandPrice?.toLocaleString()} ({s.sellerName})
+                        {s.vehicle} {s.model} ({s.year}) - {formatPKR(s.demandPrice)} ({s.sellerName})
                       </option>
                     ))}
                   </select>
@@ -379,7 +379,7 @@ export default function CollaborationCenter() {
                     <option value="">-- Choose Buyer Inquiry Item --</option>
                     {buyersList.map((b) => (
                       <option key={b.id} value={b.id}>
-                        {b.vehicle} {b.model} ({b.year}) - Budget: Rs. {b.budget?.toLocaleString()} ({b.buyerName})
+                        {b.vehicle} {b.model} ({b.year}) - Budget: {formatPKR(b.budget)} ({b.buyerName})
                       </option>
                     ))}
                   </select>

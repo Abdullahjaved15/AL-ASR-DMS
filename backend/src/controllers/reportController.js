@@ -1,4 +1,5 @@
 const prisma = require('../config/db');
+const { parsePakistaniPrice } = require('../utils/priceParser');
 
 const getDateRange = (rangeType, startDate, endDate) => {
   const now = new Date();
@@ -135,8 +136,8 @@ const getSalesmenReports = async (req, res) => {
 
       const smDeals = dealsMap[sm.id] || [];
       const dealsClosedCount = smDeals.length;
-      const totalRevenue = smDeals.reduce((sum, d) => sum + (parseFloat(String(d.dealPrice || 0).replace(/[^0-9.]/g, '')) || 0), 0);
-      const totalProfit = smDeals.reduce((sum, d) => sum + (parseFloat(String(d.profit || 0).replace(/[^0-9.]/g, '')) || 0), 0);
+      const totalRevenue = smDeals.reduce((sum, d) => sum + parsePakistaniPrice(d.dealPrice), 0);
+      const totalProfit = smDeals.reduce((sum, d) => sum + parsePakistaniPrice(d.profit), 0);
 
       const conversionRate = totalLeadsCount > 0 
         ? ((dealsClosedCount / totalLeadsCount) * 100).toFixed(1) 
@@ -224,8 +225,8 @@ const exportReportsCSV = async (req, res) => {
       if (totalLeads === 0 && deals.length === 0) continue; // Skip dummy entries
 
       const dealsClosed = deals.length;
-      const revenue = deals.reduce((s, d) => s + (parseFloat(String(d.dealPrice || 0).replace(/[^0-9.]/g, '')) || 0), 0);
-      const profit = deals.reduce((s, d) => s + (parseFloat(String(d.profit || 0).replace(/[^0-9.]/g, '')) || 0), 0);
+      const revenue = deals.reduce((s, d) => s + parsePakistaniPrice(d.dealPrice), 0);
+      const profit = deals.reduce((s, d) => s + parsePakistaniPrice(d.profit), 0);
       const rate = totalLeads > 0 ? ((dealsClosed / totalLeads) * 100).toFixed(1) + '%' : '0.0%';
 
       let totalDays = 0, count = 0;
@@ -244,7 +245,7 @@ const exportReportsCSV = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename=DMS_Sales_Report_${range.replace(/\s+/g, '_')}.csv`);
     return res.status(200).send(csvContent);
   } catch (error) {
-    return res.status(500).json({ message: 'CSV export failed', error: error.message });
+    return res.status(500).json({ message: 'Failed to export sales report', error: error.message });
   }
 };
 
@@ -307,10 +308,10 @@ const getBankCasesReport = async (req, res) => {
     const bankSummary = {};
 
     cases.forEach(c => {
-      const budget = Number(c.budget) || 0;
-      const downpayment = Number(c.downpaymentAmount) || 0;
-      const fees = Number(c.processingFees) || 0;
-      const due = Number(c.dueAmount) || (budget - downpayment + fees);
+      const budget = parsePakistaniPrice(c.budget);
+      const downpayment = parsePakistaniPrice(c.downpaymentAmount);
+      const fees = parsePakistaniPrice(c.processingFees);
+      const due = parsePakistaniPrice(c.dueAmount) || (budget - downpayment + fees);
 
       totalBudget += budget;
       totalDownpayment += downpayment;

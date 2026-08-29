@@ -2,6 +2,7 @@ const prisma = require('../config/db');
 const cloudinary = require('../config/cloudinary');
 const fs = require('fs');
 const path = require('path');
+const { parsePakistaniPrice } = require('../utils/priceParser');
 
 // Helper to upload image to Cloudinary if it's a base64 string
 const handleCloudinaryUpload = async (photoStr, folderName) => {
@@ -84,9 +85,9 @@ const getInvoices = async (req, res) => {
       })
     ]);
 
-    const totalSalesVolume = statsRaw.reduce((sum, inv) => sum + (parseFloat(String(inv.totalPrice || inv.saleAmount || 0).replace(/[^0-9.]/g, '')) || 0), 0);
-    const totalCommissionEarned = statsRaw.reduce((sum, inv) => sum + (parseFloat(String(inv.commissionAmount || 0).replace(/[^0-9.]/g, '')) || 0), 0);
-    const grandTotalValue = statsRaw.reduce((sum, inv) => sum + (parseFloat(String(inv.totalAmount || 0).replace(/[^0-9.]/g, '')) || 0), 0) || (totalSalesVolume + totalCommissionEarned);
+    const totalSalesVolume = statsRaw.reduce((sum, inv) => sum + parsePakistaniPrice(inv.totalPrice || inv.saleAmount), 0);
+    const totalCommissionEarned = statsRaw.reduce((sum, inv) => sum + parsePakistaniPrice(inv.commissionAmount), 0);
+    const grandTotalValue = statsRaw.reduce((sum, inv) => sum + parsePakistaniPrice(inv.totalAmount), 0) || (totalSalesVolume + totalCommissionEarned);
 
     return res.json({
       invoices,
@@ -212,11 +213,11 @@ const createInvoice = async (req, res) => {
     const finalVehicleMaker = vehicleMaker || carVehicle || 'N/A';
     const finalVehicleModel = vehicleModel || carModel || 'N/A';
 
-    const numericTotalPrice = parseFloat(String(totalPrice || agreedAmount || saleAmount || 0).replace(/[^0-9.]/g, '')) || 0;
-    const numericAdvance = parseFloat(String(advanceAmount || 0).replace(/[^0-9.]/g, '')) || 0;
+    const numericTotalPrice = parsePakistaniPrice(totalPrice || agreedAmount || saleAmount);
+    const numericAdvance = parsePakistaniPrice(advanceAmount);
     const numericRemaining = remainingAmount !== undefined && remainingAmount !== null && remainingAmount !== '' 
-      ? (parseFloat(String(remainingAmount).replace(/[^0-9.]/g, '')) || 0)
-      : (numericTotalPrice - numericAdvance);
+      ? parsePakistaniPrice(remainingAmount)
+      : Math.max(0, numericTotalPrice - numericAdvance);
     const numericCommPercent = parseFloat(String(commissionPercent || 0).replace(/[^0-9.]/g, '')) || 0;
     const commissionAmount = (numericTotalPrice * numericCommPercent) / 100;
     const totalAmountCalculated = numericTotalPrice + commissionAmount;
@@ -414,11 +415,11 @@ const updateInvoice = async (req, res) => {
     const finalVehicleMaker = vehicleMaker || existing.vehicleMaker;
     const finalVehicleModel = vehicleModel || existing.vehicleModel;
 
-    const numericTotalPrice = parseFloat(totalPrice) || parseFloat(agreedAmount) || existing.totalPrice || 0;
-    const numericAdvance = parseFloat(advanceAmount) || 0;
+    const numericTotalPrice = parsePakistaniPrice(totalPrice || agreedAmount || existing.totalPrice || existing.agreedAmount);
+    const numericAdvance = parsePakistaniPrice(advanceAmount !== undefined ? advanceAmount : existing.advanceAmount);
     const numericRemaining = remainingAmount !== undefined && remainingAmount !== null && remainingAmount !== '' 
-      ? parseFloat(remainingAmount) 
-      : (numericTotalPrice - numericAdvance);
+      ? parsePakistaniPrice(remainingAmount) 
+      : Math.max(0, numericTotalPrice - numericAdvance);
 
     const updatedInvoice = await prisma.invoice.update({
       where: { id },
@@ -452,8 +453,8 @@ const updateInvoice = async (req, res) => {
         regFatherName: regFatherName !== undefined ? regFatherName : existing.regFatherName,
         regAddress: regAddress !== undefined ? regAddress : existing.regAddress,
 
-        agreedAmount: agreedAmount !== undefined ? String(agreedAmount) : (existing.agreedAmount || String(numericTotalPrice)),
-        agreedAmountHalf: agreedAmountHalf !== undefined ? String(agreedAmountHalf) : (existing.agreedAmountHalf || String(numericTotalPrice / 2)),
+        agreedAmount: agreedAmount !== undefined ? (agreedAmount ? String(parsePakistaniPrice(agreedAmount)) : '') : (existing.agreedAmount || String(numericTotalPrice)),
+        agreedAmountHalf: agreedAmountHalf !== undefined ? (agreedAmountHalf ? String(parsePakistaniPrice(agreedAmountHalf)) : '') : (existing.agreedAmountHalf || String(Math.round(numericTotalPrice / 2))),
         agreedAmountWords: agreedAmountWords !== undefined ? agreedAmountWords : existing.agreedAmountWords,
         agreementTime: agreementTime !== undefined ? agreementTime : existing.agreementTime,
         agreementDay: agreementDay !== undefined ? agreementDay : existing.agreementDay,
@@ -467,12 +468,12 @@ const updateInvoice = async (req, res) => {
         onAccount: onAccount !== undefined ? onAccount : existing.onAccount,
         accountOf: accountOf !== undefined ? accountOf : existing.accountOf,
         time: time !== undefined ? time : existing.time,
-        cashAmount: cashAmount !== undefined ? (cashAmount !== null ? String(cashAmount) : null) : existing.cashAmount,
+        cashAmount: cashAmount !== undefined ? (cashAmount !== null && String(cashAmount).trim() !== '' ? String(parsePakistaniPrice(cashAmount)) : null) : existing.cashAmount,
         statusBoxNotes: statusBoxNotes !== undefined ? statusBoxNotes : existing.statusBoxNotes,
 
-        totalPrice: totalPrice !== undefined ? String(totalPrice) : (existing.totalPrice || String(numericTotalPrice)),
-        advanceAmount: advanceAmount !== undefined ? String(advanceAmount) : (existing.advanceAmount || String(numericAdvance)),
-        remainingAmount: remainingAmount !== undefined ? String(remainingAmount) : (existing.remainingAmount || String(numericRemaining)),
+        totalPrice: totalPrice !== undefined ? (totalPrice ? String(parsePakistaniPrice(totalPrice)) : '') : (existing.totalPrice || String(numericTotalPrice)),
+        advanceAmount: advanceAmount !== undefined ? (advanceAmount ? String(parsePakistaniPrice(advanceAmount)) : '') : (existing.advanceAmount || String(numericAdvance)),
+        remainingAmount: remainingAmount !== undefined ? (remainingAmount ? String(parsePakistaniPrice(remainingAmount)) : '') : (existing.remainingAmount || String(numericRemaining)),
         paymentDuration: paymentDuration !== undefined ? paymentDuration : existing.paymentDuration,
         dated: dated !== undefined ? dated : existing.dated,
 

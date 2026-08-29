@@ -2,6 +2,7 @@ import React from 'react';
 import { X, Users, Phone, MapPin, Calendar, Tag, UserCheck, Edit, DollarSign, FileText, Truck } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import { useAuth } from '../context/AuthContext';
+import { formatPKR } from '../utils/priceFormatter';
 
 const formatDateStr = (dateVal) => {
   if (!dateVal) return '-';
@@ -129,7 +130,7 @@ export default function BuyerDetailModal({ buyer, onClose, onEdit }) {
                 <div className="flex justify-between">
                   <span className="text-slate-400 font-mono">Vehicle Target Budget:</span>
                   <span className="font-mono font-bold text-emerald-400 text-sm">
-                    Rs. {buyer.budget?.toLocaleString()}
+                    {formatPKR(buyer.budget)}
                   </span>
                 </div>
                 {buyer.isBankCase && isAdmin && (
@@ -137,19 +138,19 @@ export default function BuyerDetailModal({ buyer, onClose, onEdit }) {
                     <div className="flex justify-between">
                       <span className="text-slate-400 font-mono">Downpayment ({buyer.downpaymentPercent || 0}% of Vehicle Price):</span>
                       <span className="font-mono text-amber-300 font-bold">
-                        - Rs. {(buyer.downpaymentAmount || 0).toLocaleString()}
+                        - {formatPKR(buyer.downpaymentAmount)}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400 font-mono">Processing Fees (Added After Downpayment):</span>
                       <span className="font-mono text-purple-300 font-bold">
-                        + Rs. {(buyer.processingFees || 0).toLocaleString()}
+                        + {formatPKR(buyer.processingFees)}
                       </span>
                     </div>
                     <div className="flex justify-between pt-1 border-t border-white/10">
                       <span className="text-slate-300 font-mono font-bold">Calculated Due Loan Balance:</span>
                       <span className="font-mono font-extrabold text-cyan-300 text-sm">
-                        Rs. {(buyer.dueAmount || 0).toLocaleString()}
+                        {formatPKR(buyer.dueAmount)}
                       </span>
                     </div>
                   </>
