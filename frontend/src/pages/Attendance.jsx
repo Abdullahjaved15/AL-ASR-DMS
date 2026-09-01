@@ -175,7 +175,7 @@ export default function AttendancePage() {
     if (mins > standardCheckoutMins + 15) {
       return { type: 'OVERTIME', label: 'Overtime / Late Exit', color: 'text-purple-400 bg-purple-500/10 border-purple-500/30' };
     }
-    return { type: 'ON_TIME', label: 'Standard 9 PM', color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30' };
+    return null;
   };
 
   // Fetch attendance records for selectedDate and populate dailyLogsMap
