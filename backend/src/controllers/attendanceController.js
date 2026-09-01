@@ -308,7 +308,7 @@ const deleteAttendance = async (req, res) => {
   }
 };
 
-// --- WEEKLY & MONTHLY ATTENDANCE REPORTS ---
+// --- ATTENDANCE REPORTS (DAILY, WEEKLY, MONTHLY, CUSTOM) ---
 const getAttendanceReports = async (req, res) => {
   try {
     const { type, startDate, endDate, employeeId } = req.query;
@@ -317,7 +317,10 @@ const getAttendanceReports = async (req, res) => {
     let end = endDate ? normalizeDate(endDate) : null;
 
     const now = new Date();
-    if (type === 'weekly' && !start) {
+    if (type === 'daily' && !start) {
+      start = normalizeDate(now.toISOString().slice(0, 10));
+      end = normalizeDate(now.toISOString().slice(0, 10));
+    } else if (type === 'weekly' && !start) {
       const d = new Date(now);
       d.setDate(d.getDate() - 6);
       start = normalizeDate(d.toISOString().slice(0, 10));
@@ -329,6 +332,9 @@ const getAttendanceReports = async (req, res) => {
       start = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
       end = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0));
     }
+
+    start.setUTCHours(0, 0, 0, 0);
+    end.setUTCHours(23, 59, 59, 999);
 
     const empWhere = { status: 'ACTIVE' };
     if (employeeId) empWhere.id = employeeId;
@@ -362,6 +368,8 @@ const getAttendanceReports = async (req, res) => {
         ? Math.round((activeDays / totalRecordedDays) * 100) 
         : 0;
 
+      const avgHoursPerDay = activeDays > 0 ? parseFloat((totalHours / activeDays).toFixed(2)) : 0;
+
       return {
         employee: emp,
         summary: {
@@ -371,6 +379,7 @@ const getAttendanceReports = async (req, res) => {
           leaveDays: leaveCount,
           absentDays: absentCount,
           totalHours: parseFloat(totalHours.toFixed(2)),
+          avgHoursPerDay,
           totalRecordedDays,
           attendanceRate
         },

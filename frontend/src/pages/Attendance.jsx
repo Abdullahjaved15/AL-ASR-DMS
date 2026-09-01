@@ -17,25 +17,25 @@ import {
   Building, 
   Briefcase,
   ChevronRight,
+  ChevronDown,
   Filter,
   LogIn,
   LogOut,
   RotateCcw,
   Sparkles,
   Check,
-  Timer,
-  CheckCheck
+  Timer
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const DEFAULT_CHECK_IN = '09:00 AM';
-const DEFAULT_CHECK_OUT = '09:00 PM'; // Updated standard closing from 6:00 PM to 9:00 PM (12 hrs shift)
+const DEFAULT_CHECK_OUT = '09:00 PM'; // 09:00 AM – 09:00 PM (12 hrs shift)
 
 export default function AttendancePage() {
   const { user } = useAuth();
 
-  // Primary navigation tabs: 'daily', 'roster', 'history', 'reports'
+  // Navigation tabs: 'daily', 'roster', 'reports'
   const [activeTab, setActiveTab] = useState('daily');
 
   // Common state
@@ -43,7 +43,7 @@ export default function AttendancePage() {
   const [systemUsers, setSystemUsers] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Live ticking clock for accurate time stamping & UI freshness
+  // Live ticking clock
   const [currentTime, setCurrentTime] = useState(new Date());
 
   // Daily logger state
@@ -66,19 +66,8 @@ export default function AttendancePage() {
     userId: ''
   });
 
-  // History state
-  const [historyLogs, setHistoryLogs] = useState([]);
-  const [historySearch, setHistorySearch] = useState('');
-  const [historyStartDate, setHistoryStartDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 14);
-    return d.toISOString().slice(0, 10);
-  });
-  const [historyEndDate, setHistoryEndDate] = useState(new Date().toISOString().slice(0, 10));
-  const [historyEmpFilter, setHistoryEmpFilter] = useState('');
-
-  // Reports state
-  const [reportType, setReportType] = useState('monthly'); // 'weekly', 'monthly', 'custom'
+  // Reports state (Daily, Weekly, Monthly, Custom)
+  const [reportType, setReportType] = useState('monthly'); // 'daily', 'weekly', 'monthly', 'custom'
   const [reportStartDate, setReportStartDate] = useState(() => {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
@@ -87,6 +76,7 @@ export default function AttendancePage() {
   const [reportEmpFilter, setReportEmpFilter] = useState('');
   const [reportData, setReportData] = useState(null);
   const [loadingReport, setLoadingReport] = useState(false);
+  const [expandedEmployeeId, setExpandedEmployeeId] = useState(null);
 
   // Debounce timers ref for auto-saving manual text edits
   const debounceTimers = useRef({});
@@ -107,12 +97,10 @@ export default function AttendancePage() {
   useEffect(() => {
     if (activeTab === 'daily') {
       fetchDailyAttendance();
-    } else if (activeTab === 'history') {
-      fetchHistoryAttendance();
     } else if (activeTab === 'reports') {
       fetchReports();
     }
-  }, [activeTab, selectedDate, historyStartDate, historyEndDate, historyEmpFilter, reportType, reportStartDate, reportEndDate, reportEmpFilter]);
+  }, [activeTab, selectedDate, reportType, reportStartDate, reportEndDate, reportEmpFilter]);
 
   const fetchEmployees = async () => {
     try {
@@ -163,7 +151,7 @@ export default function AttendancePage() {
     return parseFloat(((outMins - inMins) / 60).toFixed(2));
   };
 
-  // Classify checkout timing: Early Departure (< 08:45 PM / 1245 mins), Overtime (> 09:15 PM / 1275 mins), Standard
+  // Classify checkout timing: Early Departure (< 08:45 PM), Overtime (> 09:15 PM), Standard (null)
   const getCheckoutTag = (checkOut) => {
     const mins = parseTimeToMinutes(checkOut);
     if (mins === null) return null;
@@ -218,7 +206,6 @@ export default function AttendancePage() {
       };
       const res = await api.saveAttendance(payload);
       
-      // Update local state with saved values including calculated hours
       setDailyLogsMap(prev => ({
         ...prev,
         [empId]: {
@@ -264,7 +251,6 @@ export default function AttendancePage() {
       [field]: value
     };
 
-    // Recalculate hours dynamically
     if (field === 'checkIn' || field === 'checkOut') {
       updatedLog.totalHours = calculateDurationHours(
         field === 'checkIn' ? value : updatedLog.checkIn,
@@ -277,7 +263,6 @@ export default function AttendancePage() {
       [empId]: updatedLog
     }));
 
-    // Debounced Auto-Save
     if (debounceTimers.current[empId]) {
       clearTimeout(debounceTimers.current[empId]);
     }
@@ -307,7 +292,7 @@ export default function AttendancePage() {
     saveEmployeeAttendanceAsync(empId, updated);
   };
 
-  // Immediate Check-Out Time Stamp & Auto-Save (Handles both early leaves and late overtimes)
+  // Immediate Check-Out Time Stamp & Auto-Save
   const handleStampCheckOutNow = (empId) => {
     const timeNow = formatTime12h(new Date());
     const current = dailyLogsMap[empId] || {
@@ -345,18 +330,6 @@ export default function AttendancePage() {
     saveEmployeeAttendanceAsync(empId, updated);
   };
 
-  // Clear check-out time (e.g., employee still on duty) & Auto-Save
-  const handleClearCheckOut = (empId) => {
-    const current = dailyLogsMap[empId] || { checkIn: DEFAULT_CHECK_IN, status: 'PRESENT', notes: '' };
-    const updated = {
-      ...current,
-      checkOut: '',
-      totalHours: 0
-    };
-    setDailyLogsMap(prev => ({ ...prev, [empId]: updated }));
-    saveEmployeeAttendanceAsync(empId, updated);
-  };
-
   // Bulk Save all employees
   const handleSaveAllDaily = async () => {
     setSavingDaily(true);
@@ -382,7 +355,6 @@ export default function AttendancePage() {
         records
       });
 
-      // Mark all rows as saved
       const newStatus = {};
       employees.forEach(e => { newStatus[e.id] = 'saved'; });
       setRowSaveStatus(newStatus);
@@ -483,41 +455,14 @@ export default function AttendancePage() {
     }
   };
 
-  // --- HISTORY LOG HANDLERS ---
-  const fetchHistoryAttendance = async () => {
-    setLoading(true);
-    try {
-      const logs = await api.getAttendance({
-        startDate: historyStartDate,
-        endDate: historyEndDate,
-        employeeId: historyEmpFilter
-      });
-      setHistoryLogs(logs || []);
-    } catch (err) {
-      console.error('Failed to fetch history logs:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteHistoryRecord = async (id) => {
-    if (!window.confirm('Delete this attendance record?')) return;
-    try {
-      await api.deleteAttendance(id);
-      fetchHistoryAttendance();
-    } catch (err) {
-      alert(err.message || 'Failed to delete attendance record');
-    }
-  };
-
   // --- REPORT HANDLERS ---
   const fetchReports = async () => {
     setLoadingReport(true);
     try {
       const data = await api.getAttendanceReports({
         type: reportType,
-        startDate: reportStartDate,
-        endDate: reportEndDate,
+        startDate: reportType === 'custom' ? reportStartDate : undefined,
+        endDate: reportType === 'custom' ? reportEndDate : undefined,
         employeeId: reportEmpFilter
       });
       setReportData(data);
@@ -530,8 +475,8 @@ export default function AttendancePage() {
 
   const handleExportCSV = () => {
     const url = api.getAttendanceExportUrl({
-      startDate: reportStartDate,
-      endDate: reportEndDate,
+      startDate: reportData?.startDate ? new Date(reportData.startDate).toISOString().slice(0, 10) : reportStartDate,
+      endDate: reportData?.endDate ? new Date(reportData.endDate).toISOString().slice(0, 10) : reportEndDate,
       employeeId: reportEmpFilter
     });
     window.open(url, '_blank');
@@ -626,7 +571,7 @@ export default function AttendancePage() {
                 </span>
               </div>
               <p className="text-xs font-mono text-slate-400 mt-0.5">
-                Standard Shift: <span className="text-cyan-400 font-bold">09:00 AM – 09:00 PM</span> (12h) • Real-time Early & Overtime Checkout Auto-Save
+                Standard Shift: <span className="text-cyan-400 font-bold">09:00 AM – 09:00 PM</span> (12h) • Daily, Weekly & Monthly Hours Reports
               </p>
             </div>
           </div>
@@ -655,7 +600,7 @@ export default function AttendancePage() {
           }`}
         >
           <Clock className="w-4 h-4" />
-          <span>Daily Logger & Checkout</span>
+          <span>Daily Attendance Logger</span>
         </button>
 
         <button
@@ -671,18 +616,6 @@ export default function AttendancePage() {
         </button>
 
         <button
-          onClick={() => setActiveTab('history')}
-          className={`px-4 py-2 rounded-xl text-xs font-medium font-mono transition-all flex items-center space-x-2 ${
-            activeTab === 'history'
-              ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-400 border border-cyan-500/40 shadow-lg shadow-cyan-500/10 font-bold'
-              : 'text-slate-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          <FileText className="w-4 h-4" />
-          <span>Attendance History</span>
-        </button>
-
-        <button
           onClick={() => setActiveTab('reports')}
           className={`px-4 py-2 rounded-xl text-xs font-medium font-mono transition-all flex items-center space-x-2 ${
             activeTab === 'reports'
@@ -691,7 +624,7 @@ export default function AttendancePage() {
           }`}
         >
           <BarChart2 className="w-4 h-4" />
-          <span>Weekly & Monthly Reports</span>
+          <span>Attendance Reports (Day, Week, Month)</span>
         </button>
       </div>
 
@@ -821,7 +754,7 @@ export default function AttendancePage() {
                     <th className="py-3.5 px-4">Employee Details</th>
                     <th className="py-3.5 px-4">Status</th>
                     <th className="py-3.5 px-4">Check-In Time</th>
-                    <th className="py-3.5 px-4">Check-Out Action & Time (9 PM Std)</th>
+                    <th className="py-3.5 px-4">Check-Out Action & Time</th>
                     <th className="py-3.5 px-4 text-center">Hours Worked</th>
                     <th className="py-3.5 px-4">Notes / Remarks</th>
                     <th className="py-3.5 px-4 text-right">Auto-Save Status</th>
@@ -916,7 +849,7 @@ export default function AttendancePage() {
                                 className="bg-slate-900 border border-white/10 rounded-xl px-2.5 py-1 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono w-28 disabled:opacity-40"
                               />
 
-                              {/* Primary Check-Out Button (Stamps Current Live Time & Auto-Saves) */}
+                              {/* Primary Check-Out Button */}
                               <button
                                 type="button"
                                 onClick={() => handleStampCheckOutNow(emp.id)}
@@ -940,7 +873,7 @@ export default function AttendancePage() {
                               </button>
                             </div>
 
-                            {/* Departure Tag / Badge */}
+                            {/* Departure Tag / Badge (Only for Early or Overtime) */}
                             {!isAbsentOrLeave && log.checkOut && checkoutTag && (
                               <div className="flex items-center space-x-2">
                                 <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border ${checkoutTag.color}`}>
@@ -1102,152 +1035,7 @@ export default function AttendancePage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 3: ATTENDANCE HISTORY */}
-      {/* ========================================================================= */}
-      {activeTab === 'history' && (
-        <div className="space-y-6">
-          {/* History Filters */}
-          <div className="glass-card rounded-2xl p-4 border border-white/10 flex flex-wrap items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center space-x-2">
-                <span className="text-xs font-mono text-slate-400">From:</span>
-                <input
-                  type="date"
-                  value={historyStartDate}
-                  onChange={(e) => setHistoryStartDate(e.target.value)}
-                  className="bg-slate-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
-                />
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <span className="text-xs font-mono text-slate-400">To:</span>
-                <input
-                  type="date"
-                  value={historyEndDate}
-                  onChange={(e) => setHistoryEndDate(e.target.value)}
-                  className="bg-slate-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
-                />
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <span className="text-xs font-mono text-slate-400">Employee:</span>
-                <select
-                  value={historyEmpFilter}
-                  onChange={(e) => setHistoryEmpFilter(e.target.value)}
-                  className="bg-slate-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
-                >
-                  <option value="">All Employees</option>
-                  {employees.map(e => (
-                    <option key={e.id} value={e.id}>{e.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <button
-              onClick={fetchHistoryAttendance}
-              className="px-3.5 py-1.5 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-mono font-bold hover:bg-cyan-500/30 transition-all"
-            >
-              Refresh Logs
-            </button>
-          </div>
-
-          {/* History Table */}
-          <div className="glass-card rounded-2xl overflow-hidden border border-white/10">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-900/80 border-b border-white/10 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
-                    <th className="py-3.5 px-4">Date</th>
-                    <th className="py-3.5 px-4">Employee Name</th>
-                    <th className="py-3.5 px-4">Designation</th>
-                    <th className="py-3.5 px-4">Status</th>
-                    <th className="py-3.5 px-4">Check-In</th>
-                    <th className="py-3.5 px-4">Check-Out</th>
-                    <th className="py-3.5 px-4">Shift Type</th>
-                    <th className="py-3.5 px-4">Hours Worked</th>
-                    <th className="py-3.5 px-4">Notes</th>
-                    <th className="py-3.5 px-4 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5 text-xs">
-                  {historyLogs.map((log) => {
-                    const tag = getCheckoutTag(log.checkOut);
-                    return (
-                      <tr key={log.id} className="hover:bg-white/5 transition-colors font-mono">
-                        <td className="py-3.5 px-4 text-cyan-300 font-bold">
-                          {new Date(log.date).toLocaleDateString()}
-                        </td>
-
-                        <td className="py-3.5 px-4 font-sans font-bold text-white">
-                          {log.employee?.name || 'Unknown'}
-                        </td>
-
-                        <td className="py-3.5 px-4 font-sans text-slate-300">
-                          {log.employee?.designation || 'N/A'}
-                        </td>
-
-                        <td className="py-3.5 px-4">
-                          <span className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border ${getStatusBadgeClass(log.status)}`}>
-                            {log.status}
-                          </span>
-                        </td>
-
-                        <td className="py-3.5 px-4 text-slate-200">
-                          {log.checkIn || '-'}
-                        </td>
-
-                        <td className="py-3.5 px-4 text-slate-200">
-                          {log.checkOut || '-'}
-                        </td>
-
-                        <td className="py-3.5 px-4">
-                          {log.checkOut && tag ? (
-                            <span className={`text-[10px] px-2 py-0.5 rounded-md border font-bold ${tag.color}`}>
-                              {tag.label}
-                            </span>
-                          ) : (
-                            <span className="text-slate-600">-</span>
-                          )}
-                        </td>
-
-                        <td className="py-3.5 px-4 text-amber-300 font-bold">
-                          {log.totalHours || 0} hrs
-                        </td>
-
-                        <td className="py-3.5 px-4 font-sans text-slate-400">
-                          {log.notes || '-'}
-                        </td>
-
-                        <td className="py-3.5 px-4 text-right">
-                          <button
-                            onClick={() => handleDeleteHistoryRecord(log.id)}
-                            className="p-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-colors"
-                            title="Delete log"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-
-                  {historyLogs.length === 0 && !loading && (
-                    <tr>
-                      <td colSpan="10" className="py-12 text-center text-slate-500 font-mono text-xs">
-                        No attendance history records found for the selected filter range.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 4: WEEKLY & MONTHLY REPORTS */}
+      {/* TAB 3: ATTENDANCE REPORTS (DAY, WEEK, MONTH) */}
       {/* ========================================================================= */}
       {activeTab === 'reports' && (
         <div className="space-y-6">
@@ -1255,12 +1043,13 @@ export default function AttendancePage() {
           <div className="glass-card rounded-2xl p-4 border border-white/10 flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center space-x-2">
-                <span className="text-xs font-mono text-slate-400">Timeframe:</span>
+                <span className="text-xs font-mono text-slate-400">Report Timeframe:</span>
                 <select
                   value={reportType}
                   onChange={(e) => setReportType(e.target.value)}
-                  className="bg-slate-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                  className="bg-slate-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono font-bold"
                 >
+                  <option value="daily">Daily Report (Today)</option>
                   <option value="weekly">Weekly Report (Last 7 Days)</option>
                   <option value="monthly">Monthly Report (This Month)</option>
                   <option value="custom">Custom Date Range</option>
@@ -1286,7 +1075,7 @@ export default function AttendancePage() {
               )}
 
               <div className="flex items-center space-x-2">
-                <span className="text-xs font-mono text-slate-400">Employee:</span>
+                <span className="text-xs font-mono text-slate-400">Filter Staff:</span>
                 <select
                   value={reportEmpFilter}
                   onChange={(e) => setReportEmpFilter(e.target.value)}
@@ -1294,19 +1083,28 @@ export default function AttendancePage() {
                 >
                   <option value="">All Employees</option>
                   {employees.map(e => (
-                    <option key={e.id} value={e.id}>{e.name}</option>
+                    <option key={e.id} value={e.id}>{e.name} ({e.department})</option>
                   ))}
                 </select>
               </div>
             </div>
 
-            <button
-              onClick={handleExportCSV}
-              className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black font-bold font-mono rounded-xl text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center space-x-1.5"
-            >
-              <Download className="w-4 h-4" />
-              <span>Export CSV Report</span>
-            </button>
+            <div className="flex items-center space-x-2.5">
+              <button
+                onClick={fetchReports}
+                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 rounded-xl text-xs font-mono font-bold transition-all"
+              >
+                Refresh Report
+              </button>
+
+              <button
+                onClick={handleExportCSV}
+                className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black font-bold font-mono rounded-xl text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center space-x-1.5"
+              >
+                <Download className="w-4 h-4" />
+                <span>Export CSV Hours Log</span>
+              </button>
+            </div>
           </div>
 
           {/* Report Breakdown */}
@@ -1335,20 +1133,27 @@ export default function AttendancePage() {
                   </p>
                 </div>
 
-                <div className="glass-card rounded-2xl p-4 border border-white/10">
-                  <p className="text-xs font-mono text-slate-400 uppercase">Total Hours Worked</p>
-                  <p className="text-2xl font-extrabold text-cyan-400 mt-1">
+                <div className="glass-card rounded-2xl p-4 border border-cyan-500/30 bg-cyan-500/5 shadow-lg shadow-cyan-500/10">
+                  <p className="text-xs font-mono text-cyan-400 uppercase font-bold">Total Hours Worked</p>
+                  <p className="text-2xl font-extrabold text-cyan-300 mt-1">
                     {reportData.reports.reduce((sum, r) => sum + r.summary.totalHours, 0).toFixed(1)} hrs
                   </p>
                 </div>
               </div>
 
-              {/* Per-Employee Summary Table */}
+              {/* Per-Employee Summary & Check-In / Check-Out Hours Table */}
               <div className="glass-card rounded-2xl overflow-hidden border border-white/10">
-                <div className="p-4 border-b border-white/10 flex items-center justify-between">
-                  <h4 className="font-bold text-white text-sm">Employee Attendance Summary & Performance</h4>
-                  <span className="text-xs font-mono text-slate-400">
-                    Period: {new Date(reportData.startDate).toLocaleDateString()} – {new Date(reportData.endDate).toLocaleDateString()}
+                <div className="p-4 border-b border-white/10 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h4 className="font-bold text-white text-sm">
+                      Employee Working Hours Summary & Attendance Log
+                    </h4>
+                    <p className="text-[11px] font-mono text-slate-400 mt-0.5">
+                      Period: <span className="text-cyan-400 font-bold">{new Date(reportData.startDate).toLocaleDateString()}</span> – <span className="text-cyan-400 font-bold">{new Date(reportData.endDate).toLocaleDateString()}</span> ({reportData.type.toUpperCase()})
+                    </p>
+                  </div>
+                  <span className="text-xs font-mono text-slate-400 bg-slate-900 px-3 py-1 rounded-xl border border-white/5">
+                    Click any row to view day-by-day check-in & check-out logs
                   </span>
                 </div>
 
@@ -1358,66 +1163,165 @@ export default function AttendancePage() {
                       <tr className="bg-slate-900/80 border-b border-white/10 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
                         <th className="py-3.5 px-4">Employee</th>
                         <th className="py-3.5 px-4">Department</th>
-                        <th className="py-3.5 px-4 text-center">Present</th>
-                        <th className="py-3.5 px-4 text-center">Late</th>
-                        <th className="py-3.5 px-4 text-center">Half Day</th>
-                        <th className="py-3.5 px-4 text-center">Leave</th>
-                        <th className="py-3.5 px-4 text-center">Absent</th>
-                        <th className="py-3.5 px-4 text-right">Total Hours</th>
+                        <th className="py-3.5 px-4 text-center">Present Days</th>
+                        <th className="py-3.5 px-4 text-center">Late / Half Day</th>
+                        <th className="py-3.5 px-4 text-center">Absent / Leave</th>
+                        <th className="py-3.5 px-4 text-right font-bold text-amber-300">Total Hours Worked</th>
+                        <th className="py-3.5 px-4 text-right">Avg Hrs/Day</th>
                         <th className="py-3.5 px-4 text-right">Attendance %</th>
+                        <th className="py-3.5 px-4 text-center">Daily Logs</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5 text-xs">
-                      {reportData.reports.map((rep) => (
-                        <tr key={rep.employee.id} className="hover:bg-white/5 transition-colors">
-                          <td className="py-3.5 px-4">
-                            <p className="font-bold text-white text-sm">{rep.employee.name}</p>
-                            <p className="text-[10px] font-mono text-cyan-400">{rep.employee.designation}</p>
-                          </td>
+                      {reportData.reports.map((rep) => {
+                        const isExpanded = expandedEmployeeId === rep.employee.id;
 
-                          <td className="py-3.5 px-4 font-mono text-slate-300">
-                            {rep.employee.department}
-                          </td>
+                        return (
+                          <React.Fragment key={rep.employee.id}>
+                            <tr 
+                              onClick={() => setExpandedEmployeeId(isExpanded ? null : rep.employee.id)}
+                              className="hover:bg-white/5 transition-colors cursor-pointer"
+                            >
+                              <td className="py-3.5 px-4">
+                                <div className="flex items-center space-x-2.5">
+                                  <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 font-bold flex items-center justify-center text-xs">
+                                    {rep.employee.name.charAt(0)}
+                                  </div>
+                                  <div>
+                                    <p className="font-bold text-white text-sm">{rep.employee.name}</p>
+                                    <p className="text-[10px] font-mono text-cyan-400">{rep.employee.designation}</p>
+                                  </div>
+                                </div>
+                              </td>
 
-                          <td className="py-3.5 px-4 text-center font-mono font-bold text-emerald-400">
-                            {rep.summary.presentDays}
-                          </td>
+                              <td className="py-3.5 px-4 font-mono text-slate-300">
+                                {rep.employee.department}
+                              </td>
 
-                          <td className="py-3.5 px-4 text-center font-mono font-bold text-amber-400">
-                            {rep.summary.lateDays}
-                          </td>
+                              <td className="py-3.5 px-4 text-center font-mono font-bold text-emerald-400">
+                                {rep.summary.presentDays}
+                              </td>
 
-                          <td className="py-3.5 px-4 text-center font-mono font-bold text-cyan-400">
-                            {rep.summary.halfDays}
-                          </td>
+                              <td className="py-3.5 px-4 text-center font-mono font-bold text-amber-400">
+                                {rep.summary.lateDays + rep.summary.halfDays}
+                              </td>
 
-                          <td className="py-3.5 px-4 text-center font-mono text-blue-400">
-                            {rep.summary.leaveDays}
-                          </td>
+                              <td className="py-3.5 px-4 text-center font-mono font-bold text-rose-400">
+                                {rep.summary.absentDays + rep.summary.leaveDays}
+                              </td>
 
-                          <td className="py-3.5 px-4 text-center font-mono font-bold text-rose-400">
-                            {rep.summary.absentDays}
-                          </td>
+                              <td className="py-3.5 px-4 text-right font-mono font-extrabold text-amber-300 text-sm">
+                                {rep.summary.totalHours.toFixed(1)} hrs
+                              </td>
 
-                          <td className="py-3.5 px-4 text-right font-mono font-bold text-white">
-                            {rep.summary.totalHours} hrs
-                          </td>
+                              <td className="py-3.5 px-4 text-right font-mono text-slate-300">
+                                {rep.summary.avgHoursPerDay ? `${rep.summary.avgHoursPerDay.toFixed(1)} hrs` : '0.0 hrs'}
+                              </td>
 
-                          <td className="py-3.5 px-4 text-right">
-                            <div className="flex items-center justify-end space-x-2">
-                              <div className="w-16 bg-slate-800 rounded-full h-2 overflow-hidden">
-                                <div
-                                  className="bg-gradient-to-r from-cyan-500 to-emerald-400 h-full rounded-full"
-                                  style={{ width: `${rep.summary.attendanceRate}%` }}
-                                ></div>
-                              </div>
-                              <span className="font-mono font-bold text-cyan-400 text-xs w-9 text-right">
-                                {rep.summary.attendanceRate}%
-                              </span>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                              <td className="py-3.5 px-4 text-right">
+                                <div className="flex items-center justify-end space-x-2">
+                                  <div className="w-16 bg-slate-800 rounded-full h-2 overflow-hidden">
+                                    <div
+                                      className="bg-gradient-to-r from-cyan-500 to-emerald-400 h-full rounded-full"
+                                      style={{ width: `${rep.summary.attendanceRate}%` }}
+                                    ></div>
+                                  </div>
+                                  <span className="font-mono font-bold text-cyan-400 text-xs w-9 text-right">
+                                    {rep.summary.attendanceRate}%
+                                  </span>
+                                </div>
+                              </td>
+
+                              <td className="py-3.5 px-4 text-center">
+                                <button
+                                  type="button"
+                                  className="p-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
+                                >
+                                  {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                </button>
+                              </td>
+                            </tr>
+
+                            {/* Detailed Check-In / Check-Out Log Breakdown per day for this employee */}
+                            {isExpanded && (
+                              <tr className="bg-slate-950/70">
+                                <td colSpan="9" className="p-4 pl-12">
+                                  <div className="border border-white/10 rounded-2xl p-4 bg-slate-900/60 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                      <h5 className="font-bold text-xs font-mono text-cyan-300 flex items-center space-x-2">
+                                        <Clock className="w-3.5 h-3.5" />
+                                        <span>Daily Check-In & Check-Out Working Hours: {rep.employee.name}</span>
+                                      </h5>
+                                      <span className="text-[10px] font-mono text-slate-400">
+                                        Total Shift Hours in Period: <strong className="text-amber-300">{rep.summary.totalHours.toFixed(1)} hrs</strong>
+                                      </span>
+                                    </div>
+
+                                    <div className="overflow-x-auto">
+                                      <table className="w-full text-left font-mono text-xs">
+                                        <thead>
+                                          <tr className="border-b border-white/10 text-slate-500 text-[10px] uppercase">
+                                            <th className="py-2">Date</th>
+                                            <th className="py-2">Check-In</th>
+                                            <th className="py-2">Check-Out</th>
+                                            <th className="py-2">Hours Worked</th>
+                                            <th className="py-2">Status</th>
+                                            <th className="py-2">Notes</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-white/5 text-slate-300">
+                                          {rep.logs.map(log => {
+                                            const tag = getCheckoutTag(log.checkOut);
+                                            return (
+                                              <tr key={log.id} className="hover:bg-white/5">
+                                                <td className="py-2 text-cyan-300 font-bold">
+                                                  {new Date(log.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                                                </td>
+                                                <td className="py-2 text-slate-200">
+                                                  {log.checkIn || '-'}
+                                                </td>
+                                                <td className="py-2 text-slate-200">
+                                                  <div className="flex items-center space-x-1.5">
+                                                    <span>{log.checkOut || '-'}</span>
+                                                    {log.checkOut && tag && (
+                                                      <span className={`text-[9px] px-1.5 py-0.5 rounded border ${tag.color}`}>
+                                                        {tag.label}
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                </td>
+                                                <td className="py-2 font-bold text-amber-300">
+                                                  {log.totalHours ? `${log.totalHours.toFixed(1)} hrs` : '0.0 hrs'}
+                                                </td>
+                                                <td className="py-2">
+                                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getStatusBadgeClass(log.status)}`}>
+                                                    {log.status}
+                                                  </span>
+                                                </td>
+                                                <td className="py-2 text-slate-400 font-sans">
+                                                  {log.notes || '-'}
+                                                </td>
+                                              </tr>
+                                            );
+                                          })}
+
+                                          {rep.logs.length === 0 && (
+                                            <tr>
+                                              <td colSpan="6" className="py-4 text-center text-slate-500 text-[11px]">
+                                                No attendance logs recorded for this period.
+                                              </td>
+                                            </tr>
+                                          )}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
 
                       {reportData.reports.length === 0 && (
                         <tr>
