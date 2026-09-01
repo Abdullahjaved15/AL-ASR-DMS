@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, Car, UserPlus, Handshake, Menu, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import InstallAppButton from './InstallAppButton';
 
 export default function Header({ currentTab, search, setSearch, onOpenModal, onToggleMobileMenu }) {
 const { user, isAdmin, logout } = useAuth();
@@ -122,8 +121,6 @@ const { user, isAdmin, logout } = useAuth();
           </>
         )}
 
-        {/* Install Desktop / Mobile App Button */}
-        <InstallAppButton variant="header" />
 
         <button
           onClick={logout}
