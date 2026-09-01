@@ -15,23 +15,39 @@ const normalizeDate = (dateStr) => {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 };
 
-// Calculate total hours between checkIn and checkOut strings (e.g., "09:00 AM" or "09:00" and "06:00 PM" or "18:00")
+// Calculate total hours between checkIn and checkOut strings (e.g., "09:00 AM" or "09:00" and "09:00 PM" or "21:00")
 const calculateHours = (checkIn, checkOut) => {
   if (!checkIn || !checkOut) return 0;
   try {
     const parseTime = (str) => {
-      let [time, modifier] = str.trim().split(' ');
-      let [hours, minutes] = time.split(':').map(Number);
-      if (modifier) {
-        modifier = modifier.toUpperCase();
+      if (!str || typeof str !== 'string') return null;
+      const clean = str.trim();
+      const match = clean.match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
+      if (match) {
+        let hours = parseInt(match[1], 10);
+        const minutes = parseInt(match[2], 10);
+        const modifier = match[3] ? match[3].toUpperCase() : null;
         if (modifier === 'PM' && hours < 12) hours += 12;
         if (modifier === 'AM' && hours === 12) hours = 0;
+        return hours * 60 + minutes;
       }
-      return hours * 60 + (minutes || 0);
+      
+      // Fallback for space separated or other standard splits
+      const parts = clean.split(/[\s:]+/);
+      if (parts.length >= 2) {
+        let hours = parseInt(parts[0], 10);
+        let minutes = parseInt(parts[1], 10) || 0;
+        const modifier = parts[2] ? parts[2].toUpperCase() : null;
+        if (modifier === 'PM' && hours < 12) hours += 12;
+        if (modifier === 'AM' && hours === 12) hours = 0;
+        return hours * 60 + minutes;
+      }
+      return null;
     };
 
     const inMins = parseTime(checkIn);
     const outMins = parseTime(checkOut);
+    if (inMins === null || outMins === null) return 0;
     if (outMins < inMins) return 0;
     const diff = (outMins - inMins) / 60;
     return parseFloat(diff.toFixed(2));
