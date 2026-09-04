@@ -32,7 +32,9 @@ import {
   ArrowDownLeft,
   X,
   Receipt,
-  Sparkles
+  Sparkles,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -792,8 +794,500 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
     }
   };
 
+  // --- EXCEL & SPREADSHEET PRINTING AND CSV EXPORTS ---
+
   const printLedgerStatement = () => {
-    window.print();
+    if (!selectedAccountLedger) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow popups in your browser to print the Ledger Statement.');
+      return;
+    }
+
+    const todayStr = new Date().toLocaleDateString('en-GB', { 
+      day: '2-digit', 
+      month: 'short', 
+      year: 'numeric' 
+    });
+
+    const accName = selectedAccountLedger.account?.name || selectedAccountLedger.name || 'Account Ledger';
+    const accCode = selectedAccountLedger.account?.code || selectedAccountLedger.code || '';
+    const accType = selectedAccountLedger.account?.type || selectedAccountLedger.type || '';
+    const accSubType = selectedAccountLedger.account?.subType || selectedAccountLedger.subType || '';
+    const bankDetails = selectedAccountLedger.account?.accountNumber ? `${selectedAccountLedger.account.bankName || ''} - ${selectedAccountLedger.account.accountNumber}` : '';
+    
+    const entries = selectedAccountLedger.entries || [];
+    const totalDebit = selectedAccountLedger.totalDebit || 0;
+    const totalCredit = selectedAccountLedger.totalCredit || 0;
+    const closingBalance = selectedAccountLedger.closingBalance !== undefined ? selectedAccountLedger.closingBalance : (selectedAccountLedger.currentBalance || 0);
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>AL ASR MOTORS - Ledger Statement: ${accName} (${accCode})</title>
+          <style>
+            @page { size: portrait; margin: 8mm 8mm; }
+            * { box-sizing: border-box; }
+            body { font-family: 'Segoe UI', Calibri, Arial, sans-serif; padding: 0; margin: 0; color: #0f172a; background: #ffffff; font-size: 9px; line-height: 1.3; }
+            
+            .header-container { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 8px; }
+            .logo-title-box { display: flex; align-items: center; gap: 12px; }
+            .title { font-size: 15px; font-weight: 800; color: #0f172a; letter-spacing: 0.5px; text-transform: uppercase; }
+            .subtitle { font-size: 9px; color: #475569; font-family: monospace; }
+            
+            .acc-banner { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+            .acc-name { font-size: 13px; font-weight: 800; color: #0f172a; }
+            .acc-meta { font-size: 8.5px; color: #64748b; font-family: monospace; margin-top: 2px; }
+            
+            .kpi-row { display: flex; gap: 10px; margin-bottom: 10px; }
+            .kpi-box { flex: 1; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; background: #f8fafc; text-align: center; }
+            .kpi-title { font-size: 8px; font-weight: 700; color: #64748b; text-transform: uppercase; font-family: monospace; }
+            .kpi-value { font-size: 13px; font-weight: 800; font-family: monospace; margin-top: 2px; }
+            .kpi-value.green { color: #15803d; }
+            .kpi-value.red { color: #b91c1c; }
+            .kpi-value.blue { color: #0284c7; }
+            
+            /* Excel Grid Table */
+            table { width: 100%; border-collapse: collapse; border: 1.5px solid #334155; margin-top: 4px; font-size: 9px; }
+            thead th { background-color: #1e293b; color: #ffffff; text-align: left; padding: 6px 8px; font-size: 8.5px; font-weight: 700; text-transform: uppercase; border: 1px solid #475569; letter-spacing: 0.3px; }
+            thead th.num { text-align: right; }
+            tbody td { padding: 5px 8px; border: 1px solid #cbd5e1; vertical-align: middle; }
+            tbody td.num { text-align: right; font-family: monospace; font-weight: 700; }
+            tbody tr:nth-child(even) { background-color: #f8fafc; }
+            tbody tr:hover { background-color: #f1f5f9; }
+            
+            /* Footer Totals Row */
+            tfoot tr { background-color: #f1f5f9; font-weight: 800; border-top: 2px solid #0f172a; }
+            tfoot td { padding: 6px 8px; border: 1px solid #cbd5e1; font-size: 9.5px; }
+            tfoot td.num { text-align: right; font-family: monospace; }
+            
+            .signatures-box { display: flex; justify-content: space-between; margin-top: 35px; padding-top: 10px; page-break-inside: avoid; }
+            .signature-col { width: 28%; text-align: center; border-top: 1px dashed #64748b; padding-top: 4px; font-size: 8.5px; font-weight: 700; color: #334155; }
+            
+            .print-footer { margin-top: 12px; text-align: center; font-size: 8px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 4px; font-family: monospace; }
+          </style>
+        </head>
+        <body>
+          <div class="header-container">
+            <div class="logo-title-box">
+              <img src="${logoBase64}" alt="AL ASR MOTORS" style="height: 40px; width: auto; object-fit: contain;" />
+              <div>
+                <div class="title">AL ASR MOTORS — OFFICIAL GENERAL LEDGER STATEMENT</div>
+                <div class="subtitle">Complete Transaction Statement & Balance Register • Generated: ${todayStr}</div>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-weight: 800; font-size: 11px; color: #0f172a;">AL ASR MOTORS DMS</div>
+              <div style="font-size: 8px; color: #64748b;">Sahiwal, Punjab, Pakistan</div>
+            </div>
+          </div>
+
+          <div class="acc-banner">
+            <div>
+              <div class="acc-name">${accName}</div>
+              <div class="acc-meta">Account Code: <strong>${accCode}</strong> • Type: <strong>${accType}</strong> • Subtype: <strong>${accSubType}</strong> ${bankDetails ? '• ' + bankDetails : ''}</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 8px; font-weight: 700; color: #64748b; text-transform: uppercase;">Current Balance</div>
+              <div style="font-size: 15px; font-weight: 800; font-family: monospace; color: ${closingBalance >= 0 ? '#15803d' : '#b91c1c'};">
+                Rs. ${closingBalance.toLocaleString()}
+              </div>
+            </div>
+          </div>
+
+          <div class="kpi-row">
+            <div class="kpi-box">
+              <div class="kpi-title">Total Debits (+ Inflow)</div>
+              <div class="kpi-value green">+Rs. ${totalDebit.toLocaleString()}</div>
+            </div>
+            <div class="kpi-box">
+              <div class="kpi-title">Total Credits (- Outflow)</div>
+              <div class="kpi-value red">-Rs. ${totalCredit.toLocaleString()}</div>
+            </div>
+            <div class="kpi-box">
+              <div class="kpi-title">Closing Running Balance</div>
+              <div class="kpi-value blue">Rs. ${closingBalance.toLocaleString()}</div>
+            </div>
+            <div class="kpi-box">
+              <div class="kpi-title">Total Entries</div>
+              <div class="kpi-value" style="color: #334155;">${entries.length} Txns</div>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 25px;">#</th>
+                <th style="width: 110px;">Date & Time</th>
+                <th style="width: 120px;">Txn / Ref #</th>
+                <th>Particulars / Description</th>
+                <th style="width: 90px;">Reference</th>
+                <th style="width: 95px;" class="num">Debit (+In)</th>
+                <th style="width: 95px;" class="num">Credit (-Out)</th>
+                <th style="width: 105px;" class="num">Running Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${entries.length === 0 ? `
+                <tr>
+                  <td colspan="8" style="text-align: center; padding: 25px; color: #64748b; font-style: italic;">
+                    No ledger transactions recorded for this account.
+                  </td>
+                </tr>
+              ` : entries.map((entry, idx) => {
+                const isDebit = entry.entryType === 'DEBIT';
+                const amt = Number(entry.amount) || 0;
+                const runningBal = Number(entry.runningBalance) || 0;
+
+                return `
+                  <tr>
+                    <td>${idx + 1}</td>
+                    <td style="font-family: monospace;">${new Date(entry.date).toLocaleDateString('en-GB')} ${new Date(entry.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                    <td style="font-family: monospace; font-weight: 700; color: #0369a1;">${entry.transactionNumber || '-'}</td>
+                    <td>
+                      <div style="font-weight: 600;">${entry.description || 'Transaction entry'}</div>
+                      ${entry.chassisNumber ? `<div style="font-size: 7.5px; color: #0284c7; font-family: monospace;">Chassis: ${entry.chassisNumber}</div>` : ''}
+                    </td>
+                    <td style="font-family: monospace; font-size: 8px;">${entry.referenceNumber || '-'}</td>
+                    <td class="num" style="color: #15803d;">${isDebit ? amt.toLocaleString() : '-'}</td>
+                    <td class="num" style="color: #b91c1c;">${!isDebit ? amt.toLocaleString() : '-'}</td>
+                    <td class="num" style="color: #0f172a;">Rs. ${runningBal.toLocaleString()}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="5" style="text-align: right; text-transform: uppercase;">Total Ledger Summary:</td>
+                <td class="num" style="color: #15803d; border-bottom: 3px double #0f172a;">Rs. ${totalDebit.toLocaleString()}</td>
+                <td class="num" style="color: #b91c1c; border-bottom: 3px double #0f172a;">Rs. ${totalCredit.toLocaleString()}</td>
+                <td class="num" style="color: #0369a1; border-bottom: 3px double #0f172a;">Rs. ${closingBalance.toLocaleString()}</td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div class="signatures-box">
+            <div class="signature-col">
+              Prepared By<br/><span style="font-weight: normal; font-size: 7.5px; color: #64748b;">Accountant</span>
+            </div>
+            <div class="signature-col">
+              Verified By<br/><span style="font-weight: normal; font-size: 7.5px; color: #64748b;">Head of Accounts</span>
+            </div>
+            <div class="signature-col">
+              Approved By<br/><span style="font-weight: normal; font-size: 7.5px; color: #64748b;">Chief Executive / Super Admin</span>
+            </div>
+          </div>
+
+          <div class="print-footer">
+            AL ASR MOTORS Dealership & Accounts Management System • Generated on ${todayStr} • Confidential Accounting Record
+          </div>
+
+          <script>
+            window.onload = function() { window.print(); };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
+  const exportLedgerToCSV = () => {
+    if (!selectedAccountLedger) return;
+    const entries = selectedAccountLedger.entries || [];
+    if (entries.length === 0) {
+      alert('No ledger transactions to export.');
+      return;
+    }
+
+    const accName = selectedAccountLedger.account?.name || selectedAccountLedger.name || 'Account';
+    const accCode = selectedAccountLedger.account?.code || selectedAccountLedger.code || '';
+
+    const headers = ['#', 'Date', 'Time', 'Voucher / Txn #', 'Particulars / Description', 'Reference #', 'Chassis #', 'Debit (+In PKR)', 'Credit (-Out PKR)', 'Running Balance (PKR)'];
+    const rows = entries.map((entry, idx) => {
+      const isDebit = entry.entryType === 'DEBIT';
+      const amt = Number(entry.amount) || 0;
+      const runningBal = Number(entry.runningBalance) || 0;
+
+      return [
+        idx + 1,
+        new Date(entry.date).toLocaleDateString('en-GB'),
+        new Date(entry.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        `"${(entry.transactionNumber || '').replace(/"/g, '""')}"`,
+        `"${(entry.description || '').replace(/"/g, '""')}"`,
+        `"${(entry.referenceNumber || '').replace(/"/g, '""')}"`,
+        `"${(entry.chassisNumber || '').replace(/"/g, '""')}"`,
+        isDebit ? amt : 0,
+        !isDebit ? amt : 0,
+        runningBal
+      ].join(',');
+    });
+
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `AL_ASR_Ledger_${accCode || 'ACC'}_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const printDayBookReport = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow popups in your browser to print the Day Book Report.');
+      return;
+    }
+
+    const todayStr = new Date().toLocaleDateString('en-GB', { 
+      day: '2-digit', 
+      month: 'short', 
+      year: 'numeric' 
+    });
+
+    const periodLabel = auditTimeRange === 'TODAY' 
+      ? 'Today (' + todayStr + ')' 
+      : auditTimeRange === 'THIS_MONTH' 
+      ? 'This Month' 
+      : auditTimeRange === 'THIS_YEAR'
+      ? 'This Financial Year'
+      : 'Custom Period';
+
+    const transactions = auditTransactions || [];
+    let totalDebitSum = 0;
+    let totalCreditSum = 0;
+
+    transactions.forEach(t => {
+      const type = (t.type || '').toUpperCase();
+      const amount = Number(t.amount) || 0;
+      if (type.includes('RECEIPT') || type.includes('INFLOW') || type.includes('DEPOSIT') || type === 'INSTALLMENT_COLLECTION') {
+        totalDebitSum += amount;
+      } else if (type.includes('PAYMENT') || type.includes('EXPENSE') || type.includes('OUTFLOW') || type.includes('WITHDRAWAL')) {
+        totalCreditSum += amount;
+      } else {
+        totalDebitSum += amount;
+      }
+    });
+
+    const netDelta = (auditAnalytics?.netLiquidityChange !== undefined) 
+      ? auditAnalytics.netLiquidityChange 
+      : (totalDebitSum - totalCreditSum);
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>AL ASR MOTORS - Financial Day Book & Audit Trail (${todayStr})</title>
+          <style>
+            @page { size: landscape; margin: 8mm 8mm; }
+            * { box-sizing: border-box; }
+            body { font-family: 'Segoe UI', Calibri, Arial, sans-serif; padding: 0; margin: 0; color: #0f172a; background: #ffffff; font-size: 9px; line-height: 1.3; }
+            
+            .header-container { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 8px; }
+            .logo-title-box { display: flex; align-items: center; gap: 12px; }
+            .title { font-size: 15px; font-weight: 800; color: #0f172a; letter-spacing: 0.5px; text-transform: uppercase; }
+            .subtitle { font-size: 9px; color: #475569; font-family: monospace; }
+            
+            .kpi-row { display: flex; gap: 10px; margin-bottom: 10px; }
+            .kpi-box { flex: 1; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; background: #f8fafc; }
+            .kpi-title { font-size: 8px; font-weight: 700; color: #64748b; text-transform: uppercase; font-family: monospace; }
+            .kpi-value { font-size: 13px; font-weight: 800; font-family: monospace; margin-top: 2px; }
+            .kpi-value.green { color: #15803d; }
+            .kpi-value.red { color: #b91c1c; }
+            .kpi-value.blue { color: #0284c7; }
+            
+            /* Excel Grid Table */
+            table { width: 100%; border-collapse: collapse; border: 1.5px solid #334155; margin-top: 4px; font-size: 9px; }
+            thead th { background-color: #1e293b; color: #ffffff; text-align: left; padding: 6px 8px; font-size: 8.5px; font-weight: 700; text-transform: uppercase; border: 1px solid #475569; letter-spacing: 0.3px; }
+            thead th.num { text-align: right; }
+            tbody td { padding: 5px 8px; border: 1px solid #cbd5e1; vertical-align: middle; }
+            tbody td.num { text-align: right; font-family: monospace; font-weight: 700; }
+            tbody tr:nth-child(even) { background-color: #f8fafc; }
+            tbody tr:hover { background-color: #f1f5f9; }
+            
+            .badge-type { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 8px; font-weight: 700; font-family: monospace; }
+            .badge-green { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+            .badge-red { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+            .badge-blue { background: #e0f2fe; color: #075985; border: 1px solid #bae6fd; }
+            .badge-purple { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+
+            /* Footer Totals Row */
+            tfoot tr { background-color: #f1f5f9; font-weight: 800; border-top: 2px solid #0f172a; }
+            tfoot td { padding: 6px 8px; border: 1px solid #cbd5e1; font-size: 9.5px; }
+            tfoot td.num { text-align: right; font-family: monospace; }
+            
+            .signatures-box { display: flex; justify-content: space-between; margin-top: 30px; padding-top: 10px; page-break-inside: avoid; }
+            .signature-col { width: 28%; text-align: center; border-top: 1px dashed #64748b; padding-top: 4px; font-size: 8.5px; font-weight: 700; color: #334155; }
+            
+            .print-footer { margin-top: 12px; text-align: center; font-size: 8px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 4px; font-family: monospace; }
+          </style>
+        </head>
+        <body>
+          <div class="header-container">
+            <div class="logo-title-box">
+              <img src="${logoBase64}" alt="AL ASR MOTORS" style="height: 40px; width: auto; object-fit: contain;" />
+              <div>
+                <div class="title">AL ASR MOTORS — FINANCIAL DAY BOOK & AUDIT TRAIL</div>
+                <div class="subtitle">Official Cash & Bank Transaction Register • Period: ${periodLabel} • Printed: ${todayStr}</div>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-weight: 800; font-size: 11px; color: #0f172a;">AL ASR MOTORS DMS</div>
+              <div style="font-size: 8px; color: #64748b;">Sahiwal, Punjab, Pakistan</div>
+            </div>
+          </div>
+
+          <div class="kpi-row">
+            <div class="kpi-box">
+              <div class="kpi-title">Total Inflows (Cash + Bank)</div>
+              <div class="kpi-value green">+Rs. ${(auditAnalytics?.totalGrossInflow !== undefined ? auditAnalytics.totalGrossInflow : totalDebitSum).toLocaleString()}</div>
+            </div>
+            <div class="kpi-box">
+              <div class="kpi-title">Total Outflows (Payments/Spent)</div>
+              <div class="kpi-value red">-Rs. ${(auditAnalytics?.totalGrossOutflow !== undefined ? auditAnalytics.totalGrossOutflow : totalCreditSum).toLocaleString()}</div>
+            </div>
+            <div class="kpi-box">
+              <div class="kpi-title">Net Period Liquidity Delta</div>
+              <div class="kpi-value ${netDelta >= 0 ? 'green' : 'red'}">${netDelta >= 0 ? '+' : ''}Rs. ${netDelta.toLocaleString()}</div>
+            </div>
+            <div class="kpi-box">
+              <div class="kpi-title">Recorded Transactions</div>
+              <div class="kpi-value blue">${transactions.length} Records</div>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 25px;">#</th>
+                <th style="width: 105px;">Date & Time</th>
+                <th style="width: 115px;">Voucher / Txn #</th>
+                <th style="width: 85px;">Type</th>
+                <th>Particulars / Description</th>
+                <th style="width: 125px;">Accounts Involved</th>
+                <th style="width: 95px;" class="num">Inflow / Dr (PKR)</th>
+                <th style="width: 95px;" class="num">Outflow / Cr (PKR)</th>
+                <th style="width: 95px;">Logged By</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${transactions.length === 0 ? `
+                <tr>
+                  <td colspan="9" style="text-align: center; padding: 25px; color: #64748b; font-style: italic;">
+                    No financial day book events recorded for this timeframe.
+                  </td>
+                </tr>
+              ` : transactions.map((txn, idx) => {
+                const type = (txn.type || '').toUpperCase();
+                const amt = Number(txn.amount) || 0;
+                const isInflow = type.includes('RECEIPT') || type.includes('INFLOW') || type.includes('DEPOSIT') || type === 'INSTALLMENT_COLLECTION';
+                const isOutflow = type.includes('PAYMENT') || type.includes('EXPENSE') || type.includes('OUTFLOW') || type.includes('WITHDRAWAL');
+                
+                let badgeClass = 'badge-blue';
+                if (isInflow) badgeClass = 'badge-green';
+                else if (isOutflow) badgeClass = 'badge-red';
+                else if (type.includes('TRANSFER')) badgeClass = 'badge-purple';
+
+                const loggedUser = txn.user?.name || txn.loggedBy?.name || txn.loggedBy || 'System';
+
+                return `
+                  <tr>
+                    <td>${idx + 1}</td>
+                    <td style="font-family: monospace;">${new Date(txn.date).toLocaleDateString('en-GB')} ${new Date(txn.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                    <td style="font-family: monospace; font-weight: 700; color: #0369a1;">${txn.transactionNumber || '-'}</td>
+                    <td><span class="badge-type ${badgeClass}">${txn.type}</span></td>
+                    <td>
+                      <div style="font-weight: 600;">${txn.description || 'Transaction entry'}</div>
+                      ${txn.referenceNumber ? `<div style="font-size: 7.5px; color: #64748b; font-family: monospace;">Ref: ${txn.referenceNumber} ${txn.chassisNumber ? '• Chassis: ' + txn.chassisNumber : ''}</div>` : ''}
+                    </td>
+                    <td style="font-family: monospace; font-size: 8px;">${txn.accountsInvolved || (txn.debitAccount && txn.creditAccount ? `${txn.debitAccount.name} ➔ ${txn.creditAccount.name}` : '-')}</td>
+                    <td class="num" style="color: #15803d;">${isInflow ? amt.toLocaleString() : '-'}</td>
+                    <td class="num" style="color: #b91c1c;">${isOutflow ? amt.toLocaleString() : '-'}</td>
+                    <td style="font-size: 8px;">${loggedUser}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="6" style="text-align: right; text-transform: uppercase;">Total Period Summary:</td>
+                <td class="num" style="color: #15803d; border-bottom: 3px double #0f172a;">Rs. ${(auditAnalytics?.totalGrossInflow !== undefined ? auditAnalytics.totalGrossInflow : totalDebitSum).toLocaleString()}</td>
+                <td class="num" style="color: #b91c1c; border-bottom: 3px double #0f172a;">Rs. ${(auditAnalytics?.totalGrossOutflow !== undefined ? auditAnalytics.totalGrossOutflow : totalCreditSum).toLocaleString()}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div class="signatures-box">
+            <div class="signature-col">
+              Prepared By<br/><span style="font-weight: normal; font-size: 7.5px; color: #64748b;">Accountant / Cashier</span>
+            </div>
+            <div class="signature-col">
+              Verified By<br/><span style="font-weight: normal; font-size: 7.5px; color: #64748b;">Head of Accounts</span>
+            </div>
+            <div class="signature-col">
+              Approved By<br/><span style="font-weight: normal; font-size: 7.5px; color: #64748b;">Chief Executive / Super Admin</span>
+            </div>
+          </div>
+
+          <div class="print-footer">
+            AL ASR MOTORS Dealership & Accounts Management System • Generated on ${todayStr} • Confidential Accounting Record
+          </div>
+
+          <script>
+            window.onload = function() { window.print(); };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
+  const exportDayBookToCSV = () => {
+    const transactions = auditTransactions || [];
+    if (transactions.length === 0) {
+      alert('No Day Book records to export.');
+      return;
+    }
+
+    const headers = ['#', 'Date', 'Time', 'Voucher / Txn #', 'Type', 'Particulars / Description', 'Accounts Involved', 'Inflow / Debit (PKR)', 'Outflow / Credit (PKR)', 'Logged By'];
+    const rows = transactions.map((txn, idx) => {
+      const type = (txn.type || '').toUpperCase();
+      const amt = Number(txn.amount) || 0;
+      const isInflow = type.includes('RECEIPT') || type.includes('INFLOW') || type.includes('DEPOSIT') || type === 'INSTALLMENT_COLLECTION';
+      const isOutflow = type.includes('PAYMENT') || type.includes('EXPENSE') || type.includes('OUTFLOW') || type.includes('WITHDRAWAL');
+      const loggedUser = txn.user?.name || txn.loggedBy?.name || txn.loggedBy || 'System';
+
+      return [
+        idx + 1,
+        new Date(txn.date).toLocaleDateString('en-GB'),
+        new Date(txn.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        `"${(txn.transactionNumber || '').replace(/"/g, '""')}"`,
+        `"${type}"`,
+        `"${(txn.description || '').replace(/"/g, '""')}"`,
+        `"${(txn.accountsInvolved || '').replace(/"/g, '""')}"`,
+        isInflow ? amt : 0,
+        isOutflow ? amt : 0,
+        `"${loggedUser.replace(/"/g, '""')}"`
+      ].join(',');
+    });
+
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `AL_ASR_DayBook_${auditTimeRange}_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -1721,13 +2215,24 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
               ))}
             </div>
 
-            <button
-              onClick={printLedgerStatement}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 rounded-xl text-xs font-mono flex items-center space-x-1.5"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Print Day Book Report</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={exportDayBookToCSV}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-mono font-bold flex items-center space-x-1.5 transition-all shadow-sm"
+                title="Download Day Book records as an Excel-compatible CSV spreadsheet"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Export Excel / CSV</span>
+              </button>
+              <button
+                onClick={printDayBookReport}
+                className="px-3.5 py-1.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-mono font-bold rounded-xl text-xs flex items-center space-x-1.5 transition-all shadow-lg shadow-cyan-500/20"
+                title="Print formatted Excel-style Day Book spreadsheet with rows, columns and signature blocks"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Print Day Book (Excel Sheet)</span>
+              </button>
+            </div>
           </div>
 
           {/* Analytics Summary */}
@@ -2322,11 +2827,20 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                   <span>- Pay from this Ledger</span>
                 </button>
                 <button
+                  onClick={exportLedgerToCSV}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-mono font-bold flex items-center space-x-1.5 transition-all shadow-sm"
+                  title="Download Ledger Statement records as an Excel-compatible CSV spreadsheet"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>Export Excel / CSV</span>
+                </button>
+                <button
                   onClick={printLedgerStatement}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 rounded-xl text-xs font-mono flex items-center space-x-1"
+                  className="px-3.5 py-1.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-mono font-bold rounded-xl text-xs flex items-center space-x-1.5 transition-all shadow-lg shadow-cyan-500/20"
+                  title="Print formatted Excel-style Ledger statement with rows, columns and signature blocks"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Print Ledger</span>
+                  <span>Print Ledger (Excel Sheet)</span>
                 </button>
                 <button onClick={() => setIsLedgerModalOpen(false)} className="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-800">
                   <X className="w-5 h-5" />
