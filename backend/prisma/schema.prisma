@@ -371,6 +371,28 @@ model CurrentStock {
   @@index([createdAt])
 }
 
+model AccountsStock {
+  id            String   @id @default(uuid())
+  vehicle       String
+  model         String
+  year          String
+  color         String   @default("White")
+  mileage       Int      @default(0)
+  askingPrice   String?  @default("")
+  purchasePrice String?  @default("")
+  status        String   @default("AVAILABLE") // AVAILABLE, RESERVED, AT_CUSTOMER, SOLD
+  location      String   @default("Main Showroom")
+  notes         String?
+  careOf        String?  // Care of / In-charge
+  regNumber     String?  // Vehicle Registration / Plate Number
+  chassisNumber String?  // Vehicle Chassis Number
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
 model ReceivingLetter {
   id                String   @id @default(uuid())
   letterNumber      String   @unique

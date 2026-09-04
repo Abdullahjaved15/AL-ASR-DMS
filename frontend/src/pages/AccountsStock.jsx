@@ -79,7 +79,7 @@ export default function AccountsStock({ onNavigate }) {
   const fetchStock = async () => {
     setLoading(true);
     try {
-      const data = await api.getCurrentStock({ search, status: statusFilter });
+      const data = await api.getAccountsStock({ search, status: statusFilter });
       if (data) {
         setStockList(data.stock || []);
         setStats(data.stats || {});
@@ -102,7 +102,7 @@ export default function AccountsStock({ onNavigate }) {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await api.createStockItem(cleanStockPayload(formData));
+      await api.createAccountsStockItem(cleanStockPayload(formData));
       setIsAddModalOpen(false);
       resetForm();
       fetchStock();
@@ -118,10 +118,7 @@ export default function AccountsStock({ onNavigate }) {
     if (!selectedStock) return;
     setSubmitting(true);
     try {
-      const res = await api.updateStockItem(selectedStock.id, cleanStockPayload(formData));
-      if (res?.requiresApproval) {
-        alert(res.message || 'Edit request submitted for approval.');
-      }
+      await api.updateAccountsStockItem(selectedStock.id, cleanStockPayload(formData));
       setIsEditModalOpen(false);
       setSelectedStock(null);
       resetForm();
@@ -134,15 +131,22 @@ export default function AccountsStock({ onNavigate }) {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this stock entry?')) return;
+    if (!window.confirm('Are you sure you want to delete this accounts stock entry?')) return;
     try {
-      const res = await api.deleteStockItem(id);
-      if (res?.requiresApproval) {
-        alert(res.message || 'Deletion request submitted for approval.');
-      }
+      await api.deleteAccountsStockItem(id);
       fetchStock();
     } catch (err) {
       alert(err.message || 'Failed to delete stock entry');
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (!window.confirm('Are you sure you want to DELETE ALL records from Accounts Current Stock? This will NOT affect Showroom stock.')) return;
+    try {
+      await api.clearAllAccountsStock();
+      fetchStock();
+    } catch (err) {
+      alert(err.message || 'Failed to clear accounts stock');
     }
   };
 
@@ -380,6 +384,17 @@ export default function AccountsStock({ onNavigate }) {
             <Download className="w-4 h-4" />
             <span>📄 Export Accounts Stock PDF</span>
           </button>
+
+          {stockList.length > 0 && canManageAccounts && (
+            <button
+              onClick={handleClearAll}
+              className="px-3 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold font-mono text-xs rounded-xl flex items-center space-x-1.5 transition-all shadow-sm"
+              title="Delete all accounts current stock records"
+            >
+              <Trash2 className="w-4 h-4 text-rose-400" />
+              <span>Clear Accounts Stock</span>
+            </button>
+          )}
 
           {canManageAccounts && (
             <button

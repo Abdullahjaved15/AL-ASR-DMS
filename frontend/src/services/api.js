@@ -305,6 +305,47 @@ export const api = {
     return handleResponse(res);
   },
 
+  // Accounts Current Stock API (Dedicated & Independent)
+  getAccountsStock: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/accounts-stock?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  createAccountsStockItem: async (data) => {
+    const res = await fetch(`${API_BASE}/accounts-stock`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  updateAccountsStockItem: async (id, data) => {
+    const res = await fetch(`${API_BASE}/accounts-stock/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  deleteAccountsStockItem: async (id) => {
+    const res = await fetch(`${API_BASE}/accounts-stock/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  clearAllAccountsStock: async () => {
+    const res = await fetch(`${API_BASE}/accounts-stock/clear-all`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
   // Invoices & Vouchers API (Super Admin)
   getInvoices: async (params = {}) => {
     const query = cleanParams(params);

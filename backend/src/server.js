@@ -25,6 +25,7 @@ const installmentRoutes = require('./routes/installmentRoutes');
 const auditTrailRoutes = require('./routes/auditTrailRoutes');
 const soldCarsRoutes = require('./routes/soldCarsRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const accountsStockRoutes = require('./routes/accountsStockRoutes');
 
 const app = express();
 
@@ -65,6 +66,7 @@ app.use('/api/installments', installmentRoutes);
 app.use('/api/audit-trail', auditTrailRoutes);
 app.use('/api/sold-cars', soldCarsRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/accounts-stock', accountsStockRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {

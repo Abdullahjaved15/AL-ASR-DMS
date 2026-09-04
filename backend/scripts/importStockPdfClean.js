@@ -151,11 +151,11 @@ async function importStockPdf() {
       data: {
         vehicle: vehicleName || 'Showroom Vehicle',
         model: yearStr || '2024',
-        year: modelYear,
+        year: String(modelYear),
         color: colorVal,
         mileage: mileageVal,
-        askingPrice: askingPricePkr,
-        purchasePrice: Math.round(askingPricePkr * 0.92),
+        askingPrice: String(askingPricePkr),
+        purchasePrice: '', // Keep purchase price empty so showroom stock doesn't have accounts purchase records
         status: 'AVAILABLE',
         location: 'Main Showroom Floor',
         careOf: careOf,
@@ -165,7 +165,7 @@ async function importStockPdf() {
     });
 
     createdItems.push(created);
-    console.log(`[${createdItems.length}] Added: ${created.vehicle} (${created.model}) - Rs. ${created.askingPrice.toLocaleString()} - Care Of: ${created.careOf} - Reg: ${created.regNumber}`);
+    console.log(`[${createdItems.length}] Added: ${created.vehicle} (${created.model}) - Rs. ${Number(created.askingPrice).toLocaleString()} - Care Of: ${created.careOf} - Reg: ${created.regNumber}`);
   }
 
   console.log(`\n🎉 SUCCESSFULLY IMPORTED ${createdItems.length} SHOWROOM STOCK VEHICLES TO DATABASE!`);
