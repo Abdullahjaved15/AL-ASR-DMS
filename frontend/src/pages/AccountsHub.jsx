@@ -31,7 +31,8 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   X,
-  Receipt
+  Receipt,
+  Sparkles
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -314,6 +315,76 @@ export default function AccountsHub({ onNavigate }) {
     } finally {
       setLedgerLoading(false);
     }
+  };
+
+  const generateNextAccountCode = (type, subType, existingAccounts = []) => {
+    const typePrefixMap = { 
+      ASSET: '1', 
+      LIABILITY: '2', 
+      EQUITY: '3', 
+      REVENUE: '4', 
+      EXPENSE: '5' 
+    };
+    const prefix = typePrefixMap[type] || '1';
+    const existingCodes = new Set(existingAccounts.map(a => String(a.code || '').trim()));
+    
+    let candidate = parseInt(`${prefix}001`, 10);
+    if (type === 'ASSET') {
+      if (subType === 'CASH') candidate = 1001;
+      else if (subType === 'BANK') candidate = 1010;
+      else if (subType === 'CUSTOMER') candidate = 1050;
+      else if (subType === 'INVENTORY') candidate = 1100;
+    } else if (type === 'LIABILITY') {
+      if (subType === 'VENDOR') candidate = 2001;
+      else if (subType === 'LOAN') candidate = 2050;
+    }
+    
+    while (existingCodes.has(String(candidate))) {
+      candidate++;
+    }
+    return String(candidate);
+  };
+
+  const openAddAccountModal = (defaultType = 'EXPENSE', defaultSubType = 'EXPENSE') => {
+    const autoCode = generateNextAccountCode(defaultType, defaultSubType, accounts);
+    setAccountFormData({
+      code: autoCode,
+      name: '',
+      type: defaultType,
+      subType: defaultSubType,
+      bankName: '',
+      accountNumber: '',
+      branch: '',
+      openingBalance: '',
+      description: ''
+    });
+    setIsAddAccountModalOpen(true);
+  };
+
+  const handleAccountTypeChange = (newType) => {
+    let newSubType = newType;
+    if (newType === 'ASSET') newSubType = 'BANK';
+    else if (newType === 'LIABILITY') newSubType = 'VENDOR';
+    else if (newType === 'EXPENSE') newSubType = 'EXPENSE';
+    else if (newType === 'REVENUE') newSubType = 'REVENUE';
+    else if (newType === 'EQUITY') newSubType = 'CAPITAL';
+
+    const newCode = generateNextAccountCode(newType, newSubType, accounts);
+    setAccountFormData(prev => ({
+      ...prev,
+      type: newType,
+      subType: newSubType,
+      code: newCode
+    }));
+  };
+
+  const handleAccountSubTypeChange = (newSubType) => {
+    const newCode = generateNextAccountCode(accountFormData.type, newSubType, accounts);
+    setAccountFormData(prev => ({
+      ...prev,
+      subType: newSubType,
+      code: newCode
+    }));
   };
 
   const handleCreateAccount = async (e) => {
@@ -751,7 +822,7 @@ export default function AccountsHub({ onNavigate }) {
           {/* Add Account Button */}
           {canManageAccounts && activeTab === 'coa' && (
             <button
-              onClick={() => setIsAddAccountModalOpen(true)}
+              onClick={() => openAddAccountModal('EXPENSE', 'EXPENSE')}
               className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black text-xs font-mono font-bold transition-all flex items-center space-x-1.5 shadow-lg shadow-cyan-500/20"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -985,20 +1056,7 @@ export default function AccountsHub({ onNavigate }) {
                 </p>
                 {canManageAccounts && (
                   <button
-                    onClick={() => {
-                      setAccountFormData({
-                        code: '',
-                        name: '',
-                        type: 'ASSET',
-                        subType: 'BANK',
-                        bankName: '',
-                        accountNumber: '',
-                        branch: '',
-                        openingBalance: '',
-                        description: ''
-                      });
-                      setIsAddAccountModalOpen(true);
-                    }}
+                    onClick={() => openAddAccountModal('ASSET', 'BANK')}
                     className="mt-4 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black text-xs font-mono font-bold rounded-xl shadow-lg shadow-cyan-500/20 inline-flex items-center space-x-2"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -1751,29 +1809,55 @@ export default function AccountsHub({ onNavigate }) {
             <form onSubmit={handleCreateAccount} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Account Code</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 5006"
-                    value={accountFormData.code}
-                    onChange={(e) => setAccountFormData({ ...accountFormData, code: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-mono text-slate-400">Account Code *</label>
+                    <span className="text-[9px] font-mono font-bold text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20 flex items-center space-x-1">
+                      <Sparkles className="w-2.5 h-2.5" />
+                      <span>Auto</span>
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. 5001"
+                      value={accountFormData.code}
+                      onChange={(e) => setAccountFormData({ ...accountFormData, code: e.target.value })}
+                      className="w-full bg-slate-900 border border-cyan-500/30 rounded-xl pl-3 pr-8 py-2 text-sm text-cyan-300 font-bold focus:outline-none focus:border-cyan-400 font-mono shadow-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const regenerated = generateNextAccountCode(accountFormData.type, accountFormData.subType, accounts);
+                        setAccountFormData(prev => ({ ...prev, code: regenerated }));
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-cyan-400 p-1 transition-colors"
+                      title="Regenerate next sequential code"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-mono mt-1">
+                    Auto-sequenced Chart of Accounts code
+                  </p>
                 </div>
 
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">Classification Type *</label>
                   <select
                     value={accountFormData.type}
-                    onChange={(e) => setAccountFormData({ ...accountFormData, type: e.target.value, subType: e.target.value })}
+                    onChange={(e) => handleAccountTypeChange(e.target.value)}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
                   >
-                    <option value="ASSET">ASSET</option>
-                    <option value="LIABILITY">LIABILITY</option>
-                    <option value="EQUITY">EQUITY</option>
-                    <option value="REVENUE">REVENUE</option>
-                    <option value="EXPENSE">EXPENSE</option>
+                    <option value="ASSET">ASSET (1xxx)</option>
+                    <option value="LIABILITY">LIABILITY (2xxx)</option>
+                    <option value="EQUITY">EQUITY (3xxx)</option>
+                    <option value="REVENUE">REVENUE (4xxx)</option>
+                    <option value="EXPENSE">EXPENSE (5xxx)</option>
                   </select>
+                  <p className="text-[10px] text-slate-500 font-mono mt-1">
+                    Prefix {accountFormData.type === 'ASSET' ? '1' : accountFormData.type === 'LIABILITY' ? '2' : accountFormData.type === 'EQUITY' ? '3' : accountFormData.type === 'REVENUE' ? '4' : '5'}xxx
+                  </p>
                 </div>
               </div>
 
@@ -1790,19 +1874,48 @@ export default function AccountsHub({ onNavigate }) {
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-slate-400 mb-1">Sub-Type</label>
+                <label className="block text-xs font-mono text-slate-400 mb-1">Sub-Type Category</label>
                 <select
                   value={accountFormData.subType}
-                  onChange={(e) => setAccountFormData({ ...accountFormData, subType: e.target.value })}
+                  onChange={(e) => handleAccountSubTypeChange(e.target.value)}
                   className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
                 >
-                  <option value="EXPENSE">Expense Account</option>
-                  <option value="BANK">Bank Account</option>
-                  <option value="CASH">Cash Account</option>
-                  <option value="CUSTOMER">Customer Receivable</option>
-                  <option value="VENDOR">Vendor / Seller Payable</option>
-                  <option value="CAPITAL">Capital / Equity</option>
-                  <option value="OTHER">Other Ledger</option>
+                  {accountFormData.type === 'ASSET' ? (
+                    <>
+                      <option value="BANK">Bank Account (1010+)</option>
+                      <option value="CASH">Cash Account (1001+)</option>
+                      <option value="CUSTOMER">Customer Receivable (1050+)</option>
+                      <option value="INVENTORY">Inventory / Vehicle Stock (1100+)</option>
+                      <option value="OTHER">Other Current / Fixed Asset</option>
+                    </>
+                  ) : accountFormData.type === 'LIABILITY' ? (
+                    <>
+                      <option value="VENDOR">Vendor / Supplier Payable (2001+)</option>
+                      <option value="LOAN">Loans & Borrowings (2050+)</option>
+                      <option value="OTHER">Other Current Liability</option>
+                    </>
+                  ) : accountFormData.type === 'EQUITY' ? (
+                    <>
+                      <option value="CAPITAL">Owner Capital / Equity (3001+)</option>
+                      <option value="DRAWINGS">Owner Drawings</option>
+                      <option value="OTHER">Retained Earnings / Reserves</option>
+                    </>
+                  ) : accountFormData.type === 'REVENUE' ? (
+                    <>
+                      <option value="REVENUE">Vehicle Sales Revenue (4001+)</option>
+                      <option value="COMMISSION">Commission & Brokerage Income</option>
+                      <option value="OTHER">Other Operational Income</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="EXPENSE">General Operating Expense (5001+)</option>
+                      <option value="SALARY">Salaries & Payroll</option>
+                      <option value="RENT">Showroom Rent & Utilities</option>
+                      <option value="MAINTENANCE">Vehicle Repairs & Fuel</option>
+                      <option value="MARKETING">Marketing & Advertising</option>
+                      <option value="OTHER">Other Administrative Expense</option>
+                    </>
+                  )}
                 </select>
               </div>
 

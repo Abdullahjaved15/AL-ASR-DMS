@@ -120,13 +120,32 @@ const createAccount = async (req, res) => {
       return res.status(400).json({ message: 'Account name and type are required' });
     }
 
-    // Generate code if not provided
-    let finalCode = code;
+    // Auto-generate code if not provided
+    let finalCode = code ? String(code).trim() : '';
     if (!finalCode) {
       const typePrefixMap = { ASSET: '1', LIABILITY: '2', EQUITY: '3', REVENUE: '4', EXPENSE: '5' };
       const prefix = typePrefixMap[type] || '9';
-      const count = await prisma.account.count({ where: { type } });
-      finalCode = `${prefix}${String(count + 1).padStart(3, '0')}`;
+      
+      const existingAccounts = await prisma.account.findMany({
+        select: { code: true }
+      });
+      const codeSet = new Set(existingAccounts.map(a => String(a.code || '').trim()));
+      
+      let candidate = parseInt(`${prefix}001`, 10);
+      if (type === 'ASSET') {
+        if (subType === 'CASH') candidate = 1001;
+        else if (subType === 'BANK') candidate = 1010;
+        else if (subType === 'CUSTOMER') candidate = 1050;
+        else if (subType === 'INVENTORY') candidate = 1100;
+      } else if (type === 'LIABILITY') {
+        if (subType === 'VENDOR') candidate = 2001;
+        else if (subType === 'LOAN') candidate = 2050;
+      }
+      
+      while (codeSet.has(String(candidate))) {
+        candidate++;
+      }
+      finalCode = String(candidate);
     }
 
     const existingCode = await prisma.account.findUnique({ where: { code: finalCode } });
