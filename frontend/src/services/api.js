@@ -688,6 +688,24 @@ export const api = {
     return handleResponse(res);
   },
 
+  receiveAmountInLedger: async (data) => {
+    const res = await fetch(`${API_BASE}/accounts/receive-amount`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  payAmountFromLedger: async (data) => {
+    const res = await fetch(`${API_BASE}/accounts/pay-amount`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
   // 2. Security Cheques
   getSecurityCheques: async (params = {}) => {
     const query = cleanParams(params);

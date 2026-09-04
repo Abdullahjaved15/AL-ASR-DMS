@@ -58,6 +58,8 @@ export default function AccountsHub({ onNavigate }) {
   // Modal states
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
+  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
   const [selectedAccountLedger, setSelectedAccountLedger] = useState(null);
   const [ledgerLoading, setLedgerLoading] = useState(false);
@@ -118,6 +120,32 @@ export default function AccountsHub({ onNavigate }) {
     amount: '',
     date: new Date().toISOString().slice(0, 10),
     referenceNumber: '',
+    notes: ''
+  });
+
+  const [receiveFormData, setReceiveFormData] = useState({
+    accountId: '',
+    amount: '',
+    receivedFrom: '',
+    paymentMethod: 'CASH',
+    sourceAccountId: '',
+    date: new Date().toISOString().slice(0, 10),
+    referenceNumber: '',
+    chassisNumber: '',
+    description: '',
+    notes: ''
+  });
+
+  const [payFormData, setPayFormData] = useState({
+    accountId: '',
+    amount: '',
+    paidTo: '',
+    paymentMethod: 'CASH',
+    targetAccountId: '',
+    date: new Date().toISOString().slice(0, 10),
+    referenceNumber: '',
+    chassisNumber: '',
+    description: '',
     notes: ''
   });
 
@@ -428,6 +456,80 @@ export default function AccountsHub({ onNavigate }) {
       alert('Funds transferred successfully!');
     } catch (err) {
       alert(err.message || 'Transfer failed');
+    }
+  };
+
+  const openReceiveModal = (preselectedAccountId = null) => {
+    setReceiveFormData({
+      accountId: preselectedAccountId || (bankAndCashAccounts[0]?.id || accounts[0]?.id || ''),
+      amount: '',
+      receivedFrom: '',
+      paymentMethod: 'CASH',
+      sourceAccountId: '',
+      date: new Date().toISOString().slice(0, 10),
+      referenceNumber: '',
+      chassisNumber: '',
+      description: '',
+      notes: ''
+    });
+    setIsReceiveModalOpen(true);
+  };
+
+  const openPayModal = (preselectedAccountId = null) => {
+    setPayFormData({
+      accountId: preselectedAccountId || (bankAndCashAccounts[0]?.id || accounts[0]?.id || ''),
+      amount: '',
+      paidTo: '',
+      paymentMethod: 'CASH',
+      targetAccountId: '',
+      date: new Date().toISOString().slice(0, 10),
+      referenceNumber: '',
+      chassisNumber: '',
+      description: '',
+      notes: ''
+    });
+    setIsPayModalOpen(true);
+  };
+
+  const handleReceiveSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await api.receiveAmountInLedger({
+        ...receiveFormData,
+        amount: normalizePriceInput(receiveFormData.amount)
+      });
+      alert(res.message || 'Amount received and posted to ledger successfully!');
+      setIsReceiveModalOpen(false);
+      fetchAccountsData();
+      fetchBankCashAccounts();
+      const currentSelectedId = selectedAccountLedger?.account?.id || selectedAccountLedger?.id;
+      if (currentSelectedId && (currentSelectedId === receiveFormData.accountId || currentSelectedId === receiveFormData.sourceAccountId)) {
+        const updated = await api.getAccountLedger(currentSelectedId, ledgerDateFilter);
+        setSelectedAccountLedger(updated);
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to receive amount');
+    }
+  };
+
+  const handlePaySubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await api.payAmountFromLedger({
+        ...payFormData,
+        amount: normalizePriceInput(payFormData.amount)
+      });
+      alert(res.message || 'Payment recorded and deducted from ledger successfully!');
+      setIsPayModalOpen(false);
+      fetchAccountsData();
+      fetchBankCashAccounts();
+      const currentSelectedId = selectedAccountLedger?.account?.id || selectedAccountLedger?.id;
+      if (currentSelectedId && (currentSelectedId === payFormData.accountId || currentSelectedId === payFormData.targetAccountId)) {
+        const updated = await api.getAccountLedger(currentSelectedId, ledgerDateFilter);
+        setSelectedAccountLedger(updated);
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to record payment');
     }
   };
 
@@ -810,10 +912,30 @@ export default function AccountsHub({ onNavigate }) {
             <span>Invoices & Payment Vouchers</span>
           </button>
 
+          {/* Receive Amount / Inflow Button */}
+          <button
+            onClick={() => openReceiveModal()}
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black text-xs font-mono font-bold transition-all flex items-center space-x-1.5 shadow-lg shadow-emerald-500/20 cursor-pointer"
+            title="Receive money / deposit into any ledger or bank account"
+          >
+            <ArrowDownLeft className="w-3.5 h-3.5" />
+            <span>+ Receive Money</span>
+          </button>
+
+          {/* Pay Amount / Outflow Button */}
+          <button
+            onClick={() => openPayModal()}
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-400 hover:to-red-500 text-white text-xs font-mono font-bold transition-all flex items-center space-x-1.5 shadow-lg shadow-rose-500/20 cursor-pointer"
+            title="Record payment / outflow from any ledger or bank account"
+          >
+            <ArrowUpRight className="w-3.5 h-3.5" />
+            <span>- Record Payment</span>
+          </button>
+
           {/* Transfer Funds Button */}
           <button
             onClick={() => setIsTransferModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 text-xs font-mono font-bold transition-all flex items-center space-x-1.5"
+            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 text-xs font-mono font-bold transition-all flex items-center space-x-1.5 cursor-pointer"
           >
             <ArrowRightLeft className="w-3.5 h-3.5" />
             <span>Transfer Funds</span>
@@ -987,6 +1109,22 @@ export default function AccountsHub({ onNavigate }) {
                           <td className="py-3.5 px-4 text-center">
                             <div className="flex items-center justify-center space-x-1.5">
                               <button
+                                onClick={(e) => { e.stopPropagation(); openReceiveModal(acc.id); }}
+                                className="px-2 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 rounded-lg text-[11px] font-mono transition-all flex items-center space-x-1"
+                                title="Receive / Inflow into this Ledger"
+                              >
+                                <ArrowDownLeft className="w-3 h-3" />
+                                <span>Receive</span>
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); openPayModal(acc.id); }}
+                                className="px-2 py-1 bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 rounded-lg text-[11px] font-mono transition-all flex items-center space-x-1"
+                                title="Pay / Outflow from this Ledger"
+                              >
+                                <ArrowUpRight className="w-3 h-3" />
+                                <span>Pay</span>
+                              </button>
+                              <button
                                 onClick={(e) => { e.stopPropagation(); handleOpenLedger(acc); }}
                                 className="px-2.5 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg text-xs font-mono transition-all flex items-center space-x-1"
                                 title="View Ledger"
@@ -1091,7 +1229,7 @@ export default function AccountsHub({ onNavigate }) {
                   </h3>
                 </div>
 
-                <div className="mt-4 flex items-center justify-between pt-3 border-t border-white/5">
+                <div className="mt-4 flex items-center justify-between pt-3 border-t border-white/5 flex-wrap gap-2">
                   <button
                     onClick={() => handleOpenLedger(cash)}
                     className="text-xs font-mono text-cyan-400 hover:underline flex items-center space-x-1"
@@ -1099,15 +1237,33 @@ export default function AccountsHub({ onNavigate }) {
                     <span>View Cash Transactions</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
-                  <button
-                    onClick={() => {
-                      setTransferFormData({ ...transferFormData, fromAccountId: cash.id });
-                      setIsTransferModalOpen(true);
-                    }}
-                    className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-[11px] font-mono hover:bg-emerald-500/30 transition-all"
-                  >
-                    Deposit to Bank
-                  </button>
+                  <div className="flex items-center space-x-1.5 flex-wrap gap-1">
+                    <button
+                      onClick={() => openReceiveModal(cash.id)}
+                      className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-[11px] font-mono hover:bg-emerald-500/30 transition-all flex items-center space-x-1"
+                      title="Receive / Inflow Cash into Showroom Safe"
+                    >
+                      <ArrowDownLeft className="w-3 h-3" />
+                      <span>Receive Cash</span>
+                    </button>
+                    <button
+                      onClick={() => openPayModal(cash.id)}
+                      className="px-2.5 py-1 bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-[11px] font-mono hover:bg-rose-500/30 transition-all flex items-center space-x-1"
+                      title="Pay / Outflow Cash from Showroom Safe"
+                    >
+                      <ArrowUpRight className="w-3 h-3" />
+                      <span>Pay Cash</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTransferFormData({ ...transferFormData, fromAccountId: cash.id });
+                        setIsTransferModalOpen(true);
+                      }}
+                      className="px-2.5 py-1 bg-slate-800 text-slate-300 border border-white/10 rounded-lg text-[11px] font-mono hover:bg-slate-700 transition-all"
+                    >
+                      To Bank
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -1153,7 +1309,23 @@ export default function AccountsHub({ onNavigate }) {
                     <span>Account Statement</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
-                  <div className="flex items-center space-x-1.5">
+                  <div className="flex items-center space-x-1.5 flex-wrap gap-1">
+                    <button
+                      onClick={() => openReceiveModal(bank.id)}
+                      className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-[11px] font-mono hover:bg-emerald-500/30 transition-all flex items-center space-x-1"
+                      title="Deposit / Receive Amount in this Bank Account"
+                    >
+                      <ArrowDownLeft className="w-3 h-3" />
+                      <span>Deposit</span>
+                    </button>
+                    <button
+                      onClick={() => openPayModal(bank.id)}
+                      className="px-2.5 py-1 bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-[11px] font-mono hover:bg-rose-500/30 transition-all flex items-center space-x-1"
+                      title="Pay / Outflow from this Bank Account"
+                    >
+                      <ArrowUpRight className="w-3 h-3" />
+                      <span>Pay</span>
+                    </button>
                     <button
                       onClick={() => {
                         setTransferFormData({ ...transferFormData, fromAccountId: bank.id });
@@ -2126,7 +2298,23 @@ export default function AccountsHub({ onNavigate }) {
                 </p>
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 flex-wrap gap-1">
+                <button
+                  onClick={() => openReceiveModal(selectedAccountLedger.account?.id || selectedAccountLedger.id)}
+                  className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-mono font-bold flex items-center space-x-1.5 shadow-sm"
+                  title="Receive money directly into this account ledger"
+                >
+                  <ArrowDownLeft className="w-3.5 h-3.5" />
+                  <span>+ Receive in this Ledger</span>
+                </button>
+                <button
+                  onClick={() => openPayModal(selectedAccountLedger.account?.id || selectedAccountLedger.id)}
+                  className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 rounded-xl text-xs font-mono font-bold flex items-center space-x-1.5 shadow-sm"
+                  title="Record payment / outflow directly from this account ledger"
+                >
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                  <span>- Pay from this Ledger</span>
+                </button>
                 <button
                   onClick={printLedgerStatement}
                   className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 rounded-xl text-xs font-mono flex items-center space-x-1"
@@ -3295,6 +3483,422 @@ export default function AccountsHub({ onNavigate }) {
                   className="px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black font-bold font-mono text-xs rounded-xl shadow-lg shadow-emerald-500/20"
                 >
                   Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 12: RECEIVE AMOUNT IN LEDGER / BANK / CASH                          */}
+      {/* ========================================================================= */}
+      {isReceiveModalOpen && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="glass-modal rounded-3xl p-6 w-full max-w-lg border border-emerald-500/40 shadow-2xl my-8">
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-white/10">
+              <div className="flex items-center space-x-2">
+                <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  <ArrowDownLeft className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Receive Money in Ledger</h3>
+                  <p className="text-xs text-slate-400 font-mono">Record incoming payment, deposit, or customer receipt into any account ledger</p>
+                </div>
+              </div>
+              <button onClick={() => setIsReceiveModalOpen(false)} className="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-800">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleReceiveSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono text-slate-300 mb-1 font-semibold">
+                  Receiving Account / Bank / Ledger *
+                </label>
+                <select
+                  required
+                  value={receiveFormData.accountId}
+                  onChange={(e) => setReceiveFormData({ ...receiveFormData, accountId: e.target.value })}
+                  className="w-full bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-400 font-mono"
+                >
+                  <option value="">-- Select Receiving Account --</option>
+                  <optgroup label="Showroom Cash Safe & Banks">
+                    {bankAndCashAccounts.map(acc => (
+                      <option key={acc.id} value={acc.id}>
+                        [{acc.subType || acc.type}] {acc.name} — Balance: Rs. {acc.currentBalance?.toLocaleString()}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="All Chart of Accounts Ledgers">
+                    {accounts.map(acc => (
+                      <option key={acc.id} value={acc.id}>
+                        [{acc.code}] {acc.name} ({acc.type}) — Balance: Rs. {acc.currentBalance?.toLocaleString()}
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono text-slate-300 mb-1 font-semibold">
+                    Amount to Receive (PKR) *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    placeholder="e.g. 500000"
+                    value={receiveFormData.amount}
+                    onChange={(e) => setReceiveFormData({ ...receiveFormData, amount: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                  />
+                  {receiveFormData.amount && (
+                    <p className="text-[10px] text-emerald-400 font-mono mt-1 font-bold">
+                      {getPriceHint(receiveFormData.amount)}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-300 mb-1 font-semibold">
+                    Received Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={receiveFormData.date}
+                    onChange={(e) => setReceiveFormData({ ...receiveFormData, date: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono text-slate-300 mb-1">
+                    Received From (Party / Customer)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Payer / Customer name"
+                    value={receiveFormData.receivedFrom}
+                    onChange={(e) => setReceiveFormData({ ...receiveFormData, receivedFrom: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-300 mb-1">
+                    Payment Method
+                  </label>
+                  <select
+                    value={receiveFormData.paymentMethod}
+                    onChange={(e) => setReceiveFormData({ ...receiveFormData, paymentMethod: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                  >
+                    <option value="CASH">Cash in Hand</option>
+                    <option value="BANK_TRANSFER">Bank Transfer / Online</option>
+                    <option value="CHEQUE">Cheque / Pay Order</option>
+                    <option value="OTHER">Other Mode</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono text-slate-300 mb-1">
+                    Deposit Slip / Ref #
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Slip # or Online Ref"
+                    value={receiveFormData.referenceNumber}
+                    onChange={(e) => setReceiveFormData({ ...receiveFormData, referenceNumber: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-300 mb-1">
+                    Chassis # (Optional Vehicle)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. NHP10-1234567"
+                    value={receiveFormData.chassisNumber}
+                    onChange={(e) => setReceiveFormData({ ...receiveFormData, chassisNumber: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-300 mb-1">
+                  Source / Offset Account (Optional Double-Entry Credit)
+                </label>
+                <select
+                  value={receiveFormData.sourceAccountId}
+                  onChange={(e) => setReceiveFormData({ ...receiveFormData, sourceAccountId: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                >
+                  <option value="">-- Direct Receipt / Unlinked Credit --</option>
+                  {accounts.map(acc => (
+                    <option key={acc.id} value={acc.id}>
+                      [{acc.code}] {acc.name} ({acc.type})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-300 mb-1">
+                  Particulars / Description
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Received token payment / cash deposit from customer"
+                  value={receiveFormData.description}
+                  onChange={(e) => setReceiveFormData({ ...receiveFormData, description: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-300 mb-1">
+                  Additional Notes / Remarks
+                </label>
+                <textarea
+                  rows="2"
+                  placeholder="Additional remarks or notes..."
+                  value={receiveFormData.notes}
+                  onChange={(e) => setReceiveFormData({ ...receiveFormData, notes: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                ></textarea>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setIsReceiveModalOpen(false)}
+                  className="px-4 py-2 bg-slate-800 text-slate-300 font-mono text-xs rounded-xl hover:bg-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black font-bold font-mono text-xs rounded-xl shadow-lg shadow-emerald-500/20 flex items-center space-x-1.5"
+                >
+                  <ArrowDownLeft className="w-4 h-4" />
+                  <span>Post Receipt to Ledger</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 13: PAY AMOUNT FROM LEDGER / BANK / CASH                            */}
+      {/* ========================================================================= */}
+      {isPayModalOpen && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="glass-modal rounded-3xl p-6 w-full max-w-lg border border-rose-500/40 shadow-2xl my-8">
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-white/10">
+              <div className="flex items-center space-x-2">
+                <div className="p-2 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                  <ArrowUpRight className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Record Payment / Outflow</h3>
+                  <p className="text-xs text-slate-400 font-mono">Record expense, vendor payment, or cash/bank withdrawal from any ledger</p>
+                </div>
+              </div>
+              <button onClick={() => setIsPayModalOpen(false)} className="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-800">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handlePaySubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono text-slate-300 mb-1 font-semibold">
+                  Source Account / Bank / Ledger (Paying From) *
+                </label>
+                <select
+                  required
+                  value={payFormData.accountId}
+                  onChange={(e) => setPayFormData({ ...payFormData, accountId: e.target.value })}
+                  className="w-full bg-slate-900 border border-rose-500/40 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-400 font-mono"
+                >
+                  <option value="">-- Select Source Account --</option>
+                  <optgroup label="Showroom Cash Safe & Banks">
+                    {bankAndCashAccounts.map(acc => (
+                      <option key={acc.id} value={acc.id}>
+                        [{acc.subType || acc.type}] {acc.name} — Balance: Rs. {acc.currentBalance?.toLocaleString()}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="All Chart of Accounts Ledgers">
+                    {accounts.map(acc => (
+                      <option key={acc.id} value={acc.id}>
+                        [{acc.code}] {acc.name} ({acc.type}) — Balance: Rs. {acc.currentBalance?.toLocaleString()}
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono text-slate-300 mb-1 font-semibold">
+                    Amount to Pay (PKR) *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    placeholder="e.g. 50000"
+                    value={payFormData.amount}
+                    onChange={(e) => setPayFormData({ ...payFormData, amount: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500 font-mono"
+                  />
+                  {payFormData.amount && (
+                    <p className="text-[10px] text-rose-400 font-mono mt-1 font-bold">
+                      {getPriceHint(payFormData.amount)}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-300 mb-1 font-semibold">
+                    Payment Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={payFormData.date}
+                    onChange={(e) => setPayFormData({ ...payFormData, date: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono text-slate-300 mb-1">
+                    Paid To (Payee / Vendor / Party)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Payee name"
+                    value={payFormData.paidTo}
+                    onChange={(e) => setPayFormData({ ...payFormData, paidTo: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-300 mb-1">
+                    Payment Method
+                  </label>
+                  <select
+                    value={payFormData.paymentMethod}
+                    onChange={(e) => setPayFormData({ ...payFormData, paymentMethod: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500 font-mono"
+                  >
+                    <option value="CASH">Cash in Hand</option>
+                    <option value="BANK_TRANSFER">Bank Transfer / Online</option>
+                    <option value="CHEQUE">Cheque / Pay Order</option>
+                    <option value="OTHER">Other Mode</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono text-slate-300 mb-1">
+                    Voucher / Cheque / Ref #
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="PV # or Cheque #"
+                    value={payFormData.referenceNumber}
+                    onChange={(e) => setPayFormData({ ...payFormData, referenceNumber: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-300 mb-1">
+                    Chassis # (Optional Vehicle Link)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. NHP10-1234567"
+                    value={payFormData.chassisNumber}
+                    onChange={(e) => setPayFormData({ ...payFormData, chassisNumber: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-300 mb-1">
+                  Destination / Offset Expense Account (Optional Debit)
+                </label>
+                <select
+                  value={payFormData.targetAccountId}
+                  onChange={(e) => setPayFormData({ ...payFormData, targetAccountId: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500 font-mono"
+                >
+                  <option value="">-- Direct Expense / Unlinked Debit --</option>
+                  {accounts.map(acc => (
+                    <option key={acc.id} value={acc.id}>
+                      [{acc.code}] {acc.name} ({acc.type})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-300 mb-1">
+                  Particulars / Description
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Utility bill payment / showroom maintenance"
+                  value={payFormData.description}
+                  onChange={(e) => setPayFormData({ ...payFormData, description: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-300 mb-1">
+                  Additional Notes / Remarks
+                </label>
+                <textarea
+                  rows="2"
+                  placeholder="Additional payment details..."
+                  value={payFormData.notes}
+                  onChange={(e) => setPayFormData({ ...payFormData, notes: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500"
+                ></textarea>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setIsPayModalOpen(false)}
+                  className="px-4 py-2 bg-slate-800 text-slate-300 font-mono text-xs rounded-xl hover:bg-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-400 hover:to-red-500 text-white font-bold font-mono text-xs rounded-xl shadow-lg shadow-rose-500/20 flex items-center space-x-1.5"
+                >
+                  <ArrowUpRight className="w-4 h-4" />
+                  <span>Post Payment from Ledger</span>
                 </button>
               </div>
             </form>

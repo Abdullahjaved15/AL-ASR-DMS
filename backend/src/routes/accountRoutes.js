@@ -18,6 +18,10 @@ router.post('/', accountController.createAccount);
 // Fund Transfers (Cash to Bank, Bank to Bank)
 router.post('/transfer', accountController.transferFunds);
 
+// Receive & Pay Amount directly in Ledger or Bank Account
+router.post('/receive-amount', accountController.receiveAmountInLedger);
+router.post('/pay-amount', accountController.payAmountFromLedger);
+
 // Edit / Delete Account (Accounts Head or Super Admin only)
 router.put('/:id', requireAccountsHeadOrSuperAdmin, accountController.updateAccount);
 router.delete('/:id', requireAccountsHeadOrSuperAdmin, accountController.deleteAccount);

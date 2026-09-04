@@ -492,6 +492,245 @@ const transferFunds = async (req, res) => {
   }
 };
 
+// 8. Receive Amount / Deposit into any Ledger or Bank Account
+const receiveAmountInLedger = async (req, res) => {
+  try {
+    const {
+      accountId,
+      amount,
+      receivedFrom,
+      paymentMethod = 'CASH',
+      sourceAccountId,
+      date,
+      referenceNumber,
+      chassisNumber,
+      description,
+      notes
+    } = req.body;
+
+    if (!accountId || !amount) {
+      return res.status(400).json({ message: 'Target ledger account and amount are required.' });
+    }
+
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return res.status(400).json({ message: 'Please enter a valid positive amount.' });
+    }
+
+    const targetAccount = await prisma.account.findUnique({ where: { id: accountId } });
+    if (!targetAccount) {
+      return res.status(404).json({ message: 'Target account not found.' });
+    }
+
+    let sourceAccount = null;
+    if (sourceAccountId && sourceAccountId !== accountId) {
+      sourceAccount = await prisma.account.findUnique({ where: { id: sourceAccountId } });
+    }
+
+    const txnDate = date ? new Date(date) : new Date();
+    const txnNumber = await generateTxnNumber('RV');
+    const fullDesc = description || `Amount Received into [${targetAccount.name}] from ${receivedFrom || 'Party'}${notes ? ` - ${notes}` : ''}`;
+
+    const isTargetNormalDebit = ['ASSET', 'EXPENSE'].includes(targetAccount.type);
+
+    const result = await prisma.$transaction(async (tx) => {
+      const entriesToCreate = [
+        {
+          accountId: targetAccount.id,
+          type: isTargetNormalDebit ? 'DEBIT' : 'CREDIT',
+          amount: numAmount,
+          description: `Received from ${receivedFrom || 'Party'}: ${fullDesc}`
+        }
+      ];
+
+      if (sourceAccount) {
+        const isSourceNormalDebit = ['ASSET', 'EXPENSE'].includes(sourceAccount.type);
+        entriesToCreate.push({
+          accountId: sourceAccount.id,
+          type: isSourceNormalDebit ? 'CREDIT' : 'DEBIT',
+          amount: numAmount,
+          description: `Paid/Settled into [${targetAccount.name}]`
+        });
+
+        const sourceDelta = isSourceNormalDebit ? -numAmount : numAmount;
+        await tx.account.update({
+          where: { id: sourceAccount.id },
+          data: { currentBalance: { increment: sourceDelta } }
+        });
+      }
+
+      const transaction = await tx.transaction.create({
+        data: {
+          transactionNumber: txnNumber,
+          date: txnDate,
+          type: 'RECEIPT_VOUCHER',
+          amount: numAmount,
+          description: fullDesc,
+          referenceType: 'MANUAL',
+          referenceNumber: referenceNumber || txnNumber,
+          chassisNumber: chassisNumber || null,
+          createdById: req.user.id,
+          entries: {
+            create: entriesToCreate
+          }
+        }
+      });
+
+      const targetDelta = isTargetNormalDebit ? numAmount : numAmount;
+      const updatedTarget = await tx.account.update({
+        where: { id: targetAccount.id },
+        data: { currentBalance: { increment: targetDelta } }
+      });
+
+      try {
+        await tx.notification.create({
+          data: {
+            title: `💰 Amount Received: Rs. ${numAmount.toLocaleString()}`,
+            message: `Rs. ${numAmount.toLocaleString()} received in [${targetAccount.name}] from "${receivedFrom || 'Party'}". Method: ${paymentMethod}.`,
+            type: 'FINANCIAL_INFLOW',
+            category: targetAccount.subType === 'BANK' ? 'BANK' : 'CASH',
+            amount: numAmount,
+            targetRole: 'ACCOUNTS_HEAD'
+          }
+        });
+      } catch (e) {
+        // quiet fail
+      }
+
+      await tx.activityLog.create({
+        data: {
+          userId: req.user.id,
+          action: 'RECEIVE_AMOUNT_LEDGER',
+          details: `Received Rs. ${numAmount.toLocaleString()} in ${targetAccount.name} (${targetAccount.code}) from ${receivedFrom || 'Party'}`
+        }
+      });
+
+      return { transaction, updatedAccount: updatedTarget };
+    });
+
+    return res.status(201).json({
+      message: `Successfully received Rs. ${numAmount.toLocaleString()} in ${targetAccount.name}`,
+      transaction: result.transaction,
+      account: result.updatedAccount
+    });
+  } catch (error) {
+    console.error('receiveAmountInLedger error:', error);
+    return res.status(500).json({ message: 'Failed to record received amount in ledger', error: error.message });
+  }
+};
+
+// 9. Pay Amount / Record Outflow from any Ledger or Bank Account
+const payAmountFromLedger = async (req, res) => {
+  try {
+    const {
+      accountId,
+      amount,
+      paidTo,
+      paymentMethod = 'CASH',
+      targetAccountId,
+      date,
+      referenceNumber,
+      chassisNumber,
+      description,
+      notes
+    } = req.body;
+
+    if (!accountId || !amount) {
+      return res.status(400).json({ message: 'Source account and amount are required.' });
+    }
+
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return res.status(400).json({ message: 'Please enter a valid positive amount.' });
+    }
+
+    const sourceAccount = await prisma.account.findUnique({ where: { id: accountId } });
+    if (!sourceAccount) {
+      return res.status(404).json({ message: 'Source account not found.' });
+    }
+
+    let targetAccount = null;
+    if (targetAccountId && targetAccountId !== accountId) {
+      targetAccount = await prisma.account.findUnique({ where: { id: targetAccountId } });
+    }
+
+    const txnDate = date ? new Date(date) : new Date();
+    const txnNumber = await generateTxnNumber('PV');
+    const fullDesc = description || `Payment from [${sourceAccount.name}] to ${paidTo || 'Party'}${notes ? ` - ${notes}` : ''}`;
+
+    const isSourceNormalDebit = ['ASSET', 'EXPENSE'].includes(sourceAccount.type);
+
+    const result = await prisma.$transaction(async (tx) => {
+      const entriesToCreate = [
+        {
+          accountId: sourceAccount.id,
+          type: isSourceNormalDebit ? 'CREDIT' : 'DEBIT',
+          amount: numAmount,
+          description: `Payment to ${paidTo || 'Party'}: ${fullDesc}`
+        }
+      ];
+
+      if (targetAccount) {
+        const isTargetNormalDebit = ['ASSET', 'EXPENSE'].includes(targetAccount.type);
+        entriesToCreate.push({
+          accountId: targetAccount.id,
+          type: isTargetNormalDebit ? 'DEBIT' : 'CREDIT',
+          amount: numAmount,
+          description: `Paid from [${sourceAccount.name}]`
+        });
+
+        const targetDelta = isTargetNormalDebit ? numAmount : -numAmount;
+        await tx.account.update({
+          where: { id: targetAccount.id },
+          data: { currentBalance: { increment: targetDelta } }
+        });
+      }
+
+      const transaction = await tx.transaction.create({
+        data: {
+          transactionNumber: txnNumber,
+          date: txnDate,
+          type: 'PAYMENT_VOUCHER',
+          amount: numAmount,
+          description: fullDesc,
+          referenceType: 'MANUAL',
+          referenceNumber: referenceNumber || txnNumber,
+          chassisNumber: chassisNumber || null,
+          createdById: req.user.id,
+          entries: {
+            create: entriesToCreate
+          }
+        }
+      });
+
+      const sourceDelta = isSourceNormalDebit ? -numAmount : -numAmount;
+      const updatedSource = await tx.account.update({
+        where: { id: sourceAccount.id },
+        data: { currentBalance: { increment: sourceDelta } }
+      });
+
+      await tx.activityLog.create({
+        data: {
+          userId: req.user.id,
+          action: 'PAY_AMOUNT_LEDGER',
+          details: `Paid Rs. ${numAmount.toLocaleString()} from ${sourceAccount.name} (${sourceAccount.code}) to ${paidTo || 'Party'}`
+        }
+      });
+
+      return { transaction, updatedAccount: updatedSource };
+    });
+
+    return res.status(201).json({
+      message: `Successfully paid Rs. ${numAmount.toLocaleString()} from ${sourceAccount.name}`,
+      transaction: result.transaction,
+      account: result.updatedAccount
+    });
+  } catch (error) {
+    console.error('payAmountFromLedger error:', error);
+    return res.status(500).json({ message: 'Failed to record payment from ledger', error: error.message });
+  }
+};
+
 module.exports = {
   getAccounts,
   getBankAndCashAccounts,
@@ -499,5 +738,7 @@ module.exports = {
   updateAccount,
   deleteAccount,
   getAccountLedger,
-  transferFunds
+  transferFunds,
+  receiveAmountInLedger,
+  payAmountFromLedger
 };
