@@ -13,6 +13,7 @@ import Users from './pages/Users';
 import Reports from './pages/Reports';
 import CollaborationCenter from './pages/CollaborationCenter';
 import CurrentStock from './pages/CurrentStock';
+import AccountsStock from './pages/AccountsStock';
 import SoldCars from './pages/SoldCars';
 import Invoices from './pages/Invoices';
 import AccountsHub from './pages/AccountsHub';
@@ -188,6 +189,10 @@ function MainLayout() {
 
           <div className={(currentTab === 'accounts' && canAccessAccounts) ? 'block' : 'hidden'}>
             <AccountsHub onNavigate={(tab) => setCurrentTab(tab)} />
+          </div>
+
+          <div className={(currentTab === 'accounts_stock' && canAccessAccounts) ? 'block' : 'hidden'}>
+            <AccountsStock onNavigate={(tab) => setCurrentTab(tab)} />
           </div>
 
           <div className={(currentTab === 'invoices' && canAccessAccounts) ? 'block' : 'hidden'}>

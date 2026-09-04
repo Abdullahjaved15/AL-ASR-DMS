@@ -13,9 +13,10 @@ const safeInt = (val, fallback = 0) => {
   return isNaN(parsed) ? fallback : parsed;
 };
 
-const checkAdmin = (req, res) => {
-  if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN') {
-    res.status(403).json({ message: 'Access denied: Showroom Current Stock is restricted exclusively to Administrators.' });
+const checkCanManageStock = (req, res) => {
+  const allowed = ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTS_HEAD', 'ACCOUNTANT'];
+  if (!allowed.includes(req.user.role)) {
+    res.status(403).json({ message: 'Access denied: Stock management is restricted to Administrators and Accounts.' });
     return false;
   }
   return true;
@@ -48,19 +49,26 @@ const getCurrentStock = async (req, res) => {
 
     const totalUnits = stock.length;
     const totalValuation = stock.reduce((sum, item) => sum + parsePakistaniPrice(item.askingPrice), 0);
+    const totalPurchaseValuation = stock.reduce((sum, item) => sum + parsePakistaniPrice(item.purchasePrice), 0);
+    const projectedProfit = totalValuation - totalPurchaseValuation;
     const availableUnits = stock.filter(item => item.status === 'AVAILABLE').length;
     const reservedUnits = stock.filter(item => item.status === 'RESERVED').length;
     const atCustomerUnits = stock.filter(item => item.status === 'AT_CUSTOMER' || item.status === 'At Customer').length;
+    const soldUnits = stock.filter(item => item.status === 'SOLD').length;
 
     return res.json({
       stock,
       stats: {
         totalUnits,
         totalValuation,
+        totalPurchaseValuation,
+        projectedProfit,
         availableUnits,
         reservedUnits,
         atCustomerUnits,
-        avgPrice: totalUnits > 0 ? Math.round(totalValuation / totalUnits) : 0
+        soldUnits,
+        avgPrice: totalUnits > 0 ? Math.round(totalValuation / totalUnits) : 0,
+        avgPurchasePrice: totalUnits > 0 ? Math.round(totalPurchaseValuation / totalUnits) : 0
       }
     });
   } catch (error) {
@@ -69,7 +77,7 @@ const getCurrentStock = async (req, res) => {
 };
 
 const createStockItem = async (req, res) => {
-  if (!checkAdmin(req, res)) return;
+  if (!checkCanManageStock(req, res)) return;
 
   try {
     const { vehicle, model, year, color, mileage, askingPrice, purchasePrice, status, location, notes, careOf, regNumber } = req.body;
@@ -98,7 +106,7 @@ const createStockItem = async (req, res) => {
       data: {
         userId: req.user.id,
         action: 'CREATE_CURRENT_STOCK',
-        details: `Added Showroom Stock: ${year} ${vehicle || 'Vehicle'} ${model || 'Car'} (Rs. ${parsedAskingPrice ? parsedAskingPrice.toLocaleString() : 0})`
+        details: `Added Stock Entry: ${year} ${vehicle || 'Vehicle'} ${model || 'Car'} (Asking: Rs. ${parsedAskingPrice ? parsedAskingPrice.toLocaleString() : 0} | Cost: Rs. ${parsedPurchasePrice ? parsedPurchasePrice.toLocaleString() : 0})`
       }
     });
 
@@ -109,7 +117,7 @@ const createStockItem = async (req, res) => {
 };
 
 const updateStockItem = async (req, res) => {
-  if (!checkAdmin(req, res)) return;
+  if (!checkCanManageStock(req, res)) return;
 
   try {
     const { id } = req.params;
@@ -152,8 +160,8 @@ const updateStockItem = async (req, res) => {
       regNumber: regNumber !== undefined ? regNumber : existing.regNumber
     };
 
-    // If requester is ADMIN (not SUPER_ADMIN), route to Approval Request workflow
-    if (req.user.role === 'ADMIN') {
+    // If requester is ADMIN or ACCOUNTANT (and not SUPER_ADMIN / ACCOUNTS_HEAD), route to Approval Request workflow
+    if (req.user.role === 'ADMIN' || req.user.role === 'ACCOUNTANT') {
       const request = await prisma.approvalRequest.create({
         data: {
           entityType: 'CURRENT_STOCK',
@@ -164,7 +172,7 @@ const updateStockItem = async (req, res) => {
           requestedById: req.user.id,
           proposedData: updateData,
           currentData: existing,
-          reason: req.body.reason || 'Admin submitted changes for showroom stock vehicle'
+          reason: req.body.reason || 'Staff submitted changes for stock vehicle'
         }
       });
 
@@ -172,12 +180,12 @@ const updateStockItem = async (req, res) => {
         data: {
           userId: req.user.id,
           action: 'SUBMIT_APPROVAL_REQUEST',
-          details: `Admin requested EDIT approval for showroom stock #${id} (${existing.vehicle} ${existing.model})`
+          details: `${req.user.role} requested EDIT approval for stock #${id} (${existing.vehicle} ${existing.model})`
         }
       });
 
       return res.json({
-        message: 'Your edit request has been submitted to the Super Admin for approval.',
+        message: 'Your edit request has been submitted for approval.',
         requiresApproval: true,
         approvalRequest: request
       });
@@ -192,7 +200,7 @@ const updateStockItem = async (req, res) => {
       data: {
         userId: req.user.id,
         action: 'UPDATE_CURRENT_STOCK',
-        details: `Updated Showroom Stock #${id}: ${updated.vehicle} ${updated.model}`
+        details: `Updated Stock #${id}: ${updated.vehicle} ${updated.model}`
       }
     });
 
@@ -204,7 +212,7 @@ const updateStockItem = async (req, res) => {
 };
 
 const deleteStockItem = async (req, res) => {
-  if (!checkAdmin(req, res)) return;
+  if (!checkCanManageStock(req, res)) return;
 
   try {
     const { id } = req.params;
@@ -214,8 +222,8 @@ const deleteStockItem = async (req, res) => {
       return res.status(404).json({ message: 'Stock entry not found' });
     }
 
-    // If requester is ADMIN (not SUPER_ADMIN), route to Approval Request workflow
-    if (req.user.role === 'ADMIN') {
+    // If requester is ADMIN or ACCOUNTANT (and not SUPER_ADMIN / ACCOUNTS_HEAD), route to Approval Request workflow
+    if (req.user.role === 'ADMIN' || req.user.role === 'ACCOUNTANT') {
       const request = await prisma.approvalRequest.create({
         data: {
           entityType: 'CURRENT_STOCK',
@@ -225,7 +233,7 @@ const deleteStockItem = async (req, res) => {
           status: 'PENDING',
           requestedById: req.user.id,
           currentData: existing,
-          reason: req.body?.reason || 'Admin requested deletion of showroom stock vehicle'
+          reason: req.body?.reason || 'Staff requested deletion of stock vehicle'
         }
       });
 
@@ -233,12 +241,12 @@ const deleteStockItem = async (req, res) => {
         data: {
           userId: req.user.id,
           action: 'SUBMIT_APPROVAL_REQUEST',
-          details: `Admin requested DELETE approval for showroom stock #${id} (${existing.vehicle} ${existing.model})`
+          details: `${req.user.role} requested DELETE approval for stock #${id} (${existing.vehicle} ${existing.model})`
         }
       });
 
       return res.json({
-        message: 'Deletion request has been submitted to the Super Admin for approval.',
+        message: 'Deletion request has been submitted for approval.',
         requiresApproval: true,
         approvalRequest: request
       });
@@ -250,11 +258,11 @@ const deleteStockItem = async (req, res) => {
       data: {
         userId: req.user.id,
         action: 'DELETE_CURRENT_STOCK',
-        details: `Deleted Showroom Stock #${id}: ${existing.vehicle} ${existing.model}`
+        details: `Deleted Stock #${id}: ${existing.vehicle} ${existing.model}`
       }
     });
 
-    return res.json({ message: 'Showroom stock entry deleted successfully' });
+    return res.json({ message: 'Stock entry deleted successfully' });
   } catch (error) {
     return res.status(500).json({ message: 'Failed to delete stock entry', error: error.message });
   }

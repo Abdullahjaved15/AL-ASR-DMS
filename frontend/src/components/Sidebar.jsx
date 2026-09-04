@@ -22,7 +22,8 @@ import {
   CheckCircle2,
   Settings as SettingsIcon,
   Bell,
-  X
+  X,
+  Layers
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
@@ -59,6 +60,7 @@ export default function Sidebar({ currentTab, setCurrentTab, isMobileOpen, setIs
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, role: 'ALL' },
     { id: 'notifications', label: 'Inflow Notifications', icon: Bell, role: 'ALL', badge: unreadCount },
     { id: 'accounts', label: 'Accounts & Finance Hub', icon: Landmark, role: 'ACCOUNTS' },
+    { id: 'accounts_stock', label: 'Accounts Current Stock', icon: Layers, role: 'ACCOUNTS' },
     { id: 'invoices', label: 'Invoices & Payment Vouchers', icon: Receipt, role: 'ACCOUNTS' },
     { id: 'all_sellers', label: 'All Sellers Inventory', icon: Car, role: 'ALL' },
     { id: 'my_sellers', label: 'My Sellers Leads', icon: UserCheck, role: 'ALL' },

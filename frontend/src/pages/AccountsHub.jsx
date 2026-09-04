@@ -719,6 +719,16 @@ export default function AccountsHub({ onNavigate }) {
 
         {/* Global Action Buttons */}
         <div className="flex items-center space-x-2 w-full md:w-auto justify-end flex-wrap gap-y-2">
+          {/* Quick link to Accounts Current Stock */}
+          <button
+            onClick={() => onNavigate ? onNavigate('accounts_stock') : (window.location.hash = '#accounts_stock')}
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/20 to-blue-600/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-mono font-bold transition-all flex items-center space-x-1.5 cursor-pointer shadow-sm"
+            title="View Accounts Current Stock, Purchase Costs and Valuation"
+          >
+            <Layers className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Accounts Stock</span>
+          </button>
+
           {/* Quick link to Vouchers & Invoices */}
           <button
             onClick={() => onNavigate ? onNavigate('invoices') : (window.location.hash = '#invoices')}
