@@ -175,7 +175,7 @@ const CameraCaptureWidget = ({ label, currentPhoto, onPhotoCaptured, onPhotoRemo
   );
 };
 
-export default function Invoices() {
+export default function Invoices({ onNavigate }) {
   const { isSuperAdmin, canAccessAccounts, isAccountsHead, isAccountant } = useAuth();
   const [invoices, setInvoices] = useState([]);
   const [stats, setStats] = useState({ totalInvoices: 0, totalSalesVolume: 0, totalCommissionEarned: 0, grandTotalValue: 0 });
@@ -1433,8 +1433,8 @@ export default function Invoices() {
     printWindow.document.close();
   };
 
-  // If user is not Super Admin, show unauthorized security gate
-  if (!isSuperAdmin) {
+  // If user does not have accounts access, show unauthorized security gate
+  if (!canAccessAccounts) {
     return (
       <div className="p-8 max-w-4xl mx-auto text-center">
         <div className="glass-card rounded-2xl p-10 border border-rose-500/30 bg-rose-500/5 shadow-2xl">
@@ -1443,7 +1443,7 @@ export default function Invoices() {
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">Restricted Access Module</h2>
           <p className="text-slate-400 text-sm max-w-md mx-auto mb-6">
-            The Sales Receipt (سیل رسید) and Voucher Management module is exclusively restricted to <strong className="text-amber-400">Super Admin</strong> level authorization.
+            The Sales Receipt (سیل رسید) and Voucher Management module is restricted to <strong className="text-cyan-400">Accounts Head, Accountants & Administrators</strong>.
           </p>
           <div className="inline-flex items-center space-x-2 text-xs font-mono text-rose-400 bg-rose-500/10 px-4 py-2 rounded-xl border border-rose-500/20">
             <ShieldCheck className="w-4 h-4" />
