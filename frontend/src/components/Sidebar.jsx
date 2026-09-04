@@ -23,7 +23,8 @@ import {
   Settings as SettingsIcon,
   Bell,
   X,
-  Layers
+  Layers,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
@@ -62,6 +63,7 @@ export default function Sidebar({ currentTab, setCurrentTab, isMobileOpen, setIs
     { id: 'accounts', label: 'Accounts & Finance Hub', icon: Landmark, role: 'ACCOUNTS' },
     { id: 'accounts_stock', label: 'Accounts Current Stock', icon: Layers, role: 'ACCOUNTS' },
     { id: 'invoices', label: 'Invoices & Payment Vouchers', icon: Receipt, role: 'ACCOUNTS' },
+    { id: 'audit_trail', label: 'Audit Trail & Day Book', icon: FileText, role: 'ACCOUNTS' },
     { id: 'all_sellers', label: 'All Sellers Inventory', icon: Car, role: 'ALL' },
     { id: 'my_sellers', label: 'My Sellers Leads', icon: UserCheck, role: 'ALL' },
     { id: 'commercial_sellers', label: 'Commercial Vehicle Sellers', icon: Truck, role: 'ALL' },

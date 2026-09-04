@@ -39,11 +39,17 @@ import { useAuth } from '../context/AuthContext';
 import { formatPKR, parsePakistaniPrice, getPriceHint, normalizePriceInput } from '../utils/priceFormatter';
 import { logoBase64 } from '../utils/logoBase64';
 
-export default function AccountsHub({ onNavigate }) {
+export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
   const { user, isSuperAdmin, isAccountsHead, isAccountant, canManageAccounts } = useAuth();
 
   // Active Tab: 'coa' | 'banks' | 'cheques' | 'installments' | 'audit' | 'chassis'
-  const [activeTab, setActiveTab] = useState('coa');
+  const [activeTab, setActiveTab] = useState(initialTab || 'coa');
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // Loading & Data states
   const [loading, setLoading] = useState(true);
