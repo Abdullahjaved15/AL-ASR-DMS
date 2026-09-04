@@ -955,6 +955,38 @@ export default function AccountsHub() {
 
           {/* Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {accounts.filter(a => a.subType === 'CASH' || a.subType === 'BANK').length === 0 && (
+              <div className="col-span-full py-16 text-center glass-card rounded-2xl border border-white/10 bg-slate-900/40">
+                <Building2 className="w-12 h-12 text-cyan-400/40 mx-auto mb-3" />
+                <h4 className="text-white font-bold text-base">No Bank or Cash Accounts Yet</h4>
+                <p className="text-xs text-slate-400 font-mono mt-1 max-w-md mx-auto">
+                  Create your first bank account or showroom cash safe ledger to track balances and fund transfers.
+                </p>
+                {canManageAccounts && (
+                  <button
+                    onClick={() => {
+                      setAccountFormData({
+                        code: '',
+                        name: '',
+                        type: 'ASSET',
+                        subType: 'BANK',
+                        bankName: '',
+                        accountNumber: '',
+                        branch: '',
+                        openingBalance: '',
+                        description: ''
+                      });
+                      setIsAddAccountModalOpen(true);
+                    }}
+                    className="mt-4 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black text-xs font-mono font-bold rounded-xl shadow-lg shadow-cyan-500/20 inline-flex items-center space-x-2"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Create Bank / Cash Account</span>
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* Cash in Hand Big Card */}
             {accounts.filter(a => a.subType === 'CASH').map(cash => (
               <div key={cash.id} className="glass-card rounded-2xl p-5 border border-emerald-500/30 bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-950 relative overflow-hidden">
