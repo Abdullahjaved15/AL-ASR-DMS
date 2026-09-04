@@ -328,7 +328,11 @@ const getAccountLedger = async (req, res) => {
     // For LIABILITY, EQUITY, REVENUE: Credit increases balance, Debit decreases
     const isNormalDebit = ['ASSET', 'EXPENSE'].includes(account.type);
 
-    let running = account.openingBalance || 0;
+    const hasOpeningBalanceTxn = entries.some(e => 
+      e.transaction?.transactionNumber?.startsWith('OB-') || 
+      e.transaction?.description?.toLowerCase().includes('opening balance')
+    );
+    let running = hasOpeningBalanceTxn ? 0 : (account.openingBalance || 0);
     let totalDebit = 0;
     let totalCredit = 0;
 

@@ -129,6 +129,327 @@ const getInvoiceById = async (req, res) => {
   }
 };
 
+// Comprehensive Helper to Synchronize Double-Entry Ledger Transactions for Invoices & Vouchers
+const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
+  const inv = await prisma.invoice.findUnique({ where: { id: invoiceId } });
+  if (!inv) return null;
+
+  // 1. Revert and delete any existing transactions for this invoice
+  const existingTxns = await prisma.transaction.findMany({
+    where: {
+      OR: [
+        { referenceId: inv.id },
+        { referenceNumber: inv.invoiceNumber }
+      ]
+    },
+    include: { entries: true }
+  });
+
+  for (const txn of existingTxns) {
+    for (const entry of txn.entries) {
+      const acc = await prisma.account.findUnique({ where: { id: entry.accountId } });
+      if (acc) {
+        if (entry.type === 'DEBIT') {
+          if (['ASSET', 'EXPENSE'].includes(acc.type)) {
+            await prisma.account.update({
+              where: { id: acc.id },
+              data: { currentBalance: { decrement: entry.amount } }
+            });
+          } else {
+            await prisma.account.update({
+              where: { id: acc.id },
+              data: { currentBalance: { increment: entry.amount } }
+            });
+          }
+        } else if (entry.type === 'CREDIT') {
+          if (['ASSET', 'EXPENSE'].includes(acc.type)) {
+            await prisma.account.update({
+              where: { id: acc.id },
+              data: { currentBalance: { increment: entry.amount } }
+            });
+          } else {
+            await prisma.account.update({
+              where: { id: acc.id },
+              data: { currentBalance: { decrement: entry.amount } }
+            });
+          }
+        }
+      }
+    }
+    await prisma.transaction.delete({ where: { id: txn.id } });
+  }
+
+  // 2. Post fresh double-entry transactions
+  const todayDate = inv.date || new Date();
+  const countTxn = await prisma.transaction.count();
+  const txnSeq = String(countTxn + 1).padStart(4, '0');
+  const dateCode = new Date(todayDate).toISOString().slice(0, 10).replace(/-/g, '');
+  const finalUserId = userId || inv.createdBy;
+
+  if (inv.category === 'PAYMENT_VOUCHER') {
+    const paymentAmt = parsePakistaniPrice(inv.cashAmount || inv.totalPrice || inv.agreedAmount || inv.saleAmount || 0);
+    if (paymentAmt > 0) {
+      let sourceAccount = null;
+      if (inv.paymentMethod === 'BANK' && inv.bankAccountId) {
+        sourceAccount = await prisma.account.findUnique({ where: { id: inv.bankAccountId } });
+      }
+      if (!sourceAccount) {
+        sourceAccount = await prisma.account.findFirst({ where: { subType: 'CASH', isActive: true } })
+          || await prisma.account.findFirst({ where: { subType: 'CASH' } });
+      }
+      if (!sourceAccount) {
+        sourceAccount = await prisma.account.create({
+          data: {
+            code: '1001',
+            name: 'Cash in Hand Safe',
+            type: 'ASSET',
+            subType: 'CASH',
+            currentBalance: 0,
+            description: 'Physical showroom safe cash'
+          }
+        });
+      }
+
+      let targetAccount = null;
+      if (inv.headOfAccount && String(inv.headOfAccount).trim() !== '') {
+        const cleanHead = String(inv.headOfAccount).trim();
+        targetAccount = await prisma.account.findFirst({
+          where: {
+            OR: [
+              { id: cleanHead },
+              { code: cleanHead },
+              { name: { equals: cleanHead, mode: 'insensitive' } },
+              { name: { contains: cleanHead, mode: 'insensitive' } }
+            ]
+          }
+        });
+
+        if (!targetAccount) {
+          const maxAcc = await prisma.account.findFirst({
+            where: { code: { startsWith: '5' } },
+            orderBy: { code: 'desc' }
+          });
+          let nextCode = '5001';
+          if (maxAcc && !isNaN(Number(maxAcc.code))) {
+            nextCode = String(Number(maxAcc.code) + 1);
+          }
+          targetAccount = await prisma.account.create({
+            data: {
+              code: nextCode,
+              name: cleanHead,
+              type: 'EXPENSE',
+              subType: 'EXPENSE',
+              currentBalance: 0,
+              description: `Auto-created ledger account for ${cleanHead}`
+            }
+          });
+        }
+      }
+
+      if (!targetAccount) {
+        targetAccount = await prisma.account.findFirst({ where: { type: 'EXPENSE', isActive: true } })
+          || await prisma.account.findFirst({ where: { type: 'EXPENSE' } });
+      }
+
+      if (!targetAccount) {
+        targetAccount = await prisma.account.create({
+          data: {
+            code: '5001',
+            name: 'General & Miscellaneous Expenses',
+            type: 'EXPENSE',
+            subType: 'EXPENSE',
+            currentBalance: 0,
+            description: 'General operational and voucher expenses'
+          }
+        });
+      }
+
+      await prisma.transaction.create({
+        data: {
+          transactionNumber: `PV-${dateCode}-${txnSeq}`,
+          date: todayDate,
+          type: 'PAYMENT_VOUCHER',
+          amount: paymentAmt,
+          description: `Payment Voucher ${inv.invoiceNumber} to [${inv.payeeName || inv.buyerName || 'Payee'}] via [${sourceAccount.name}] - Head: [${targetAccount.name}] ${inv.remarks || inv.onAccount ? '(' + (inv.remarks || inv.onAccount) + ')' : ''}`,
+          referenceType: 'INVOICE',
+          referenceId: inv.id,
+          referenceNumber: inv.invoiceNumber,
+          chassisNumber: inv.chassisNumber || null,
+          createdById: finalUserId,
+          entries: {
+            create: [
+              {
+                accountId: sourceAccount.id,
+                type: 'CREDIT',
+                amount: paymentAmt,
+                description: `Payment to ${inv.payeeName || inv.buyerName || 'Payee'}`
+              },
+              {
+                accountId: targetAccount.id,
+                type: 'DEBIT',
+                amount: paymentAmt,
+                description: `Payment Voucher for [${targetAccount.name}]: ${inv.payeeName || inv.buyerName || 'Payee'}`
+              }
+            ]
+          }
+        }
+      });
+
+      // Update balances
+      await prisma.account.update({
+        where: { id: sourceAccount.id },
+        data: { currentBalance: { decrement: paymentAmt } }
+      });
+
+      if (['EXPENSE', 'ASSET'].includes(targetAccount.type)) {
+        await prisma.account.update({
+          where: { id: targetAccount.id },
+          data: { currentBalance: { increment: paymentAmt } }
+        });
+      } else {
+        await prisma.account.update({
+          where: { id: targetAccount.id },
+          data: { currentBalance: { decrement: paymentAmt } }
+        });
+      }
+    }
+  } else {
+    // SALES_RECEIPT, BOOKING_RECEIPT, DELIVERY_LETTER
+    const numericTotalPrice = parsePakistaniPrice(inv.totalPrice || inv.agreedAmount || inv.saleAmount || 0);
+    const numericAdvance = parsePakistaniPrice(inv.advanceAmount || 0);
+    const effectiveTotalReceived = numericAdvance > 0 ? numericAdvance : numericTotalPrice;
+
+    let cashReceived = 0;
+    let bankReceived = 0;
+
+    if (inv.paymentMethod === 'CASH') {
+      cashReceived = effectiveTotalReceived;
+    } else if (inv.paymentMethod === 'BANK') {
+      bankReceived = effectiveTotalReceived;
+    } else if (inv.paymentMethod === 'SPLIT') {
+      cashReceived = parsePakistaniPrice(inv.cashAmountReceived);
+      bankReceived = parsePakistaniPrice(inv.bankAmountReceived);
+      if (cashReceived === 0 && bankReceived === 0) {
+        cashReceived = effectiveTotalReceived;
+      }
+    }
+
+    const totalReceived = cashReceived + bankReceived;
+    if (totalReceived > 0) {
+      let cashAccount = null;
+      if (cashReceived > 0) {
+        cashAccount = await prisma.account.findFirst({ where: { subType: 'CASH', isActive: true } })
+          || await prisma.account.findFirst({ where: { subType: 'CASH' } });
+        if (!cashAccount) {
+          cashAccount = await prisma.account.create({
+            data: {
+              code: '1001',
+              name: 'Cash in Hand Safe',
+              type: 'ASSET',
+              subType: 'CASH',
+              currentBalance: 0,
+              description: 'Physical showroom safe cash'
+            }
+          });
+        }
+      }
+
+      let bankAccount = null;
+      if (bankReceived > 0) {
+        if (inv.bankAccountId) {
+          bankAccount = await prisma.account.findUnique({ where: { id: inv.bankAccountId } });
+        }
+        if (!bankAccount) {
+          bankAccount = await prisma.account.findFirst({ where: { subType: 'BANK', isActive: true } })
+            || await prisma.account.findFirst({ where: { subType: 'BANK' } });
+        }
+      }
+
+      let revenueAccount = await prisma.account.findFirst({ where: { code: '4001' } }) 
+        || await prisma.account.findFirst({ where: { type: 'REVENUE' } });
+      if (!revenueAccount) {
+        revenueAccount = await prisma.account.create({
+          data: {
+            code: '4001',
+            name: 'Vehicle Sales Revenue',
+            type: 'REVENUE',
+            subType: 'REVENUE',
+            currentBalance: 0,
+            description: 'Primary revenue from vehicle sales & bookings'
+          }
+        });
+      }
+
+      const entriesToCreate = [];
+      if (cashReceived > 0 && cashAccount) {
+        entriesToCreate.push({
+          accountId: cashAccount.id,
+          type: 'DEBIT',
+          amount: cashReceived,
+          description: `Cash received from ${inv.buyerName || 'Customer'} for ${inv.vehicleMaker || ''} ${inv.vehicleModel || ''}`
+        });
+      }
+
+      if (bankReceived > 0 && bankAccount) {
+        entriesToCreate.push({
+          accountId: bankAccount.id,
+          type: 'DEBIT',
+          amount: bankReceived,
+          description: `Bank transfer from ${inv.buyerName || 'Customer'} into ${bankAccount.name}`
+        });
+      }
+
+      if (revenueAccount) {
+        entriesToCreate.push({
+          accountId: revenueAccount.id,
+          type: 'CREDIT',
+          amount: totalReceived,
+          description: `Sales revenue from ${inv.buyerName || 'Customer'}`
+        });
+      }
+
+      if (entriesToCreate.length > 0) {
+        await prisma.transaction.create({
+          data: {
+            transactionNumber: `REC-${dateCode}-${txnSeq}`,
+            date: todayDate,
+            type: 'RECEIPT_VOUCHER',
+            amount: totalReceived,
+            description: `Receipt ${inv.invoiceNumber} for [${inv.buyerName || 'Customer'}] (${inv.vehicleMaker || ''} ${inv.vehicleModel || ''} - Chassis: ${inv.chassisNumber || 'N/A'}) - Cash: Rs. ${cashReceived}, Bank: Rs. ${bankReceived}`,
+            referenceType: 'INVOICE',
+            referenceId: inv.id,
+            referenceNumber: inv.invoiceNumber,
+            chassisNumber: inv.chassisNumber || null,
+            createdById: finalUserId,
+            entries: {
+              create: entriesToCreate
+            }
+          }
+        });
+
+        if (cashReceived > 0 && cashAccount) {
+          await prisma.account.update({
+            where: { id: cashAccount.id },
+            data: { currentBalance: { increment: cashReceived } }
+          });
+        }
+        if (bankReceived > 0 && bankAccount) {
+          await prisma.account.update({
+            where: { id: bankAccount.id },
+            data: { currentBalance: { increment: bankReceived } }
+          });
+        }
+        if (revenueAccount) {
+          await prisma.account.update({
+            where: { id: revenueAccount.id },
+            data: { currentBalance: { increment: totalReceived } }
+          });
+        }
+      }
+    }
+  }
+};
+
 const createInvoice = async (req, res) => {
   try {
     const {
@@ -358,342 +679,45 @@ const createInvoice = async (req, res) => {
     // AUTOMATED FINANCIAL LEDGER POSTINGS (DOUBLE ENTRY)
     // ----------------------------------------------------
     try {
-      const todayDate = new Date();
-      const countTxn = await prisma.transaction.count();
-      const txnSeq = String(countTxn + 1).padStart(4, '0');
-      const dateCode = todayDate.toISOString().slice(0, 10).replace(/-/g, '');
+      await syncInvoiceLedgerTransactions(newInvoice.id, req.user.id);
 
-      // Case A: PAYMENT VOUCHER
-      if (category === 'PAYMENT_VOUCHER') {
-        const paymentAmt = parsePakistaniPrice(cashAmount || totalPrice || agreedAmount || saleAmount);
-        if (paymentAmt > 0) {
-          // Source Account (Bank or Cash in Hand)
-          let sourceAccount = null;
-          if (paymentMethod === 'BANK' && bankAccountId) {
-            sourceAccount = await prisma.account.findUnique({ where: { id: bankAccountId } });
+      // Notification Dispatch
+      const paymentAmt = parsePakistaniPrice(cashAmount || totalPrice || agreedAmount || saleAmount);
+      if (category === 'PAYMENT_VOUCHER' && paymentAmt > 0) {
+        await prisma.notification.create({
+          data: {
+            targetRole: 'ACCOUNTS_HEAD',
+            title: `💵 Payment Voucher Outflow: Rs. ${paymentAmt.toLocaleString()}`,
+            message: `Payment Voucher #${invoiceNumber} issued to ${payeeName || finalBuyerName} for Head [${headOfAccount || 'Showroom Payment'}] via [${paymentMethod || 'CASH'}] - Rs. ${paymentAmt.toLocaleString()}`,
+            type: 'PAYMENT_VOUCHER',
+            category: paymentMethod || 'CASH',
+            amount: paymentAmt,
+            referenceId: newInvoice.id,
+            linkUrl: '/invoices'
           }
-          if (!sourceAccount) {
-            sourceAccount = await prisma.account.findFirst({ where: { subType: 'CASH', isActive: true } });
-          }
-          if (!sourceAccount) {
-            sourceAccount = await prisma.account.findFirst({ where: { subType: 'CASH' } });
-          }
-          if (!sourceAccount) {
-            // Auto-create default Cash in Hand Safe account
-            sourceAccount = await prisma.account.create({
-              data: {
-                code: '1001',
-                name: 'Cash in Hand Safe',
-                type: 'ASSET',
-                subType: 'CASH',
-                currentBalance: 0,
-                description: 'Physical showroom safe cash'
-              }
-            });
-          }
-
-          // Target Account (Expense or Payables)
-          let targetAccount = null;
-          if (headOfAccount && String(headOfAccount).trim() !== '') {
-            const cleanHead = String(headOfAccount).trim();
-            targetAccount = await prisma.account.findFirst({
-              where: {
-                OR: [
-                  { id: cleanHead },
-                  { code: cleanHead },
-                  { name: { equals: cleanHead, mode: 'insensitive' } },
-                  { name: { contains: cleanHead, mode: 'insensitive' } }
-                ]
-              }
-            });
-
-            if (!targetAccount) {
-              // Auto-generate next code in 5000 range
-              const maxAcc = await prisma.account.findFirst({
-                where: { code: { startsWith: '5' } },
-                orderBy: { code: 'desc' }
-              });
-              let nextCode = '5001';
-              if (maxAcc && !isNaN(Number(maxAcc.code))) {
-                nextCode = String(Number(maxAcc.code) + 1);
-              }
-
-              targetAccount = await prisma.account.create({
-                data: {
-                  code: nextCode,
-                  name: cleanHead,
-                  type: 'EXPENSE',
-                  subType: 'EXPENSE',
-                  currentBalance: 0,
-                  description: `Auto-created ledger account for ${cleanHead}`
-                }
-              });
-            }
-          }
-
-          if (!targetAccount) {
-            targetAccount = await prisma.account.findFirst({ where: { type: 'EXPENSE', isActive: true } })
-              || await prisma.account.findFirst({ where: { type: 'EXPENSE' } });
-          }
-
-          if (!targetAccount) {
-            targetAccount = await prisma.account.create({
-              data: {
-                code: '5001',
-                name: 'General & Miscellaneous Expenses',
-                type: 'EXPENSE',
-                subType: 'EXPENSE',
-                currentBalance: 0,
-                description: 'General operational and voucher expenses'
-              }
-            });
-          }
-
-          const pvTxn = await prisma.transaction.create({
-            data: {
-              transactionNumber: `PV-${dateCode}-${txnSeq}`,
-              date: todayDate,
-              type: 'PAYMENT_VOUCHER',
-              amount: paymentAmt,
-              description: `Payment Voucher ${invoiceNumber} to [${payeeName || finalBuyerName}] via [${sourceAccount.name}] - Head: [${targetAccount.name}] ${remarks || onAccount ? '(' + (remarks || onAccount) + ')' : ''}`,
-              referenceType: 'INVOICE',
-              referenceId: newInvoice.id,
-              referenceNumber: invoiceNumber,
-              chassisNumber: chassisNumber || null,
-              createdById: req.user.id,
-              entries: {
-                create: [
-                  {
-                    accountId: sourceAccount.id,
-                    type: 'CREDIT', // Outflow from bank/cash
-                    amount: paymentAmt,
-                    description: `Payment to ${payeeName || finalBuyerName}`
-                  },
-                  {
-                    accountId: targetAccount.id,
-                    type: 'DEBIT', // Expense / liability debit
-                    amount: paymentAmt,
-                    description: `Payment Voucher for [${targetAccount.name}]: ${payeeName || finalBuyerName}`
-                  }
-                ]
-              }
-            }
-          });
-
-          // Decrement source account balance (money left cash/bank)
-          await prisma.account.update({
-            where: { id: sourceAccount.id },
-            data: { currentBalance: { decrement: paymentAmt } }
-          });
-
-          // Update target account balance
-          if (targetAccount.type === 'EXPENSE' || targetAccount.type === 'ASSET') {
-            await prisma.account.update({
-              where: { id: targetAccount.id },
-              data: { currentBalance: { increment: paymentAmt } }
-            });
-          } else if (targetAccount.type === 'LIABILITY' || targetAccount.type === 'EQUITY') {
-            await prisma.account.update({
-              where: { id: targetAccount.id },
-              data: { currentBalance: { decrement: paymentAmt } }
-            });
-          }
-
-          // Real-time notification dispatch to ACCOUNTS_HEAD
-          try {
-            await prisma.notification.create({
-              data: {
-                targetRole: 'ACCOUNTS_HEAD',
-                title: `💵 Payment Voucher Outflow: Rs. ${paymentAmt.toLocaleString()}`,
-                message: `Payment Voucher #${invoiceNumber} issued to ${payeeName || finalBuyerName} for Head [${targetAccount.name}] via [${sourceAccount.name}] - Rs. ${paymentAmt.toLocaleString()}`,
-                type: 'PAYMENT_VOUCHER',
-                category: paymentMethod || 'CASH',
-                amount: paymentAmt,
-                referenceId: newInvoice.id,
-                linkUrl: '/invoices'
-              }
-            });
-          } catch (notifErr) {
-            console.warn('Failed to send PV notification:', notifErr.message);
-          }
-        }
-      } 
-      // Case B: SALES RECEIPT, BOOKING RECEIPT, DELIVERY LETTER
-      else {
-        let cashReceived = 0;
-        let bankReceived = 0;
-
-        const effectiveTotalReceived = numericAdvance > 0 ? numericAdvance : numericTotalPrice;
-
-        if (paymentMethod === 'CASH') {
-          cashReceived = effectiveTotalReceived;
-        } else if (paymentMethod === 'BANK') {
-          bankReceived = effectiveTotalReceived;
-        } else if (paymentMethod === 'SPLIT') {
-          cashReceived = parsePakistaniPrice(cashAmountReceived);
-          bankReceived = parsePakistaniPrice(bankAmountReceived);
-          if (cashReceived === 0 && bankReceived === 0) {
-            cashReceived = effectiveTotalReceived;
-          }
-        }
-
-        const totalReceived = cashReceived + bankReceived;
-
+        });
+      } else if (category !== 'PAYMENT_VOUCHER') {
+        const totalReceived = (numericAdvance > 0 ? numericAdvance : numericTotalPrice);
         if (totalReceived > 0) {
-          let cashAccount = null;
-          if (cashReceived > 0) {
-            cashAccount = await prisma.account.findFirst({ where: { subType: 'CASH', isActive: true } })
-              || await prisma.account.findFirst({ where: { subType: 'CASH' } });
-            if (!cashAccount) {
-              cashAccount = await prisma.account.create({
-                data: {
-                  code: '1001',
-                  name: 'Cash in Hand Safe',
-                  type: 'ASSET',
-                  subType: 'CASH',
-                  currentBalance: 0,
-                  description: 'Physical showroom safe cash'
-                }
-              });
-            }
-          }
-
-          let bankAccount = null;
-          if (bankReceived > 0) {
-            if (bankAccountId) {
-              bankAccount = await prisma.account.findUnique({ where: { id: bankAccountId } });
-            }
-            if (!bankAccount) {
-              bankAccount = await prisma.account.findFirst({ where: { subType: 'BANK', isActive: true } })
-                || await prisma.account.findFirst({ where: { subType: 'BANK' } });
-            }
-          }
-
-          let revenueAccount = await prisma.account.findFirst({ where: { code: '4001' } }) 
-            || await prisma.account.findFirst({ where: { type: 'REVENUE' } });
-          
-          if (!revenueAccount) {
-            revenueAccount = await prisma.account.create({
-              data: {
-                code: '4001',
-                name: 'Vehicle Sales Revenue',
-                type: 'REVENUE',
-                subType: 'REVENUE',
-                currentBalance: 0,
-                description: 'Primary revenue from vehicle sales & bookings'
-              }
-            });
-          }
-
-          const entriesToCreate = [];
-          if (cashReceived > 0 && cashAccount) {
-            entriesToCreate.push({
-              accountId: cashAccount.id,
-              type: 'DEBIT', // Inflow
-              amount: cashReceived,
-              description: `Cash received from ${finalBuyerName} for ${finalVehicleMaker} ${finalVehicleModel}`
-            });
-          }
-
-          if (bankReceived > 0 && bankAccount) {
-            entriesToCreate.push({
-              accountId: bankAccount.id,
-              type: 'DEBIT', // Inflow
-              amount: bankReceived,
-              description: `Bank transfer from ${finalBuyerName} into ${bankAccount.name}`
-            });
-          }
-
-          if (revenueAccount) {
-            entriesToCreate.push({
-              accountId: revenueAccount.id,
-              type: 'CREDIT', // Revenue
+          const isBooking = category === 'BOOKING_RECEIPT';
+          const typeLabel = isBooking ? 'Booking Receipt' : 'Sales Receipt';
+          await prisma.notification.create({
+            data: {
+              targetRole: 'ACCOUNTS_HEAD',
+              title: isBooking ? `📅 New Booking Inflow: Rs. ${totalReceived.toLocaleString()}` : `💰 New Sales Inflow: Rs. ${totalReceived.toLocaleString()}`,
+              message: `${typeLabel} #${invoiceNumber} generated for ${finalVehicleMaker} ${finalVehicleModel} (Chassis: ${chassisNumber || 'N/A'}). Received Rs. ${totalReceived.toLocaleString()} from Customer ${finalBuyerName} by ${req.user.name || 'Sales Officer'}.`,
+              type: category || 'FINANCIAL_INFLOW',
+              category: paymentMethod || 'CASH',
               amount: totalReceived,
-              description: `Sales revenue from ${finalBuyerName}`
-            });
-          }
-
-          if (entriesToCreate.length > 0) {
-            await prisma.transaction.create({
-              data: {
-                transactionNumber: `REC-${dateCode}-${txnSeq}`,
-                date: todayDate,
-                type: 'RECEIPT_VOUCHER',
-                amount: totalReceived,
-                description: `Receipt ${invoiceNumber} for [${finalBuyerName}] (${finalVehicleMaker} ${finalVehicleModel} - Chassis: ${chassisNumber || 'N/A'}) - Cash: Rs. ${cashReceived}, Bank: Rs. ${bankReceived}`,
-                referenceType: 'INVOICE',
-                referenceId: newInvoice.id,
-                referenceNumber: invoiceNumber,
-                chassisNumber: chassisNumber || null,
-                createdById: req.user.id,
-                entries: {
-                  create: entriesToCreate
-                }
-              }
-            });
-
-            // Update account balances
-            if (cashReceived > 0 && cashAccount) {
-              await prisma.account.update({
-                where: { id: cashAccount.id },
-                data: { currentBalance: { increment: cashReceived } }
-              });
+              referenceId: newInvoice.id,
+              linkUrl: '/invoices'
             }
-            if (bankReceived > 0 && bankAccount) {
-              await prisma.account.update({
-                where: { id: bankAccount.id },
-                data: { currentBalance: { increment: bankReceived } }
-              });
-            }
-            if (revenueAccount) {
-              await prisma.account.update({
-                where: { id: revenueAccount.id },
-                data: { currentBalance: { increment: totalReceived } }
-              });
-            }
-          }
-
-          // ----------------------------------------------------
-          // NOTIFICATION DISPATCH TO ACCOUNTS HEAD
-          // ----------------------------------------------------
-          try {
-            const isBooking = category === 'BOOKING_RECEIPT';
-            const typeLabel = isBooking ? 'Booking Receipt' : 'Sales Receipt';
-            const targetBankName = bankAccount ? bankAccount.name : 'Bank Account';
-            
-            let paymentDetailStr = '';
-            if (paymentMethod === 'CASH') {
-              paymentDetailStr = `Cash in Hand Safe (Rs. ${cashReceived.toLocaleString()})`;
-            } else if (paymentMethod === 'BANK') {
-              paymentDetailStr = `${targetBankName} (Rs. ${bankReceived.toLocaleString()})`;
-            } else if (paymentMethod === 'SPLIT') {
-              paymentDetailStr = `Split: Cash Rs. ${cashReceived.toLocaleString()} + ${targetBankName} Rs. ${bankReceived.toLocaleString()}`;
-            } else {
-              paymentDetailStr = `Rs. ${totalReceived.toLocaleString()}`;
-            }
-
-            const notifTitle = isBooking
-              ? `📅 New Booking Inflow: Rs. ${totalReceived.toLocaleString()}`
-              : `💰 New Sales Inflow: Rs. ${totalReceived.toLocaleString()}`;
-
-            const notifMessage = `${typeLabel} #${invoiceNumber} generated for ${finalVehicleMaker} ${finalVehicleModel} (Chassis: ${chassisNumber || 'N/A'}). Received ${paymentDetailStr} from Customer ${finalBuyerName} by ${req.user.name || 'Sales Officer'}.`;
-
-            await prisma.notification.create({
-              data: {
-                targetRole: 'ACCOUNTS_HEAD',
-                title: notifTitle,
-                message: notifMessage,
-                type: category || 'FINANCIAL_INFLOW',
-                category: paymentMethod || 'CASH',
-                amount: totalReceived,
-                referenceId: newInvoice.id,
-                linkUrl: '/invoices'
-              }
-            });
-          } catch (notifErr) {
-            console.warn('Failed to create notification for accounts head:', notifErr.message);
-          }
+          });
         }
+      }
+    } catch (accountError) {
+      console.error('Automated ledger posting error (non-fatal):', accountError);
+    }
 
         // ----------------------------------------------------
         // AUTOMATED INSTALLMENT PLAN CREATION (IF CHECKED)
@@ -759,10 +783,6 @@ const createInvoice = async (req, res) => {
             data: { installmentPlanId: createdPlan.id }
           });
         }
-      }
-    } catch (accountError) {
-      console.error('Automated ledger posting error (non-fatal):', accountError);
-    }
 
     await prisma.activityLog.create({
       data: {
@@ -947,6 +967,12 @@ const updateInvoice = async (req, res) => {
       }
     });
 
+    try {
+      await syncInvoiceLedgerTransactions(id, req.user.id);
+    } catch (syncErr) {
+      console.error('Failed to sync invoice transactions on update:', syncErr);
+    }
+
     await prisma.activityLog.create({
       data: {
         userId: req.user.id,
@@ -968,6 +994,55 @@ const deleteInvoice = async (req, res) => {
 
     if (!existing) {
       return res.status(404).json({ message: 'Invoice not found' });
+    }
+
+    // Revert and delete any linked transactions from the ledger
+    try {
+      const existingTxns = await prisma.transaction.findMany({
+        where: {
+          OR: [
+            { referenceId: id },
+            { referenceNumber: existing.invoiceNumber }
+          ]
+        },
+        include: { entries: true }
+      });
+
+      for (const txn of existingTxns) {
+        for (const entry of txn.entries) {
+          const acc = await prisma.account.findUnique({ where: { id: entry.accountId } });
+          if (acc) {
+            if (entry.type === 'DEBIT') {
+              if (['ASSET', 'EXPENSE'].includes(acc.type)) {
+                await prisma.account.update({
+                  where: { id: acc.id },
+                  data: { currentBalance: { decrement: entry.amount } }
+                });
+              } else {
+                await prisma.account.update({
+                  where: { id: acc.id },
+                  data: { currentBalance: { increment: entry.amount } }
+                });
+              }
+            } else if (entry.type === 'CREDIT') {
+              if (['ASSET', 'EXPENSE'].includes(acc.type)) {
+                await prisma.account.update({
+                  where: { id: acc.id },
+                  data: { currentBalance: { increment: entry.amount } }
+                });
+              } else {
+                await prisma.account.update({
+                  where: { id: acc.id },
+                  data: { currentBalance: { decrement: entry.amount } }
+                });
+              }
+            }
+          }
+        }
+        await prisma.transaction.delete({ where: { id: txn.id } });
+      }
+    } catch (txnDeleteErr) {
+      console.warn('Failed to revert transactions on invoice deletion:', txnDeleteErr.message);
     }
 
     await prisma.invoice.delete({ where: { id } });
@@ -1086,5 +1161,6 @@ module.exports = {
   updateInvoice,
   deleteInvoice,
   uploadInvoiceImages,
-  deleteInvoiceImage
+  deleteInvoiceImage,
+  syncInvoiceLedgerTransactions
 };
