@@ -518,14 +518,16 @@ export default function Invoices() {
     setSubmitting(true);
     try {
       const cleanPrice = (v) => (v !== '' && v !== null && v !== undefined ? normalizePriceInput(v) : '');
+      const effectiveAmount = formData.totalPrice || formData.agreedAmount || formData.saleAmount || formData.cashAmount;
       const payload = {
         ...formData,
-        totalPrice: cleanPrice(formData.totalPrice || formData.agreedAmount || formData.saleAmount),
+        totalPrice: cleanPrice(effectiveAmount),
         advanceAmount: cleanPrice(formData.advanceAmount),
         remainingAmount: cleanPrice(formData.remainingAmount),
-        agreedAmount: cleanPrice(formData.agreedAmount || formData.totalPrice),
+        agreedAmount: cleanPrice(formData.agreedAmount || effectiveAmount),
         agreedAmountHalf: cleanPrice(formData.agreedAmountHalf),
-        saleAmount: cleanPrice(formData.saleAmount || formData.totalPrice)
+        saleAmount: cleanPrice(formData.saleAmount || effectiveAmount),
+        cashAmount: cleanPrice(formData.cashAmount || effectiveAmount)
       };
 
       let savedResult;
@@ -666,36 +668,88 @@ export default function Invoices() {
               <td class="lbl">Account of:</td><td class="val" colspan="3">${inv.accountOf || 'N/A'}</td>
             </tr>
           </table>
-
-          <div style="border: 1px solid #0f172a; padding: 10px; font-size: 10px; line-height: 1.6; text-align: justify; margin-bottom: 14px; background: #f8fafc; border-radius: 4px;">
-            My entire satisfaction, and have taken possession of the same in perfect satisfactory condition, I do hereby I shall be fully responsible for all accident, Tokens, Machine defects and the undertake to get the ownership of this vehicle transferred in my name from the concerned registration Authority within the stipulated period of 15 days from today, and if could not, I will do so my own responsibility and risk. During the invoice making process, if any price change occurs at company end, I will pay the invoice difference.
+          <div class="receipt-header">
+            <div class="header-left">
+              <img src="${logoBase64}" class="header-logo" />
+              <div>
+                <h1 class="header-brand-title">AL-ASR MOTORS</h1>
+                <p class="header-address">450 - A/B, Lahore Road, Sahiwal.</p>
+                <p class="header-contact">Tel.: 040-4403799, 4403899, Fax: 040-4462087</p>
+              </div>
+            </div>
+            <div class="header-right">
+              <div class="receipt-type-badge dl-badge">DELIVERY LETTER</div>
+              <div class="receipt-meta-box">
+                <div>Date: <span>${createdDate}</span></div>
+                <div>Book No: <span>08</span></div>
+                <div>Receipt No: <span style="font-family: monospace; font-weight: 900; color: #0284c7;">${receiptNo}</span></div>
+              </div>
+            </div>
           </div>
 
-          <table class="grid-tbl" style="margin-bottom: 16px;">
+          <div class="party-grid">
+            <div class="party-card">
+              <div class="party-title">فریق اوّل (مالک برائے فروخت) / FIRST PARTY (SELLER)</div>
+              <table class="party-table">
+                <tr><td class="lbl">نام (Name):</td><td class="val">${sellerName}</td></tr>
+                <tr><td class="lbl">ولدیت (Father):</td><td class="val">${sellerFather}</td></tr>
+                <tr><td class="lbl">شناختی کارڈ (CNIC):</td><td class="val">${renderCNICBoxes(inv.sellerCnic)}</td></tr>
+                <tr><td class="lbl">پتہ (Address):</td><td class="val">${sellerAddress}</td></tr>
+                <tr><td class="lbl">فون (Phone):</td><td class="val">${sellerPhone}</td></tr>
+              </table>
+            </div>
+
+            <div class="party-card">
+              <div class="party-title">فریق دوئم (خریدار) / SECOND PARTY (BUYER)</div>
+              <table class="party-table">
+                <tr><td class="lbl">نام (Name):</td><td class="val">${buyerName}</td></tr>
+                <tr><td class="lbl">ولدیت (Father):</td><td class="val">${buyerFather}</td></tr>
+                <tr><td class="lbl">شناختی کارڈ (CNIC):</td><td class="val">${renderCNICBoxes(inv.buyerCnic)}</td></tr>
+                <tr><td class="lbl">پتہ (Address):</td><td class="val">${buyerAddress}</td></tr>
+                <tr><td class="lbl">فون (Phone):</td><td class="val">${buyerPhone}</td></tr>
+              </table>
+            </div>
+          </div>
+
+          <table class="veh-tbl">
+            <thead>
+              <tr>
+                <th>گاڑی (Maker)</th>
+                <th>ماڈل (Model)</th>
+                <th>رجسٹریشن نمبر (Reg No)</th>
+                <th>چیسز نمبر (Chassis No)</th>
+                <th>انجن نمبر (Engine No)</th>
+                <th>ہارس پاور (HP/CC)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>${vehicleMaker}</td>
+                <td>${vehicleModel} (${inv.carYear || 'N/A'})</td>
+                <td style="font-weight: 900; color: #0284c7;">${regNo}</td>
+                <td style="font-family: monospace;">${chassisNo}</td>
+                <td style="font-family: monospace;">${engineNo}</td>
+                <td>${powerCapacity}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="urdu-statement">
+            مندرجہ بالا گاڑی معہ جملہ کاغذات و فائل و کسٹمز کٹ (اگر لاگو ہو) فریق دوئم (خریدار) کے قبضہ میں بقائمی ہوش و حواس بلا جبر و اکراہ دی گئی ہے۔ 
+            آج بوقت <strong>${agreementTime}</strong> بروز <strong>${agreementDay}</strong> گاڑی فریق دوئم کے قبضہ میں دے دی گئی ہے۔ اب بعد ازاں ہر قسم کے چالان، ایکسیڈنٹ، قانونی یا پولیس کارروائی کی تمام تر ذمہ داری فریق دوئم (خریدار) پر ہوگی۔ شوروم کسی قسم کا ذمہ دار نہ ہوگا۔
+          </div>
+
+          <table class="witness-tbl">
             <tr>
-              <td class="lbl">Byer's Name:</td><td class="val">${buyerName}</td>
-              <td class="lbl">S/o:</td><td class="val">${buyerFather}</td>
+              <td class="lbl">دستخط فریق اوّل (Seller):</td><td class="val">___________________________</td>
+              <td class="lbl">دستخط فریق دوئم (Buyer):</td><td class="val">___________________________</td>
             </tr>
             <tr>
-              <td class="lbl">Address:</td><td class="val" colspan="3">${buyerAddress}</td>
-            </tr>
-            <tr>
-              <td class="lbl">N.I.C. No:</td><td class="val" colspan="3">${renderCNICBoxes(inv.buyerCnic)}</td>
-            </tr>
-            <tr>
-              <td class="lbl">Signature:</td><td class="val" style="height: 28px;"></td>
-              <td class="lbl">Contact:</td><td class="val">${buyerPhone}</td>
-            </tr>
-            <tr>
-              <td class="lbl">Witness Name:</td><td class="val">${inv.witness1Name || 'N/A'}</td>
-              <td class="lbl">Signature:</td><td class="val" style="height: 28px;"></td>
+              <td class="lbl">گواہ شد (Witness 1):</td><td class="val">${inv.witness1Name || '___________________________'}</td>
+              <td class="lbl">گواہ شد (Witness 2):</td><td class="val">${inv.witness2Name || '___________________________'}</td>
             </tr>
             <tr>
               <td class="lbl">N.I.C. No:</td><td class="val" colspan="3">${renderCNICBoxes(inv.witness1Cnic)}</td>
-            </tr>
-            <tr>
-              <td class="lbl">Witness Name:</td><td class="val">${inv.witness2Name || 'N/A'}</td>
-              <td class="lbl">Signature:</td><td class="val" style="height: 28px;"></td>
             </tr>
             <tr>
               <td class="lbl">N.I.C. No:</td><td class="val" colspan="3">${renderCNICBoxes(inv.witness2Cnic)}</td>
@@ -711,11 +765,11 @@ export default function Invoices() {
       const payee = inv.payeeName || (inv.buyerName && inv.buyerName !== 'N/A' ? inv.buyerName : '') || (inv.sellerName && inv.sellerName !== 'N/A' ? inv.sellerName : '') || (inv.customerName && inv.customerName !== 'N/A' ? inv.customerName : '') || '';
       const headAccount = inv.headOfAccount || '';
       const desc = inv.remarks || '';
-      const amountStr = totalPrice ? Number(totalPrice).toLocaleString() + ' /-' : '';
+      const pvAmount = parsePakistaniPrice(inv.totalPrice || inv.cashAmount || inv.agreedAmount || inv.saleAmount || 0);
+      const amountStr = pvAmount > 0 ? pvAmount.toLocaleString() + ' /-' : '';
 
       innerHTMLBody = `
         <div class="receipt-card" style="border: 2px solid #0f172a; padding: 20px; font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; background: #ffffff;">
-          <!-- Top Header Strip -->
           <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 14px;">
             <div style="display: flex; align-items: center; gap: 14px;">
               <img src="${logoBase64}" style="height: 54px;" />
@@ -731,12 +785,10 @@ export default function Invoices() {
             </div>
           </div>
 
-          <!-- Payee's Name Line -->
           <div style="font-size: 12px; margin-bottom: 14px; color: #0f172a;">
             <strong>Payee's Name</strong> <span style="border-bottom: 1.5px solid #0f172a; display: inline-block; width: calc(100% - 110px); padding-left: 8px; font-weight: 800; font-size: 13px;">${payee}</span>
           </div>
 
-          <!-- Main Head of Account & Rupees Table -->
           <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #0f172a; margin-bottom: 14px; font-size: 11px;">
             <thead>
               <tr style="border-bottom: 1.5px solid #0f172a; background: #f8fafc; font-weight: 900; font-size: 11px; text-align: center;">
@@ -757,18 +809,15 @@ export default function Invoices() {
               <tr style="border-top: 1.5px solid #0f172a; font-weight: 900; background: #f8fafc; font-size: 12px;">
                 <td style="padding: 8px 12px; text-align: right; border-right: 1.5px solid #0f172a;">Grand Total</td>
                 <td style="padding: 8px 12px; text-align: right; font-family: monospace; font-size: 14px; color: #0284c7;">
-                  ${totalPrice ? 'PKR ' + Number(totalPrice).toLocaleString() : ''}
+                  ${pvAmount > 0 ? 'PKR ' + pvAmount.toLocaleString() : ''}
                 </td>
               </tr>
             </tbody>
           </table>
 
-          <!-- In Words Line -->
           <div style="font-size: 11.5px; margin-bottom: 30px; color: #0f172a;">
-            <strong>In Words</strong> <span style="border-bottom: 1.5px solid #0f172a; display: inline-block; width: calc(100% - 75px); padding-left: 8px; font-style: italic; font-weight: 600;">${agreedWords || 'Rupees Only'}</span>
+            <strong>In Words</strong> <span style="border-bottom: 1.5px solid #0f172a; display: inline-block; width: calc(100% - 75px); padding-left: 8px; font-style: italic; font-weight: 600;">${inv.agreedAmountWords || inv.inWords || agreedWords || 'Rupees Only'}</span>
           </div>
-
-          <!-- Bottom 5 Signature Boxes Grid -->
           <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; border: 1.5px solid #0f172a; text-align: center;">
             <div style="border-right: 1px solid #0f172a; padding: 6px 2px; height: 50px; display: flex; flex-direction: column; justify-content: flex-end;">
               <span style="font-size: 10px; font-weight: 800; border-top: 1px solid #0f172a; padding-top: 3px;">Received By</span>
@@ -827,14 +876,14 @@ export default function Invoices() {
               <div style="flex: 1;"><strong>Colour:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 55px); font-weight: bold;">${inv.color || ''}</span></div>
             </div>
             <div>
-              <strong>Total Deal:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 75px); font-family: monospace; font-weight: bold;">${totalPrice ? 'PKR ' + Number(totalPrice).toLocaleString() : ''}</span>
+              <strong>Total Deal:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 75px); font-family: monospace; font-weight: bold;">${totalPrice > 0 ? 'PKR ' + totalPrice.toLocaleString() : ''}</span>
             </div>
             <div style="display: flex; gap: 15px;">
-              <div style="flex: 1;"><strong>Advance:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 65px); font-family: monospace; font-weight: bold;">${advanceAmount ? 'PKR ' + Number(advanceAmount).toLocaleString() : ''}</span></div>
+              <div style="flex: 1;"><strong>Advance:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 65px); font-family: monospace; font-weight: bold;">${advanceAmount > 0 ? 'PKR ' + advanceAmount.toLocaleString() : ''}</span></div>
               <div style="flex: 1.5;"><strong>In words:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 65px); font-style: italic;">${agreedWords || ''}</span></div>
             </div>
             <div>
-              <strong>Balance:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 65px); font-family: monospace; font-weight: bold; color: #dc2626;">${remainingAmount ? 'PKR ' + Number(remainingAmount).toLocaleString() : ''}</span>
+              <strong>Balance:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 65px); font-family: monospace; font-weight: bold; color: #dc2626;">${remainingAmount > 0 ? 'PKR ' + remainingAmount.toLocaleString() : ''}</span>
             </div>
           </div>
 
@@ -843,7 +892,7 @@ export default function Invoices() {
             <!-- Left: Bank Status Details -->
             <div style="flex: 1.1; font-size: 11px; line-height: 2.1; color: #002b66;">
               <div style="font-size: 13px; font-weight: 900; font-style: italic; border-bottom: 2px solid #002b66; margin-bottom: 6px;">Bank Status</div>
-              <div><strong>Cash:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 45px); font-family: monospace;">${inv.cashAmount ? 'PKR ' + Number(inv.cashAmount).toLocaleString() : (advanceAmount ? 'PKR ' + Number(advanceAmount).toLocaleString() : '')}</span></div>
+              <div><strong>Cash:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 45px); font-family: monospace;">${inv.cashAmount ? 'PKR ' + parsePakistaniPrice(inv.cashAmount).toLocaleString() : (advanceAmount > 0 ? 'PKR ' + advanceAmount.toLocaleString() : '')}</span></div>
               <div><strong>Cheque # ./DD # .On line:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 170px); font-family: monospace;">${inv.chequeNo || ''}</span></div>
               <div><strong>Due Date:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 65px); font-family: monospace;">${inv.dueDate ? formatDateStr(inv.dueDate) : ''}</span></div>
               <div><strong>on Account:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 80px);">${inv.onAccount || ''}</span></div>
@@ -1000,10 +1049,10 @@ export default function Invoices() {
           <!-- Transaction Agreement (معاہدہ اقرار نامہ) -->
           <div class="agreement-card">
             <div class="agr-urdu">
-              جملہ کاغذات و دیگر حقوق بعوض مبلغ Rs. ${Number(agreedSum).toLocaleString()} (جن کے نصف Rs. ${Number(agreedHalf).toLocaleString()} بنتے ہیں) بوقت ${agreementTime} بروز ${agreementDay} فریق دوئم (خریدار) پر فروخت کر دی جو کہ مندرجہ ذیل شرائط پر دونوں میں اقرارنامہ ہوا۔
+              جملہ کاغذات و دیگر حقوق بعوض مبلغ Rs. ${agreedSum > 0 ? agreedSum.toLocaleString() : '0'} (جن کے نصف Rs. ${agreedHalf > 0 ? agreedHalf.toLocaleString() : '0'} بنتے ہیں) بوقت ${agreementTime} بروز ${agreementDay} فریق دوئم (خریدار) پر فروخت کر دی جو کہ مندرجہ ذیل شرائط پر دونوں میں اقرارنامہ ہوا۔
             </div>
             <div class="agr-en">
-              All vehicle documents & ownership rights sold for PKR ${Number(agreedSum).toLocaleString()} (half sum: PKR ${Number(agreedHalf).toLocaleString()}), at ${agreementTime} on ${agreementDay}, to the buyer under the following agreed terms. ${agreedWords ? 'Amount in words: ' + agreedWords : ''}
+              All vehicle documents & ownership rights sold for PKR ${agreedSum > 0 ? agreedSum.toLocaleString() : '0'} (half sum: PKR ${agreedHalf > 0 ? agreedHalf.toLocaleString() : '0'}), at ${agreementTime} on ${agreementDay}, to the buyer under the following agreed terms. ${agreedWords ? 'Amount in words: ' + agreedWords : ''}
             </div>
           </div>
 
@@ -1019,9 +1068,9 @@ export default function Invoices() {
             </thead>
             <tbody>
               <tr>
-                <td style="color: #0f172a;">PKR ${Number(totalPrice).toLocaleString()}</td>
-                <td style="color: #16a34a;">PKR ${Number(advanceAmount).toLocaleString()}</td>
-                <td style="color: #dc2626;">PKR ${Number(remainingAmount).toLocaleString()}</td>
+                <td style="color: #0f172a;">${totalPrice > 0 ? 'PKR ' + totalPrice.toLocaleString() : 'PKR 0'}</td>
+                <td style="color: #16a34a;">${advanceAmount > 0 ? 'PKR ' + advanceAmount.toLocaleString() : 'PKR 0'}</td>
+                <td style="color: #dc2626;">${remainingAmount > 0 ? 'PKR ' + remainingAmount.toLocaleString() : 'PKR 0'}</td>
                 <td>${paymentDuration}</td>
               </tr>
             </tbody>
@@ -2542,14 +2591,20 @@ export default function Invoices() {
                         <input
                           type="text"
                           placeholder="e.g. 40 lac, 1.5 crore, 250000"
-                          value={formData.totalPrice || ''}
-                          onChange={(e) => handleInputChange('totalPrice', e.target.value)}
+                          value={formData.totalPrice || formData.cashAmount || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            handleInputChange('totalPrice', val);
+                            handleInputChange('cashAmount', val);
+                            handleInputChange('agreedAmount', val);
+                            handleInputChange('saleAmount', val);
+                          }}
                           className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-amber-500 font-mono"
                           required
                         />
-                        {Boolean(formData.totalPrice) && Boolean(getPriceHint(formData.totalPrice)) && (
+                        {Boolean(formData.totalPrice || formData.cashAmount) && Boolean(getPriceHint(formData.totalPrice || formData.cashAmount)) && (
                           <div className="mt-1 px-2 py-0.5 bg-amber-950/70 border border-amber-500/30 rounded text-[10px] font-mono text-amber-300 flex items-center justify-between">
-                            <span>{getPriceHint(formData.totalPrice)}</span>
+                            <span>{getPriceHint(formData.totalPrice || formData.cashAmount)}</span>
                           </div>
                         )}
                       </div>

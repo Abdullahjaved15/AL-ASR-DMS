@@ -375,69 +375,146 @@ const createInvoice = async (req, res) => {
           if (!sourceAccount) {
             sourceAccount = await prisma.account.findFirst({ where: { subType: 'CASH', isActive: true } });
           }
+          if (!sourceAccount) {
+            sourceAccount = await prisma.account.findFirst({ where: { subType: 'CASH' } });
+          }
+          if (!sourceAccount) {
+            // Auto-create default Cash in Hand Safe account
+            sourceAccount = await prisma.account.create({
+              data: {
+                code: '1001',
+                name: 'Cash in Hand Safe',
+                type: 'ASSET',
+                subType: 'CASH',
+                currentBalance: 0,
+                description: 'Physical showroom safe cash'
+              }
+            });
+          }
 
           // Target Account (Expense or Payables)
           let targetAccount = null;
-          if (headOfAccount) {
+          if (headOfAccount && String(headOfAccount).trim() !== '') {
+            const cleanHead = String(headOfAccount).trim();
             targetAccount = await prisma.account.findFirst({
               where: {
                 OR: [
-                  { id: headOfAccount },
-                  { code: headOfAccount },
-                  { name: { contains: headOfAccount, mode: 'insensitive' } }
+                  { id: cleanHead },
+                  { code: cleanHead },
+                  { name: { equals: cleanHead, mode: 'insensitive' } },
+                  { name: { contains: cleanHead, mode: 'insensitive' } }
                 ]
               }
             });
+
+            if (!targetAccount) {
+              // Auto-generate next code in 5000 range
+              const maxAcc = await prisma.account.findFirst({
+                where: { code: { startsWith: '5' } },
+                orderBy: { code: 'desc' }
+              });
+              let nextCode = '5001';
+              if (maxAcc && !isNaN(Number(maxAcc.code))) {
+                nextCode = String(Number(maxAcc.code) + 1);
+              }
+
+              targetAccount = await prisma.account.create({
+                data: {
+                  code: nextCode,
+                  name: cleanHead,
+                  type: 'EXPENSE',
+                  subType: 'EXPENSE',
+                  currentBalance: 0,
+                  description: `Auto-created ledger account for ${cleanHead}`
+                }
+              });
+            }
           }
+
           if (!targetAccount) {
-            targetAccount = await prisma.account.findFirst({ where: { code: '5005' } }) 
+            targetAccount = await prisma.account.findFirst({ where: { type: 'EXPENSE', isActive: true } })
               || await prisma.account.findFirst({ where: { type: 'EXPENSE' } });
           }
 
-          if (sourceAccount) {
-            await prisma.transaction.create({
+          if (!targetAccount) {
+            targetAccount = await prisma.account.create({
               data: {
-                transactionNumber: `PV-${dateCode}-${txnSeq}`,
-                date: todayDate,
-                type: 'PAYMENT_VOUCHER',
-                amount: paymentAmt,
-                description: `Payment Voucher ${invoiceNumber} to [${payeeName || finalBuyerName}] via [${sourceAccount.name}] - ${remarks || onAccount || 'Showroom Payment'}`,
-                referenceType: 'INVOICE',
-                referenceId: newInvoice.id,
-                referenceNumber: invoiceNumber,
-                chassisNumber: chassisNumber || null,
-                createdById: req.user.id,
-                entries: {
-                  create: [
-                    {
-                      accountId: sourceAccount.id,
-                      type: 'CREDIT', // Outflow from bank/cash
-                      amount: paymentAmt,
-                      description: `Payment to ${payeeName || finalBuyerName}`
-                    },
-                    ...(targetAccount ? [{
-                      accountId: targetAccount.id,
-                      type: 'DEBIT', // Expense / liability debit
-                      amount: paymentAmt,
-                      description: `Payment Voucher expense: ${payeeName || finalBuyerName}`
-                    }] : [])
-                  ]
-                }
+                code: '5001',
+                name: 'General & Miscellaneous Expenses',
+                type: 'EXPENSE',
+                subType: 'EXPENSE',
+                currentBalance: 0,
+                description: 'General operational and voucher expenses'
               }
             });
+          }
 
-            // Decrement source account balance
+          const pvTxn = await prisma.transaction.create({
+            data: {
+              transactionNumber: `PV-${dateCode}-${txnSeq}`,
+              date: todayDate,
+              type: 'PAYMENT_VOUCHER',
+              amount: paymentAmt,
+              description: `Payment Voucher ${invoiceNumber} to [${payeeName || finalBuyerName}] via [${sourceAccount.name}] - Head: [${targetAccount.name}] ${remarks || onAccount ? '(' + (remarks || onAccount) + ')' : ''}`,
+              referenceType: 'INVOICE',
+              referenceId: newInvoice.id,
+              referenceNumber: invoiceNumber,
+              chassisNumber: chassisNumber || null,
+              createdById: req.user.id,
+              entries: {
+                create: [
+                  {
+                    accountId: sourceAccount.id,
+                    type: 'CREDIT', // Outflow from bank/cash
+                    amount: paymentAmt,
+                    description: `Payment to ${payeeName || finalBuyerName}`
+                  },
+                  {
+                    accountId: targetAccount.id,
+                    type: 'DEBIT', // Expense / liability debit
+                    amount: paymentAmt,
+                    description: `Payment Voucher for [${targetAccount.name}]: ${payeeName || finalBuyerName}`
+                  }
+                ]
+              }
+            }
+          });
+
+          // Decrement source account balance (money left cash/bank)
+          await prisma.account.update({
+            where: { id: sourceAccount.id },
+            data: { currentBalance: { decrement: paymentAmt } }
+          });
+
+          // Update target account balance
+          if (targetAccount.type === 'EXPENSE' || targetAccount.type === 'ASSET') {
             await prisma.account.update({
-              where: { id: sourceAccount.id },
+              where: { id: targetAccount.id },
+              data: { currentBalance: { increment: paymentAmt } }
+            });
+          } else if (targetAccount.type === 'LIABILITY' || targetAccount.type === 'EQUITY') {
+            await prisma.account.update({
+              where: { id: targetAccount.id },
               data: { currentBalance: { decrement: paymentAmt } }
             });
+          }
 
-            if (targetAccount && targetAccount.type === 'EXPENSE') {
-              await prisma.account.update({
-                where: { id: targetAccount.id },
-                data: { currentBalance: { increment: paymentAmt } }
-              });
-            }
+          // Real-time notification dispatch to ACCOUNTS_HEAD
+          try {
+            await prisma.notification.create({
+              data: {
+                targetRole: 'ACCOUNTS_HEAD',
+                title: `💵 Payment Voucher Outflow: Rs. ${paymentAmt.toLocaleString()}`,
+                message: `Payment Voucher #${invoiceNumber} issued to ${payeeName || finalBuyerName} for Head [${targetAccount.name}] via [${sourceAccount.name}] - Rs. ${paymentAmt.toLocaleString()}`,
+                type: 'PAYMENT_VOUCHER',
+                category: paymentMethod || 'CASH',
+                amount: paymentAmt,
+                referenceId: newInvoice.id,
+                linkUrl: '/invoices'
+              }
+            });
+          } catch (notifErr) {
+            console.warn('Failed to send PV notification:', notifErr.message);
           }
         }
       } 
@@ -463,16 +540,50 @@ const createInvoice = async (req, res) => {
         const totalReceived = cashReceived + bankReceived;
 
         if (totalReceived > 0) {
-          const cashAccount = await prisma.account.findFirst({ where: { subType: 'CASH', isActive: true } });
-          let bankAccount = null;
-          if (bankAccountId) {
-            bankAccount = await prisma.account.findUnique({ where: { id: bankAccountId } });
-          } else {
-            bankAccount = await prisma.account.findFirst({ where: { subType: 'BANK', isActive: true } });
+          let cashAccount = null;
+          if (cashReceived > 0) {
+            cashAccount = await prisma.account.findFirst({ where: { subType: 'CASH', isActive: true } })
+              || await prisma.account.findFirst({ where: { subType: 'CASH' } });
+            if (!cashAccount) {
+              cashAccount = await prisma.account.create({
+                data: {
+                  code: '1001',
+                  name: 'Cash in Hand Safe',
+                  type: 'ASSET',
+                  subType: 'CASH',
+                  currentBalance: 0,
+                  description: 'Physical showroom safe cash'
+                }
+              });
+            }
           }
 
-          const revenueAccount = await prisma.account.findFirst({ where: { code: '4001' } }) 
+          let bankAccount = null;
+          if (bankReceived > 0) {
+            if (bankAccountId) {
+              bankAccount = await prisma.account.findUnique({ where: { id: bankAccountId } });
+            }
+            if (!bankAccount) {
+              bankAccount = await prisma.account.findFirst({ where: { subType: 'BANK', isActive: true } })
+                || await prisma.account.findFirst({ where: { subType: 'BANK' } });
+            }
+          }
+
+          let revenueAccount = await prisma.account.findFirst({ where: { code: '4001' } }) 
             || await prisma.account.findFirst({ where: { type: 'REVENUE' } });
+          
+          if (!revenueAccount) {
+            revenueAccount = await prisma.account.create({
+              data: {
+                code: '4001',
+                name: 'Vehicle Sales Revenue',
+                type: 'REVENUE',
+                subType: 'REVENUE',
+                currentBalance: 0,
+                description: 'Primary revenue from vehicle sales & bookings'
+              }
+            });
+          }
 
           const entriesToCreate = [];
           if (cashReceived > 0 && cashAccount) {
@@ -556,7 +667,7 @@ const createInvoice = async (req, res) => {
             } else if (paymentMethod === 'BANK') {
               paymentDetailStr = `${targetBankName} (Rs. ${bankReceived.toLocaleString()})`;
             } else if (paymentMethod === 'SPLIT') {
-              paymentDetailStr = `Split: Cash Rs. ${cashReceived.toLocaleString()} + Bank Rs. ${bankReceived.toLocaleString()} (${targetBankName})`;
+              paymentDetailStr = `Split: Cash Rs. ${cashReceived.toLocaleString()} + ${targetBankName} Rs. ${bankReceived.toLocaleString()}`;
             } else {
               paymentDetailStr = `Rs. ${totalReceived.toLocaleString()}`;
             }
