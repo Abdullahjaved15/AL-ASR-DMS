@@ -187,11 +187,11 @@ function MainLayout() {
           </div>
 
           <div className={(currentTab === 'accounts' && canAccessAccounts) ? 'block' : 'hidden'}>
-            <AccountsHub />
+            <AccountsHub onNavigate={(tab) => setCurrentTab(tab)} />
           </div>
 
           <div className={(currentTab === 'invoices' && canAccessAccounts) ? 'block' : 'hidden'}>
-            <Invoices />
+            <Invoices onNavigate={(tab) => setCurrentTab(tab)} />
           </div>
 
           <div className={currentTab === 'notifications' ? 'block' : 'hidden'}>

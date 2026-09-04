@@ -19,33 +19,33 @@ const requireRole = (...allowedRoles) => {
   };
 };
 
-// Accounts Head or Super Admin can edit/delete accounts, delete transactions, change COA
+// Accounts Head or Admin can edit/delete accounts, delete transactions, change COA
 const requireAccountsHeadOrSuperAdmin = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({ message: 'Authentication required' });
   }
 
-  if (req.user.role === 'SUPER_ADMIN' || req.user.role === 'ACCOUNTS_HEAD') {
+  if (['SUPER_ADMIN', 'ADMIN', 'ACCOUNTS_HEAD'].includes(req.user.role)) {
     return next();
   }
 
   return res.status(403).json({ 
-    message: 'Forbidden: Only Accounts Head or Super Admin can perform edit/delete or structural actions.' 
+    message: 'Forbidden: Only Accounts Head or Admin can perform edit/delete or structural actions.' 
   });
 };
 
-// Accounts Staff (Super Admin, Accounts Head, Accountant) can view & add records
+// Accounts Staff (Super Admin, Admin, Accounts Head, Accountant) can view & add records
 const requireAccountsAccess = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({ message: 'Authentication required' });
   }
 
-  if (['SUPER_ADMIN', 'ACCOUNTS_HEAD', 'ACCOUNTANT'].includes(req.user.role)) {
+  if (['SUPER_ADMIN', 'ADMIN', 'ACCOUNTS_HEAD', 'ACCOUNTANT'].includes(req.user.role)) {
     return next();
   }
 
   return res.status(403).json({ 
-    message: 'Forbidden: Accounts section is restricted to Accounts staff and Super Admin only.' 
+    message: 'Forbidden: Accounts section is restricted to Accounts staff and Admin only.' 
   });
 };
 

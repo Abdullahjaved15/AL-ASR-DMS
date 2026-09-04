@@ -30,14 +30,15 @@ import {
   Edit,
   ArrowUpRight,
   ArrowDownLeft,
-  X
+  X,
+  Receipt
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { formatPKR, parsePakistaniPrice, getPriceHint, normalizePriceInput } from '../utils/priceFormatter';
 import { logoBase64 } from '../utils/logoBase64';
 
-export default function AccountsHub() {
+export default function AccountsHub({ onNavigate }) {
   const { user, isSuperAdmin, isAccountsHead, isAccountant, canManageAccounts } = useAuth();
 
   // Active Tab: 'coa' | 'banks' | 'cheques' | 'installments' | 'audit' | 'chassis'
@@ -718,6 +719,16 @@ export default function AccountsHub() {
 
         {/* Global Action Buttons */}
         <div className="flex items-center space-x-2 w-full md:w-auto justify-end flex-wrap gap-y-2">
+          {/* Quick link to Vouchers & Invoices */}
+          <button
+            onClick={() => onNavigate ? onNavigate('invoices') : (window.location.hash = '#invoices')}
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/20 to-amber-600/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-mono font-bold transition-all flex items-center space-x-1.5 cursor-pointer shadow-sm"
+            title="Create and manage Payment Vouchers, Sales & Booking Receipts"
+          >
+            <Receipt className="w-3.5 h-3.5 text-amber-400" />
+            <span>Invoices & Payment Vouchers</span>
+          </button>
+
           {/* Transfer Funds Button */}
           <button
             onClick={() => setIsTransferModalOpen(true)}
