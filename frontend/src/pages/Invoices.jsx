@@ -176,10 +176,12 @@ const CameraCaptureWidget = ({ label, currentPhoto, onPhotoCaptured, onPhotoRemo
 };
 
 export default function Invoices() {
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, canAccessAccounts, isAccountsHead, isAccountant } = useAuth();
   const [invoices, setInvoices] = useState([]);
   const [stats, setStats] = useState({ totalInvoices: 0, totalSalesVolume: 0, totalCommissionEarned: 0, grandTotalValue: 0 });
   const [loading, setLoading] = useState(true);
+  const [bankAccounts, setBankAccounts] = useState([]);
+  const [allLedgers, setAllLedgers] = useState([]);
 
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
@@ -239,6 +241,17 @@ export default function Invoices() {
     onAccount: '',
     accountOf: '',
     time: '',
+    // Accounts & Payment Mode Fields
+    paymentMethod: 'CASH',
+    bankAccountId: '',
+    cashAmountReceived: '',
+    bankAmountReceived: '',
+    isInstallmentSale: false,
+    totalInstallments: 12,
+    installmentAmount: '',
+    installmentFrequency: 'MONTHLY',
+    installmentStartDate: new Date().toISOString().slice(0, 10),
+    deliveryStatus: 'DELIVERED',
     // Imported Vehicle
     isImported: false,
     billOfEntryNo: '',
@@ -259,10 +272,10 @@ export default function Invoices() {
   });
 
   useEffect(() => {
-    if (isSuperAdmin) {
-      fetchInvoices();
-    }
-  }, [search, selectedCategory, isSuperAdmin]);
+    fetchInvoices();
+    api.getBankAndCashAccounts().then(data => setBankAccounts(data || [])).catch(() => {});
+    api.getAccounts().then(data => setAllLedgers(data?.accounts || [])).catch(() => {});
+  }, [search, selectedCategory]);
 
   const openImageGalleryModal = (inv) => {
     setSelectedReceiptForImages(inv);
@@ -352,6 +365,7 @@ export default function Invoices() {
   };
 
   const openEditModal = (inv) => {
+    api.getBankAndCashAccounts().then(data => setBankAccounts(data || [])).catch(() => {});
     setSelectedInvoice(inv);
     setFormData({
       category: inv.category || 'SALES_RECEIPT',
@@ -406,6 +420,16 @@ export default function Invoices() {
       remainingAmount: formatPKRShort(inv.remainingAmount) || '',
       paymentDuration: inv.paymentDuration || '',
       dated: inv.dated || new Date(inv.createdAt || Date.now()).toISOString().slice(0, 10),
+      paymentMethod: inv.paymentMethod || 'CASH',
+      bankAccountId: inv.bankAccountId || '',
+      cashAmountReceived: formatPKRShort(inv.cashAmountReceived) || '',
+      bankAmountReceived: formatPKRShort(inv.bankAmountReceived) || '',
+      isInstallmentSale: Boolean(inv.isInstallmentSale),
+      totalInstallments: inv.totalInstallments || 12,
+      installmentAmount: formatPKRShort(inv.installmentAmount) || '',
+      installmentFrequency: inv.installmentFrequency || 'MONTHLY',
+      installmentStartDate: inv.installmentStartDate || new Date().toISOString().slice(0, 10),
+      deliveryStatus: inv.deliveryStatus || 'DELIVERED',
       witness1Name: inv.witness1Name || '',
       witness1Cnic: inv.witness1Cnic || '',
       witness2Name: inv.witness2Name || '',
@@ -416,6 +440,7 @@ export default function Invoices() {
   };
 
   const resetForm = () => {
+    api.getBankAndCashAccounts().then(data => setBankAccounts(data || [])).catch(() => {});
     setSelectedInvoice(null);
     setFormData({
       category: 'SALES_RECEIPT',
@@ -470,6 +495,16 @@ export default function Invoices() {
       remainingAmount: '',
       paymentDuration: '',
       dated: new Date().toISOString().slice(0, 10),
+      paymentMethod: 'CASH',
+      bankAccountId: '',
+      cashAmountReceived: '',
+      bankAmountReceived: '',
+      isInstallmentSale: false,
+      totalInstallments: 12,
+      installmentAmount: '',
+      installmentFrequency: 'MONTHLY',
+      installmentStartDate: new Date().toISOString().slice(0, 10),
+      deliveryStatus: 'DELIVERED',
       witness1Name: '',
       witness1Cnic: '',
       witness2Name: '',
@@ -1558,7 +1593,27 @@ export default function Invoices() {
                         )}
                       </td>
                       <td className="p-3.5 font-mono text-emerald-400 font-bold">
-                        {formatPKR(total)}
+                        <div>{formatPKR(total)}</div>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {inv.paymentMethod === 'BANK' ? (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-sans font-bold">
+                              🏦 Bank
+                            </span>
+                          ) : inv.paymentMethod === 'SPLIT' ? (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-sans font-bold">
+                              🔀 Split
+                            </span>
+                          ) : (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-white/10 font-sans font-bold">
+                              💵 Cash
+                            </span>
+                          )}
+                          {inv.isInstallmentSale && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-sans font-bold">
+                              📅 Plan
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="p-3.5 font-mono text-xs">
                         <button
@@ -1658,13 +1713,13 @@ export default function Invoices() {
             {formData.category === 'SALES_RECEIPT' && (
               <div className="flex overflow-x-auto border-b border-white/10 bg-slate-900/40 p-2 gap-1 text-xs">
                 {[
-                  { id: 'general', label: '📌 General Meta' },
-                  { id: 'seller', label: '👤 Seller Details (فروخت کنندہ)' },
-                  { id: 'buyer', label: '👤 Buyer Details (خریدار)' },
-                  { id: 'vehicle', label: '🚗 Vehicle Specs (گاڑی)' },
-                  { id: 'agreement', label: '📜 Agreement (معاہدہ)' },
-                  { id: 'financials', label: '💰 Balances & Financials' },
-                  { id: 'witnesses', label: '🖋️ Witnesses (گواہان)' }
+                  { id: 'general', label: '📌 1. Basic & Bank/Cash Mode' },
+                  { id: 'seller', label: '👤 2. Seller (فروخت کنندہ)' },
+                  { id: 'buyer', label: '👤 3. Buyer (خریدار)' },
+                  { id: 'vehicle', label: '🚗 4. Vehicle Specs (گاڑی)' },
+                  { id: 'agreement', label: '📜 5. Agreement (معاہدہ)' },
+                  { id: 'financials', label: '💰 6. Financials & Installments' },
+                  { id: 'witnesses', label: '🖋️ 7. Witnesses (گواہان)' }
                 ].map(tab => (
                   <button
                     key={tab.id}
@@ -2176,12 +2231,73 @@ export default function Invoices() {
                     </div>
                   </div>
 
-                  {/* 4. Bank Status */}
+                  {/* 4. Bank Status & Payment Allocation */}
                   <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
-                    <h5 className="text-xs font-bold text-emerald-400 uppercase tracking-wider border-b border-white/10 pb-2">4. Bank Status & Payment Details</h5>
+                    <h5 className="text-xs font-bold text-emerald-400 uppercase tracking-wider border-b border-white/10 pb-2">4. Money Receiving Mode & Bank Details</h5>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 bg-emerald-500/5 rounded-xl border border-emerald-500/20">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">Payment Method</label>
+                        <select
+                          value={formData.paymentMethod || 'CASH'}
+                          onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 font-mono"
+                        >
+                          <option value="CASH">💵 100% Cash in Hand (Safe)</option>
+                          <option value="BANK">🏦 100% Bank Account Transfer</option>
+                          <option value="SPLIT">🔀 Split Payment (Cash + Bank)</option>
+                        </select>
+                      </div>
+
+                      {(formData.paymentMethod === 'BANK' || formData.paymentMethod === 'SPLIT') && (
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Receiving Bank Account <span className="text-rose-400">*</span>
+                          </label>
+                          <select
+                            value={formData.bankAccountId || ''}
+                            onChange={(e) => handleInputChange('bankAccountId', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 font-mono"
+                          >
+                            <option value="">-- Select Bank Account --</option>
+                            {bankAccounts.filter(a => a.subType === 'BANK' || (a.type === 'ASSET' && (a.bankName || a.accountNumber || a.code === '1002' || a.code === '1003'))).map(bank => (
+                              <option key={bank.id} value={bank.id}>
+                                {bank.bankName || bank.name} ({bank.accountNumber || bank.code}) - Balance: Rs. {(bank.currentBalance || 0).toLocaleString()}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {formData.paymentMethod === 'SPLIT' && (
+                        <>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">Cash Portion (PKR)</label>
+                            <input
+                              type="text"
+                              placeholder="Cash amount received"
+                              value={formData.cashAmountReceived || ''}
+                              onChange={(e) => handleInputChange('cashAmountReceived', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">Bank Portion (PKR)</label>
+                            <input
+                              type="text"
+                              placeholder="Bank amount received"
+                              value={formData.bankAmountReceived || ''}
+                              onChange={(e) => handleInputChange('bankAmountReceived', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 font-mono"
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
-                        <label className="block text-xs font-semibold text-slate-300 mb-1">Cash (نقد / تفصیل)</label>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">Cash / Note (نقد / تفصیل)</label>
                         <input
                           type="text"
                           placeholder="e.g. Cash / Bank Transfer"
@@ -2191,7 +2307,7 @@ export default function Invoices() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-slate-300 mb-1">Cheque # / DD # / On Line</label>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">Cheque # / DD # / Online Ref</label>
                         <input
                           type="text"
                           placeholder="e.g. CHQ-9842104"
@@ -2268,7 +2384,48 @@ export default function Invoices() {
                     </span>
                   </div>
 
-                  <div className="space-y-4 bg-slate-900/80 p-5 rounded-xl border border-white/10">
+                    <div className="space-y-4 bg-slate-900/80 p-5 rounded-xl border border-white/10">
+                    {/* Payment Source Mode */}
+                    <div className="p-3 bg-amber-500/5 rounded-xl border border-amber-500/20 space-y-3">
+                      <h5 className="text-xs font-bold text-amber-400 uppercase tracking-wider">Payment Outflow Source</h5>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">
+                            Payment Source <span className="text-rose-400">*</span>
+                          </label>
+                          <select
+                            value={formData.paymentMethod || 'CASH'}
+                            onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-amber-500 font-mono"
+                          >
+                            <option value="CASH">💵 Cash in Hand (Showroom Safe)</option>
+                            <option value="BANK">🏦 Bank Account (Cheque / Online Transfer)</option>
+                          </select>
+                        </div>
+
+                        {formData.paymentMethod === 'BANK' && (
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">
+                              Deduct from Bank Account <span className="text-rose-400">*</span>
+                            </label>
+                            <select
+                              value={formData.bankAccountId || ''}
+                              onChange={(e) => handleInputChange('bankAccountId', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-bold focus:border-amber-500 font-mono"
+                              required
+                            >
+                              <option value="">-- Select Bank Account --</option>
+                              {bankAccounts.filter(a => a.subType === 'BANK' || (a.type === 'ASSET' && (a.bankName || a.accountNumber || a.code === '1002' || a.code === '1003'))).map(bank => (
+                                <option key={bank.id} value={bank.id}>
+                                  {bank.bankName || bank.name} ({bank.accountNumber || bank.code}) - Balance: Rs. {(bank.currentBalance || 0).toLocaleString()}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-semibold text-slate-300 mb-1">
@@ -2298,18 +2455,85 @@ export default function Invoices() {
                           required
                         />
                       </div>
-                      <div className="sm:col-span-2">
-                        <label className="block text-xs font-semibold text-slate-300 mb-1">
-                          Head of Account (کھاتہ) <span className="text-rose-400">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Vehicle Purchase / Office Expense / Settlement"
-                          value={formData.headOfAccount || ''}
-                          onChange={(e) => handleInputChange('headOfAccount', e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-amber-500"
-                          required
-                        />
+                      <div className="sm:col-span-2 space-y-2 p-3.5 bg-amber-500/5 rounded-xl border border-amber-500/20">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-xs font-bold text-amber-300">
+                            2. Target Person's Ledger / Account Head (کس کھاتے / شخص کے کھاتے میں رقم درج ہو؟) <span className="text-rose-400">*</span>
+                          </label>
+                          <span className="text-[10px] text-amber-400 font-mono font-semibold">Live Ledger Posting</span>
+                        </div>
+
+                        {/* Dropdown to pick from existing Chart of Accounts */}
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Select from Chart of Accounts / Person's Ledger:</label>
+                          <select
+                            value={allLedgers.some(a => a.name === formData.headOfAccount || a.code === formData.headOfAccount || a.id === formData.headOfAccount) ? formData.headOfAccount : ''}
+                            onChange={(e) => {
+                              if (e.target.value) handleInputChange('headOfAccount', e.target.value);
+                            }}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-amber-500/40 text-amber-300 text-xs font-semibold focus:border-amber-400 font-mono"
+                          >
+                            <option value="">-- Select Existing Ledger / Account --</option>
+                            <optgroup label="💼 Expense Ledgers (اخراجات)">
+                              {allLedgers.filter(a => a.type === 'EXPENSE').map(acc => (
+                                <option key={acc.id} value={acc.name}>[{acc.code}] {acc.name}</option>
+                              ))}
+                            </optgroup>
+                            <optgroup label="🤝 Supplier / Vendor Payables (ادائیگیاں)">
+                              {allLedgers.filter(a => a.type === 'LIABILITY').map(acc => (
+                                <option key={acc.id} value={acc.name}>[{acc.code}] {acc.name}</option>
+                              ))}
+                            </optgroup>
+                            <optgroup label="👤 Customer & Person Ledgers">
+                              {allLedgers.filter(a => a.subType === 'CUSTOMER' || (a.type === 'ASSET' && a.subType !== 'CASH' && a.subType !== 'BANK')).map(acc => (
+                                <option key={acc.id} value={acc.name}>[{acc.code}] {acc.name}</option>
+                              ))}
+                            </optgroup>
+                            <optgroup label="🏛️ Owner Equity & Capital">
+                              {allLedgers.filter(a => a.type === 'EQUITY').map(acc => (
+                                <option key={acc.id} value={acc.name}>[{acc.code}] {acc.name}</option>
+                              ))}
+                            </optgroup>
+                          </select>
+                        </div>
+
+                        <div className="pt-1">
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-[11px] text-slate-400">Or Type Custom Person / Head of Account Name:</label>
+                            <span className="text-[10px] text-amber-400/80 font-mono">Quick Pick:</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            {[
+                              'Showroom Rent Expense',
+                              'Staff Salaries & Incentives',
+                              'Vehicle Detailing & Maintenance',
+                              'Showroom Utilities & Electricity',
+                              'Supplier & Seller Payables',
+                              'General & Miscellaneous Operations'
+                            ].map(preset => (
+                              <button
+                                key={preset}
+                                type="button"
+                                onClick={() => handleInputChange('headOfAccount', preset)}
+                                className={`text-[10px] px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+                                  formData.headOfAccount === preset
+                                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 font-bold'
+                                    : 'bg-slate-950 text-slate-400 border-white/10 hover:text-white hover:border-amber-500/30'
+                                }`}
+                              >
+                                + {preset}
+                              </button>
+                            ))}
+                          </div>
+                          <input
+                            type="text"
+                            placeholder="e.g. Sarfraz Ahmed (Seller) / Showroom Rent / Vehicle Touchup"
+                            value={formData.headOfAccount || ''}
+                            onChange={(e) => handleInputChange('headOfAccount', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-amber-500"
+                            required
+                          />
+                        </div>
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-slate-300 mb-1">
@@ -2363,48 +2587,163 @@ export default function Invoices() {
               {/* ------------------------------------------------------------- */}
               {formData.category === 'SALES_RECEIPT' && (
                 <>
-                  {/* TAB 1: GENERAL DETAILS */}
+                  {/* TAB 1: GENERAL DETAILS & PAYMENT MODE */}
                   {activeTab === 'general' && (
-                    <div className="space-y-4">
-                      <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Basic Metadata & Registration</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Date (تاریخ) <span className="text-rose-400">*</span>
-                          </label>
-                          <input
-                            type="date"
-                            value={formData.dated}
-                            onChange={(e) => handleInputChange('dated', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                            required
-                          />
+                    <div className="space-y-5">
+                      <div className="space-y-3">
+                        <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Basic Metadata & Registration</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">
+                              Date (تاریخ) <span className="text-rose-400">*</span>
+                            </label>
+                            <input
+                              type="date"
+                              value={formData.dated}
+                              onChange={(e) => handleInputChange('dated', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">
+                              Registration No. (رجسٹریشن نمبر)
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. LEA-22-4589 or Unregistered"
+                              value={formData.registrationNo}
+                              onChange={(e) => handleInputChange('registrationNo', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">
+                              Time (وقت)
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 03:30 PM"
+                              value={formData.time || formData.agreementTime || ''}
+                              onChange={(e) => handleInputChange('time', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* PROMINENT MONEY ALLOCATION & BANK ACCOUNT CARD */}
+                      <div className="p-4 bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-cyan-950/30 rounded-xl border-2 border-cyan-500/30 shadow-lg space-y-3">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                          <div className="flex items-center space-x-2">
+                            <span className="p-1.5 bg-cyan-500/20 text-cyan-400 rounded-lg text-xs font-bold">💳</span>
+                            <div>
+                              <h4 className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
+                                Money Receiving Mode & Bank Account (رقم وصولی کھاتہ)
+                              </h4>
+                              <p className="text-[10px] text-slate-400 font-mono">Select where the payment from this sales receipt is deposited</p>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">
+                            Live Double Entry
+                          </span>
                         </div>
 
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Registration No. (رجسٹریشن نمبر)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. LEA-22-4589 or Unregistered"
-                            value={formData.registrationNo}
-                            onChange={(e) => handleInputChange('registrationNo', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                          />
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">
+                              Payment Method <span className="text-rose-400">*</span>
+                            </label>
+                            <select
+                              value={formData.paymentMethod || 'CASH'}
+                              onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
+                              className="w-full px-3 py-2.5 rounded-lg bg-slate-950 border border-cyan-500/40 text-white text-xs font-bold focus:border-cyan-400 font-mono"
+                            >
+                              <option value="CASH">💵 100% Cash in Hand (Showroom Safe)</option>
+                              <option value="BANK">🏦 100% Bank Account Transfer</option>
+                              <option value="SPLIT">🔀 Split Payment (Cash + Bank)</option>
+                            </select>
+                          </div>
+
+                          {(formData.paymentMethod === 'BANK' || formData.paymentMethod === 'SPLIT') && (
+                            <div className="sm:col-span-2">
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                Receiving Bank Account (وصول کنندہ بینک) <span className="text-rose-400">*</span>
+                              </label>
+                              <select
+                                value={formData.bankAccountId || ''}
+                                onChange={(e) => handleInputChange('bankAccountId', e.target.value)}
+                                className="w-full px-3 py-2.5 rounded-lg bg-slate-950 border border-cyan-500/40 text-cyan-300 text-xs font-bold focus:border-cyan-400 font-mono"
+                              >
+                                <option value="">-- Select Bank Account --</option>
+                                {bankAccounts.filter(a => a.subType === 'BANK' || (a.type === 'ASSET' && (a.bankName || a.accountNumber || a.code === '1002' || a.code === '1003'))).map(bank => (
+                                  <option key={bank.id} value={bank.id}>
+                                    {bank.bankName || bank.name} ({bank.accountNumber || bank.code}) - Balance: Rs. {(bank.currentBalance || 0).toLocaleString()}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
                         </div>
 
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Time (وقت)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. 03:30 PM"
-                            value={formData.time || formData.agreementTime || ''}
-                            onChange={(e) => handleInputChange('time', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                          />
+                        {/* Split Amounts Inputs */}
+                        {formData.paymentMethod === 'SPLIT' && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-cyan-950/40 rounded-lg border border-cyan-500/30">
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                Cash Received Portion (PKR) <span className="text-rose-400">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. 10 lac, 1000000"
+                                value={formData.cashAmountReceived || ''}
+                                onChange={(e) => handleInputChange('cashAmountReceived', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                Bank Received Portion (PKR) <span className="text-rose-400">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. 20 lac, 2000000"
+                                value={formData.bankAmountReceived || ''}
+                                onChange={(e) => handleInputChange('bankAmountReceived', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Installment & Delivery Options */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-white/10">
+                          <div className="flex items-center space-x-2 p-2 rounded-lg bg-slate-950/60 border border-white/5">
+                            <input
+                              type="checkbox"
+                              id="isInstallmentSaleQuick"
+                              checked={Boolean(formData.isInstallmentSale)}
+                              onChange={(e) => handleInputChange('isInstallmentSale', e.target.checked)}
+                              className="w-4 h-4 text-emerald-500 rounded bg-slate-900 border-white/20 focus:ring-emerald-500"
+                            />
+                            <label htmlFor="isInstallmentSaleQuick" className="text-xs font-bold text-slate-200 cursor-pointer select-none">
+                              📅 Sale on Installments (قسطوں پر فروخت)
+                            </label>
+                          </div>
+
+                          <div>
+                            <select
+                              value={formData.deliveryStatus || 'DELIVERED'}
+                              onChange={(e) => handleInputChange('deliveryStatus', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-xs font-semibold text-slate-300 font-mono"
+                            >
+                              <option value="DELIVERED">🚗 Vehicle Status: Handed Over / Delivered</option>
+                              <option value="UNDELIVERED">⚠️ Vehicle Status: Undelivered (Showroom Holding)</option>
+                            </select>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2794,10 +3133,11 @@ export default function Invoices() {
                     </div>
                   )}
 
-                  {/* TAB 6: FINANCIALS */}
+                  {/* TAB 6: FINANCIALS & PAYMENT ALLOCATION */}
                   {activeTab === 'financials' && (
                     <div className="space-y-4">
-                      <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Financial Balances & Duration</h3>
+                      <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Financial Balances & Payment Mode</h3>
+                      
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-semibold text-slate-300 mb-1">
@@ -2826,7 +3166,7 @@ export default function Invoices() {
 
                         <div>
                           <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Advance / Earnest Money (بیعانہ رقم) (PKR)
+                            Advance / Received Amount (بیعانہ / موصولہ رقم) (PKR)
                           </label>
                           <input
                             type="text"
@@ -2850,7 +3190,7 @@ export default function Invoices() {
 
                         <div>
                           <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Remaining Amount (بقایا رقم) (PKR)
+                            Remaining Balance (بقایا رقم) (PKR)
                           </label>
                           <input
                             type="text"
@@ -2878,6 +3218,153 @@ export default function Invoices() {
                             className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
                           />
                         </div>
+                      </div>
+
+                      {/* PAYMENT RECEIVING MODE & BANK ALLOCATION */}
+                      <div className="p-4 bg-slate-900/90 rounded-xl border border-cyan-500/20 space-y-3 mt-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
+                            💳 Money Receiving Mode (Cash / Bank Allocation)
+                          </h4>
+                          <span className="text-[10px] font-mono text-slate-400">Posts automatically to ledger</span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">Payment Method</label>
+                            <select
+                              value={formData.paymentMethod || 'CASH'}
+                              onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                            >
+                              <option value="CASH">💵 100% Cash in Hand (Safe)</option>
+                              <option value="BANK">🏦 100% Bank Account Transfer</option>
+                              <option value="SPLIT">🔀 Split Payment (Cash + Bank)</option>
+                            </select>
+                          </div>
+
+                          {(formData.paymentMethod === 'BANK' || formData.paymentMethod === 'SPLIT') && (
+                            <div className={formData.paymentMethod === 'SPLIT' ? 'sm:col-span-2' : 'sm:col-span-2'}>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                Receiving Bank Account <span className="text-rose-400">*</span>
+                              </label>
+                              <select
+                                value={formData.bankAccountId || ''}
+                                onChange={(e) => handleInputChange('bankAccountId', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                              >
+                                <option value="">-- Select Bank Account --</option>
+                                {bankAccounts.filter(a => a.subType === 'BANK').map(bank => (
+                                  <option key={bank.id} value={bank.id}>
+                                    {bank.bankName || bank.name} (Balance: Rs. {bank.currentBalance?.toLocaleString()})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Split Amounts Inputs */}
+                        {formData.paymentMethod === 'SPLIT' && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-cyan-950/30 rounded-lg border border-cyan-500/20">
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                Cash Received Amount (PKR) <span className="text-rose-400">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. 1000000"
+                                value={formData.cashAmountReceived || ''}
+                                onChange={(e) => handleInputChange('cashAmountReceived', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                Bank Received Amount (PKR) <span className="text-rose-400">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. 2000000"
+                                value={formData.bankAmountReceived || ''}
+                                onChange={(e) => handleInputChange('bankAmountReceived', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* INSTALLMENT PLAN OPTION */}
+                      <div className="p-4 bg-slate-900/90 rounded-xl border border-emerald-500/20 space-y-3">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="isInstallmentSale"
+                            checked={Boolean(formData.isInstallmentSale)}
+                            onChange={(e) => handleInputChange('isInstallmentSale', e.target.checked)}
+                            className="w-4 h-4 text-emerald-500 rounded bg-slate-950 border-white/20 focus:ring-emerald-500"
+                          />
+                          <label htmlFor="isInstallmentSale" className="text-xs font-bold text-white cursor-pointer select-none">
+                            📅 Is this vehicle sale on Installments? (قسطوں پر فروخت)
+                          </label>
+                        </div>
+
+                        {formData.isInstallmentSale && (
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-white/10">
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">Number of Installments</label>
+                              <input
+                                type="number"
+                                min="1"
+                                max="60"
+                                placeholder="e.g. 12"
+                                value={formData.totalInstallments || 12}
+                                onChange={(e) => handleInputChange('totalInstallments', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 font-mono"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">Installment Frequency</label>
+                              <select
+                                value={formData.installmentFrequency || 'MONTHLY'}
+                                onChange={(e) => handleInputChange('installmentFrequency', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 font-mono"
+                              >
+                                <option value="MONTHLY">Monthly (ماہانہ)</option>
+                                <option value="QUARTERLY">Quarterly (سہ ماہی)</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">Installment Start Date</label>
+                              <input
+                                type="date"
+                                value={formData.installmentStartDate || new Date().toISOString().slice(0, 10)}
+                                onChange={(e) => handleInputChange('installmentStartDate', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 font-mono"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* DELIVERY & SINGLE CHASSIS STATUS */}
+                      <div className="p-4 bg-slate-900/90 rounded-xl border border-white/10 space-y-2">
+                        <label className="block text-xs font-semibold text-slate-300">
+                          Vehicle Physical Delivery Status (گاڑی کی ترسیل)
+                        </label>
+                        <select
+                          value={formData.deliveryStatus || 'DELIVERED'}
+                          onChange={(e) => handleInputChange('deliveryStatus', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                        >
+                          <option value="DELIVERED">✅ Handed Over / Delivered to Buyer</option>
+                          <option value="UNDELIVERED">⚠️ Undelivered (Holding / Re-allocation / Double Sale Liability)</option>
+                          <option value="PENDING_SETTLEMENT">⏳ Pending Settlement / Cheque Issued</option>
+                        </select>
                       </div>
                     </div>
                   )}

@@ -43,10 +43,32 @@ export const AuthProvider = ({ children }) => {
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+  const isAccountsHead = user?.role === 'ACCOUNTS_HEAD';
+  const isAccountant = user?.role === 'ACCOUNTANT';
+  const isAccountsStaff = user?.role === 'ACCOUNTS_HEAD' || user?.role === 'ACCOUNTANT';
+  const canAccessAccounts = ['SUPER_ADMIN', 'ACCOUNTS_HEAD', 'ACCOUNTANT'].includes(user?.role);
+  const canManageAccounts = ['SUPER_ADMIN', 'ACCOUNTS_HEAD'].includes(user?.role);
   const isSalesman = user?.role === 'SALESMAN';
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, login, register, logout, isSuperAdmin, isAdmin, isSalesman }}>
+    <AuthContext.Provider 
+      value={{ 
+        user, 
+        setUser, 
+        loading, 
+        login, 
+        register, 
+        logout, 
+        isSuperAdmin, 
+        isAdmin, 
+        isAccountsHead,
+        isAccountant,
+        isAccountsStaff,
+        canAccessAccounts,
+        canManageAccounts,
+        isSalesman 
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

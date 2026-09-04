@@ -140,6 +140,14 @@ export default function Users() {
                         <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/40 rounded text-xs font-bold">
                           SUPER ADMIN
                         </span>
+                      ) : u.role === 'ACCOUNTS_HEAD' ? (
+                        <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded text-xs font-bold">
+                          ACCOUNTS HEAD
+                        </span>
+                      ) : u.role === 'ACCOUNTANT' ? (
+                        <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rounded text-xs font-medium">
+                          ACCOUNTANT
+                        </span>
                       ) : u.role === 'ADMIN' ? (
                         <span className="px-2 py-0.5 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded text-xs">
                           ADMIN
@@ -290,6 +298,8 @@ export default function Users() {
                   className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
                 >
                   <option value="SALESMAN">Salesman</option>
+                  <option value="ACCOUNTANT">Accountant (Accounts Officer)</option>
+                  <option value="ACCOUNTS_HEAD">Accounts Head (Finance Manager)</option>
                   <option value="ADMIN">Administrator</option>
                   <option value="SUPER_ADMIN">Super Administrator</option>
                 </select>

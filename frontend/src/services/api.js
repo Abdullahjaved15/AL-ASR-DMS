@@ -588,6 +588,221 @@ export const api = {
       headers: getHeaders()
     });
     return handleResponse(res);
+  },
+
+  // ==========================================
+  // ACCOUNTS & FINANCIAL MANAGEMENT APIS
+  // ==========================================
+  
+  // 1. Chart of Accounts & Bank/Cash
+  getAccounts: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/accounts?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  getBankAndCashAccounts: async () => {
+    const res = await fetch(`${API_BASE}/accounts/banks-cash`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  getAccountLedger: async (id, params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/accounts/${id}/ledger?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  createAccount: async (data) => {
+    const res = await fetch(`${API_BASE}/accounts`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  updateAccount: async (id, data) => {
+    const res = await fetch(`${API_BASE}/accounts/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  deleteAccount: async (id) => {
+    const res = await fetch(`${API_BASE}/accounts/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  transferFunds: async (data) => {
+    const res = await fetch(`${API_BASE}/accounts/transfer`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  // 2. Security Cheques
+  getSecurityCheques: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/security-cheques?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  createSecurityCheque: async (data) => {
+    const res = await fetch(`${API_BASE}/security-cheques`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  updateChequeStatus: async (id, data) => {
+    const res = await fetch(`${API_BASE}/security-cheques/${id}/status`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  updateSecurityCheque: async (id, data) => {
+    const res = await fetch(`${API_BASE}/security-cheques/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  deleteSecurityCheque: async (id) => {
+    const res = await fetch(`${API_BASE}/security-cheques/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  // 3. Installments Management
+  getInstallmentPlans: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/installments?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  getInstallmentPlanById: async (id) => {
+    const res = await fetch(`${API_BASE}/installments/${id}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  createInstallmentPlan: async (data) => {
+    const res = await fetch(`${API_BASE}/installments`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  recordInstallmentPayment: async (planId, data) => {
+    const res = await fetch(`${API_BASE}/installments/${planId}/payments`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  updateInstallmentPlan: async (id, data) => {
+    const res = await fetch(`${API_BASE}/installments/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  deleteInstallmentPlan: async (id) => {
+    const res = await fetch(`${API_BASE}/installments/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  // 4. Financial Audit Trail & Chassis Multi-Sale Tracker
+  getAuditTrail: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/audit-trail?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  getChassisMultiSaleTracker: async (chassisNumber) => {
+    const res = await fetch(`${API_BASE}/audit-trail/chassis/${encodeURIComponent(chassisNumber)}`, { 
+      headers: getHeaders() 
+    });
+    return handleResponse(res);
+  },
+
+  // 5. Sold Cars & Multi-Owner Buyback Lifecycle Registry
+  getSoldCars: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/sold-cars?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  getVehicleHistory: async (chassisNumber) => {
+    const res = await fetch(`${API_BASE}/sold-cars/${encodeURIComponent(chassisNumber)}/history`, { 
+      headers: getHeaders() 
+    });
+    return handleResponse(res);
+  },
+
+  recordVehicleBuyback: async (data) => {
+    const res = await fetch(`${API_BASE}/sold-cars/buyback`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  // 6. Live Financial Notifications
+  getNotifications: async () => {
+    const res = await fetch(`${API_BASE}/notifications`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  markNotificationAsRead: async (id) => {
+    const res = await fetch(`${API_BASE}/notifications/${id}/read`, {
+      method: 'PATCH',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  markAllNotificationsAsRead: async () => {
+    const res = await fetch(`${API_BASE}/notifications/mark-all-read`, {
+      method: 'PATCH',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  deleteNotification: async (id) => {
+    const res = await fetch(`${API_BASE}/notifications/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return handleResponse(res);
   }
 };
+
+
 

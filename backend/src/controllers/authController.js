@@ -22,9 +22,9 @@ const register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const formattedPhone = formatPakistaniPhone(phone);
 
-    // If an Admin is creating a salesman, activate immediately. Otherwise self-registration stays PENDING for admin approval.
+    // If an Admin is creating a user, activate immediately. Otherwise self-registration stays PENDING for admin approval.
     const isAdminCreator = req.user && (req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN');
-    const userRole = role && ['SUPER_ADMIN', 'ADMIN', 'SALESMAN'].includes(role.toUpperCase()) ? role.toUpperCase() : 'SALESMAN';
+    const userRole = role && ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTS_HEAD', 'ACCOUNTANT', 'SALESMAN'].includes(role.toUpperCase()) ? role.toUpperCase() : 'SALESMAN';
     const userStatus = isAdminCreator ? 'ACTIVE' : 'PENDING';
 
     const newUser = await prisma.user.create({

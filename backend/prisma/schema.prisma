@@ -13,7 +13,7 @@ model User {
   email           String        @unique
   phone           String?
   password        String
-  role            String        @default("SALESMAN") // SUPER_ADMIN, ADMIN, SALESMAN
+  role            String        @default("SALESMAN") // SUPER_ADMIN, ADMIN, ACCOUNTS_HEAD, ACCOUNTANT, SALESMAN
   status          String        @default("PENDING")  // ACTIVE, PENDING, SUSPENDED
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -33,6 +33,12 @@ model User {
   requestedApprovals ApprovalRequest[] @relation("RequestedApprovals")
   reviewedApprovals  ApprovalRequest[] @relation("ReviewedApprovals")
   incentiveApprovalSheets IncentiveApprovalSheet[]
+  
+  // Accounts Relations
+  createdAccounts        Account[]
+  createdTransactions    Transaction[]
+  createdCheques         SecurityCheque[]
+  createdInstallmentPlans InstallmentPlan[]
 }
 
 model Seller {
@@ -248,6 +254,17 @@ model Invoice {
   paymentStatus    String   @default("PAID") // PAID, PENDING, CANCELLED
   remarks          String?
 
+  // Accounts & Payment Mode Fields
+  paymentMethod        String?   @default("CASH") // CASH, BANK, SPLIT
+  bankAccountId        String?
+  cashAmountReceived   String?   @default("")
+  bankAmountReceived   String?   @default("")
+  isInstallmentSale    Boolean   @default(false)
+  installmentPlanId    String?
+  deliveryStatus       String    @default("DELIVERED") // DELIVERED, UNDELIVERED, PENDING_SETTLEMENT
+  isDoubleSaleLiability Boolean  @default(false)
+  linkedChassisSaleId  String?
+
   // Witnesses
   witness1Name     String?
   witness1Cnic     String?
@@ -264,6 +281,8 @@ model Invoice {
   @@index([invoiceNumber])
   @@index([category])
   @@index([createdAt])
+  @@index([chassisNumber])
+  @@index([deliveryStatus])
 }
 
 model InvoiceImage {
@@ -557,4 +576,206 @@ model IncentiveApprovalSheetImage {
   cloudinaryPublicId    String?
   uploadedAt            DateTime               @default(now())
 }
+
+// ==========================================
+// ACCOUNTS & FINANCIAL MANAGEMENT MODELS
+// ==========================================
+
+model Account {
+  id             String             @id @default(uuid())
+  code           String             @unique
+  name           String
+  type           String             // ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE
+  subType        String?            // CASH, BANK, CUSTOMER, VENDOR, EXPENSE, CAPITAL, OTHER
+  bankName       String?
+  accountNumber  String?
+  branch         String?
+  openingBalance Float              @default(0)
+  currentBalance Float              @default(0)
+  description    String?
+  isActive       Boolean            @default(true)
+  isSystem       Boolean            @default(false)
+
+  createdBy      String?
+  createdByUser  User?              @relation(fields: [createdBy], references: [id])
+
+  entries        TransactionEntry[]
+  securityCheques SecurityCheque[]
+
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([code])
+  @@index([type])
+  @@index([subType])
+}
+
+model Transaction {
+  id                String             @id @default(uuid())
+  transactionNumber String             @unique
+  date              DateTime           @default(now())
+  type              String             // PAYMENT_VOUCHER, RECEIPT_VOUCHER, SALES_INVOICE, FUNDS_TRANSFER, INSTALLMENT_PAYMENT, SECURITY_CHEQUE_CLEARANCE, JOURNAL
+  amount            Float
+  description       String
+  referenceType     String?            // INVOICE, INSTALLMENT, CHEQUE, TRANSFER, STOCK, MANUAL
+  referenceId       String?
+  referenceNumber   String?
+  chassisNumber     String?
+
+  createdById       String
+  createdByUser     User               @relation(fields: [createdById], references: [id])
+
+  entries           TransactionEntry[]
+
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([transactionNumber])
+  @@index([date])
+  @@index([type])
+  @@index([chassisNumber])
+  @@index([referenceNumber])
+}
+
+model TransactionEntry {
+  id            String      @id @default(uuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  
+  accountId     String
+  account       Account     @relation(fields: [accountId], references: [id])
+  
+  type          String      // DEBIT, CREDIT
+  amount        Float
+  description   String?
+
+  createdAt     DateTime    @default(now())
+
+  @@index([transactionId])
+  @@index([accountId])
+  @@index([type])
+}
+
+model SecurityCheque {
+  id            String    @id @default(uuid())
+  chequeNumber  String
+  type          String    @default("ISSUED") // ISSUED (Given by Al-Asr), RECEIVED (Taken from customer)
+  
+  bankAccountId String?
+  bankAccount   Account?  @relation(fields: [bankAccountId], references: [id])
+  
+  bankName      String    // Name of the bank (e.g. Meezan Bank)
+  partyName     String    // Payee / Party / Supplier / Customer
+  partyPhone    String?
+  partyCnic     String?
+  
+  amount        Float
+  issueDate     DateTime  @default(now())
+  dueDate       DateTime  // Maturity date
+  status        String    @default("ISSUED") // ISSUED, PRESENTED, CLEARED, BOUNCED, CANCELLED, RETURNED
+  clearedAt     DateTime?
+  
+  transactionId String?
+  chassisNumber String?
+  notes         String?
+
+  createdById   String
+  createdByUser User      @relation(fields: [createdById], references: [id])
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([chequeNumber])
+  @@index([status])
+  @@index([type])
+  @@index([dueDate])
+  @@index([chassisNumber])
+}
+
+model InstallmentPlan {
+  id                 String            @id @default(uuid())
+  planNumber         String            @unique
+  invoiceId          String?
+  
+  customerName       String
+  customerPhone      String?
+  customerCnic       String?
+  customerAddress    String?
+  
+  vehicleName        String
+  registrationNo     String?
+  chassisNumber      String?
+  
+  totalPrice         Float
+  advanceAmount      Float
+  remainingAmount    Float
+  totalInstallments  Int
+  installmentAmount  Float
+  frequency          String            @default("MONTHLY") // MONTHLY, QUARTERLY, CUSTOM
+  startDate          DateTime
+  status             String            @default("ACTIVE") // ACTIVE, COMPLETED, OVERDUE, CANCELLED
+  notes              String?
+
+  items              InstallmentItem[]
+
+  createdById        String
+  createdByUser      User              @relation(fields: [createdById], references: [id])
+
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([planNumber])
+  @@index([status])
+  @@index([customerName])
+  @@index([chassisNumber])
+}
+
+model InstallmentItem {
+  id                String          @id @default(uuid())
+  planId            String
+  plan              InstallmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  
+  installmentNumber Int
+  dueDate           DateTime
+  amount            Float
+  paidAmount        Float           @default(0)
+  paidDate          DateTime?
+  
+  paymentMethod     String?         // CASH, BANK, SPLIT
+  bankAccountId     String?
+  receiptNumber     String?
+  status            String          @default("UNPAID") // UNPAID, PARTIAL, PAID, OVERDUE
+  
+  transactionId     String?
+  notes             String?
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([planId])
+  @@index([dueDate])
+  @@index([status])
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String?
+  targetRole  String?  @default("ACCOUNTS_HEAD") // ACCOUNTS_HEAD, SUPER_ADMIN, ALL
+  title       String
+  message     String
+  type        String   @default("FINANCIAL_INFLOW") // SALES_RECEIPT, BOOKING_RECEIPT, FINANCIAL_INFLOW, BUYBACK
+  category    String?  // CASH, BANK, SPLIT
+  amount      Float?
+  referenceId String?  // e.g. invoice id
+  isRead      Boolean  @default(false)
+  readBy      String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([targetRole])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+
 

@@ -13,7 +13,10 @@ import Users from './pages/Users';
 import Reports from './pages/Reports';
 import CollaborationCenter from './pages/CollaborationCenter';
 import CurrentStock from './pages/CurrentStock';
+import SoldCars from './pages/SoldCars';
 import Invoices from './pages/Invoices';
+import AccountsHub from './pages/AccountsHub';
+import Notifications from './pages/Notifications';
 import ReceivingLetter from './pages/ReceivingLetter';
 import IncentiveApprovalSheet from './pages/IncentiveApprovalSheet';
 import Attendance from './pages/Attendance';
@@ -21,7 +24,7 @@ import Approvals from './pages/Approvals';
 import Settings from './pages/Settings';
 
 function MainLayout() {
-  const { user, isAdmin, isSuperAdmin, loading } = useAuth();
+  const { user, isAdmin, isSuperAdmin, canAccessAccounts, loading } = useAuth();
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [search, setSearch] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -77,6 +80,7 @@ function MainLayout() {
           setSearch={setSearch}
           onOpenModal={handleOpenModal}
           onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          onNavigate={(tab) => setCurrentTab(tab)}
         />
 
         <main className="flex-1 overflow-y-auto">
@@ -178,8 +182,20 @@ function MainLayout() {
             <CurrentStock />
           </div>
 
-          <div className={currentTab === 'invoices' ? 'block' : 'hidden'}>
+          <div className={currentTab === 'sold_cars' ? 'block' : 'hidden'}>
+            <SoldCars />
+          </div>
+
+          <div className={(currentTab === 'accounts' && canAccessAccounts) ? 'block' : 'hidden'}>
+            <AccountsHub />
+          </div>
+
+          <div className={(currentTab === 'invoices' && canAccessAccounts) ? 'block' : 'hidden'}>
             <Invoices />
+          </div>
+
+          <div className={currentTab === 'notifications' ? 'block' : 'hidden'}>
+            <Notifications onNavigate={(tab) => setCurrentTab(tab)} />
           </div>
 
           <div className={(currentTab === 'approvals' && isAdmin) ? 'block' : 'hidden'}>

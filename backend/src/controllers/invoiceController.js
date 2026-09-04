@@ -203,7 +203,20 @@ const createInvoice = async (req, res) => {
       witness1Name,
       witness1Cnic,
       witness2Name,
-      witness2Cnic
+      witness2Cnic,
+      // Accounts & Payment Mode Fields
+      paymentMethod,
+      bankAccountId,
+      cashAmountReceived,
+      bankAmountReceived,
+      isInstallmentSale,
+      totalInstallments,
+      installmentAmount,
+      installmentFrequency,
+      installmentStartDate,
+      deliveryStatus,
+      isDoubleSaleLiability,
+      linkedChassisSaleId
     } = req.body;
 
     const finalSellerPhoto = sellerPhoto ? await handleCloudinaryUpload(sellerPhoto, 'sellers') : null;
@@ -317,7 +330,16 @@ const createInvoice = async (req, res) => {
         commissionAmount: String(commissionAmount),
         totalAmount: String(totalAmountCalculated),
         paymentStatus: paymentStatus || 'PAID',
-        remarks: remarks || null,
+        // Accounts & Payment Mode Fields
+        paymentMethod: paymentMethod || 'CASH',
+        bankAccountId: bankAccountId || null,
+        cashAmountReceived: cashAmountReceived !== undefined && cashAmountReceived !== null ? String(cashAmountReceived) : null,
+        bankAmountReceived: bankAmountReceived !== undefined && bankAmountReceived !== null ? String(bankAmountReceived) : null,
+        isInstallmentSale: Boolean(isInstallmentSale),
+        installmentPlanId: null, // will update below if installment plan created
+        deliveryStatus: deliveryStatus || (category === 'DELIVERY_LETTER' ? 'DELIVERED' : 'DELIVERED'),
+        isDoubleSaleLiability: Boolean(isDoubleSaleLiability || deliveryStatus === 'UNDELIVERED'),
+        linkedChassisSaleId: linkedChassisSaleId || null,
 
         // Witnesses
         witness1Name: witness1Name || null,
@@ -332,16 +354,324 @@ const createInvoice = async (req, res) => {
       }
     });
 
+    // ----------------------------------------------------
+    // AUTOMATED FINANCIAL LEDGER POSTINGS (DOUBLE ENTRY)
+    // ----------------------------------------------------
+    try {
+      const todayDate = new Date();
+      const countTxn = await prisma.transaction.count();
+      const txnSeq = String(countTxn + 1).padStart(4, '0');
+      const dateCode = todayDate.toISOString().slice(0, 10).replace(/-/g, '');
+
+      // Case A: PAYMENT VOUCHER
+      if (category === 'PAYMENT_VOUCHER') {
+        const paymentAmt = parsePakistaniPrice(cashAmount || totalPrice || agreedAmount || saleAmount);
+        if (paymentAmt > 0) {
+          // Source Account (Bank or Cash in Hand)
+          let sourceAccount = null;
+          if (paymentMethod === 'BANK' && bankAccountId) {
+            sourceAccount = await prisma.account.findUnique({ where: { id: bankAccountId } });
+          }
+          if (!sourceAccount) {
+            sourceAccount = await prisma.account.findFirst({ where: { subType: 'CASH', isActive: true } });
+          }
+
+          // Target Account (Expense or Payables)
+          let targetAccount = null;
+          if (headOfAccount) {
+            targetAccount = await prisma.account.findFirst({
+              where: {
+                OR: [
+                  { id: headOfAccount },
+                  { code: headOfAccount },
+                  { name: { contains: headOfAccount, mode: 'insensitive' } }
+                ]
+              }
+            });
+          }
+          if (!targetAccount) {
+            targetAccount = await prisma.account.findFirst({ where: { code: '5005' } }) 
+              || await prisma.account.findFirst({ where: { type: 'EXPENSE' } });
+          }
+
+          if (sourceAccount) {
+            await prisma.transaction.create({
+              data: {
+                transactionNumber: `PV-${dateCode}-${txnSeq}`,
+                date: todayDate,
+                type: 'PAYMENT_VOUCHER',
+                amount: paymentAmt,
+                description: `Payment Voucher ${invoiceNumber} to [${payeeName || finalBuyerName}] via [${sourceAccount.name}] - ${remarks || onAccount || 'Showroom Payment'}`,
+                referenceType: 'INVOICE',
+                referenceId: newInvoice.id,
+                referenceNumber: invoiceNumber,
+                chassisNumber: chassisNumber || null,
+                createdById: req.user.id,
+                entries: {
+                  create: [
+                    {
+                      accountId: sourceAccount.id,
+                      type: 'CREDIT', // Outflow from bank/cash
+                      amount: paymentAmt,
+                      description: `Payment to ${payeeName || finalBuyerName}`
+                    },
+                    ...(targetAccount ? [{
+                      accountId: targetAccount.id,
+                      type: 'DEBIT', // Expense / liability debit
+                      amount: paymentAmt,
+                      description: `Payment Voucher expense: ${payeeName || finalBuyerName}`
+                    }] : [])
+                  ]
+                }
+              }
+            });
+
+            // Decrement source account balance
+            await prisma.account.update({
+              where: { id: sourceAccount.id },
+              data: { currentBalance: { decrement: paymentAmt } }
+            });
+
+            if (targetAccount && targetAccount.type === 'EXPENSE') {
+              await prisma.account.update({
+                where: { id: targetAccount.id },
+                data: { currentBalance: { increment: paymentAmt } }
+              });
+            }
+          }
+        }
+      } 
+      // Case B: SALES RECEIPT, BOOKING RECEIPT, DELIVERY LETTER
+      else {
+        let cashReceived = 0;
+        let bankReceived = 0;
+
+        const effectiveTotalReceived = numericAdvance > 0 ? numericAdvance : numericTotalPrice;
+
+        if (paymentMethod === 'CASH') {
+          cashReceived = effectiveTotalReceived;
+        } else if (paymentMethod === 'BANK') {
+          bankReceived = effectiveTotalReceived;
+        } else if (paymentMethod === 'SPLIT') {
+          cashReceived = parsePakistaniPrice(cashAmountReceived);
+          bankReceived = parsePakistaniPrice(bankAmountReceived);
+          if (cashReceived === 0 && bankReceived === 0) {
+            cashReceived = effectiveTotalReceived;
+          }
+        }
+
+        const totalReceived = cashReceived + bankReceived;
+
+        if (totalReceived > 0) {
+          const cashAccount = await prisma.account.findFirst({ where: { subType: 'CASH', isActive: true } });
+          let bankAccount = null;
+          if (bankAccountId) {
+            bankAccount = await prisma.account.findUnique({ where: { id: bankAccountId } });
+          } else {
+            bankAccount = await prisma.account.findFirst({ where: { subType: 'BANK', isActive: true } });
+          }
+
+          const revenueAccount = await prisma.account.findFirst({ where: { code: '4001' } }) 
+            || await prisma.account.findFirst({ where: { type: 'REVENUE' } });
+
+          const entriesToCreate = [];
+          if (cashReceived > 0 && cashAccount) {
+            entriesToCreate.push({
+              accountId: cashAccount.id,
+              type: 'DEBIT', // Inflow
+              amount: cashReceived,
+              description: `Cash received from ${finalBuyerName} for ${finalVehicleMaker} ${finalVehicleModel}`
+            });
+          }
+
+          if (bankReceived > 0 && bankAccount) {
+            entriesToCreate.push({
+              accountId: bankAccount.id,
+              type: 'DEBIT', // Inflow
+              amount: bankReceived,
+              description: `Bank transfer from ${finalBuyerName} into ${bankAccount.name}`
+            });
+          }
+
+          if (revenueAccount) {
+            entriesToCreate.push({
+              accountId: revenueAccount.id,
+              type: 'CREDIT', // Revenue
+              amount: totalReceived,
+              description: `Sales revenue from ${finalBuyerName}`
+            });
+          }
+
+          if (entriesToCreate.length > 0) {
+            await prisma.transaction.create({
+              data: {
+                transactionNumber: `REC-${dateCode}-${txnSeq}`,
+                date: todayDate,
+                type: 'RECEIPT_VOUCHER',
+                amount: totalReceived,
+                description: `Receipt ${invoiceNumber} for [${finalBuyerName}] (${finalVehicleMaker} ${finalVehicleModel} - Chassis: ${chassisNumber || 'N/A'}) - Cash: Rs. ${cashReceived}, Bank: Rs. ${bankReceived}`,
+                referenceType: 'INVOICE',
+                referenceId: newInvoice.id,
+                referenceNumber: invoiceNumber,
+                chassisNumber: chassisNumber || null,
+                createdById: req.user.id,
+                entries: {
+                  create: entriesToCreate
+                }
+              }
+            });
+
+            // Update account balances
+            if (cashReceived > 0 && cashAccount) {
+              await prisma.account.update({
+                where: { id: cashAccount.id },
+                data: { currentBalance: { increment: cashReceived } }
+              });
+            }
+            if (bankReceived > 0 && bankAccount) {
+              await prisma.account.update({
+                where: { id: bankAccount.id },
+                data: { currentBalance: { increment: bankReceived } }
+              });
+            }
+            if (revenueAccount) {
+              await prisma.account.update({
+                where: { id: revenueAccount.id },
+                data: { currentBalance: { increment: totalReceived } }
+              });
+            }
+          }
+
+          // ----------------------------------------------------
+          // NOTIFICATION DISPATCH TO ACCOUNTS HEAD
+          // ----------------------------------------------------
+          try {
+            const isBooking = category === 'BOOKING_RECEIPT';
+            const typeLabel = isBooking ? 'Booking Receipt' : 'Sales Receipt';
+            const targetBankName = bankAccount ? bankAccount.name : 'Bank Account';
+            
+            let paymentDetailStr = '';
+            if (paymentMethod === 'CASH') {
+              paymentDetailStr = `Cash in Hand Safe (Rs. ${cashReceived.toLocaleString()})`;
+            } else if (paymentMethod === 'BANK') {
+              paymentDetailStr = `${targetBankName} (Rs. ${bankReceived.toLocaleString()})`;
+            } else if (paymentMethod === 'SPLIT') {
+              paymentDetailStr = `Split: Cash Rs. ${cashReceived.toLocaleString()} + Bank Rs. ${bankReceived.toLocaleString()} (${targetBankName})`;
+            } else {
+              paymentDetailStr = `Rs. ${totalReceived.toLocaleString()}`;
+            }
+
+            const notifTitle = isBooking
+              ? `📅 New Booking Inflow: Rs. ${totalReceived.toLocaleString()}`
+              : `💰 New Sales Inflow: Rs. ${totalReceived.toLocaleString()}`;
+
+            const notifMessage = `${typeLabel} #${invoiceNumber} generated for ${finalVehicleMaker} ${finalVehicleModel} (Chassis: ${chassisNumber || 'N/A'}). Received ${paymentDetailStr} from Customer ${finalBuyerName} by ${req.user.name || 'Sales Officer'}.`;
+
+            await prisma.notification.create({
+              data: {
+                targetRole: 'ACCOUNTS_HEAD',
+                title: notifTitle,
+                message: notifMessage,
+                type: category || 'FINANCIAL_INFLOW',
+                category: paymentMethod || 'CASH',
+                amount: totalReceived,
+                referenceId: newInvoice.id,
+                linkUrl: '/invoices'
+              }
+            });
+          } catch (notifErr) {
+            console.warn('Failed to create notification for accounts head:', notifErr.message);
+          }
+        }
+
+        // ----------------------------------------------------
+        // AUTOMATED INSTALLMENT PLAN CREATION (IF CHECKED)
+        // ----------------------------------------------------
+        if (Boolean(isInstallmentSale) && numericRemaining > 0) {
+          const numInstallments = parseInt(req.body.totalInstallments, 10) || 12;
+          const instFrequency = req.body.installmentFrequency || 'MONTHLY';
+          const calculatedInstallmentAmt = req.body.installmentAmount 
+            ? parseFloat(req.body.installmentAmount) 
+            : Math.round(numericRemaining / numInstallments);
+
+          const ipCount = await prisma.installmentPlan.count();
+          const ipPlanNumber = `IP-${dateCode}-${String(ipCount + 1).padStart(4, '0')}`;
+          const start = req.body.installmentStartDate ? new Date(req.body.installmentStartDate) : new Date();
+
+          const scheduleItems = [];
+          for (let i = 1; i <= numInstallments; i++) {
+            const dueDate = new Date(start);
+            if (instFrequency === 'MONTHLY') dueDate.setMonth(dueDate.getMonth() + i);
+            else if (instFrequency === 'QUARTERLY') dueDate.setMonth(dueDate.getMonth() + (i * 3));
+            else dueDate.setMonth(dueDate.getMonth() + i);
+
+            const isLast = i === numInstallments;
+            const priorTotal = calculatedInstallmentAmt * (numInstallments - 1);
+            const itemAmt = isLast ? Math.max(0, numericRemaining - priorTotal) : calculatedInstallmentAmt;
+
+            scheduleItems.push({
+              installmentNumber: i,
+              dueDate,
+              amount: itemAmt,
+              paidAmount: 0,
+              status: 'UNPAID'
+            });
+          }
+
+          const createdPlan = await prisma.installmentPlan.create({
+            data: {
+              planNumber: ipPlanNumber,
+              invoiceId: newInvoice.id,
+              customerName: finalBuyerName,
+              customerPhone: buyerPhone || customerPhone || null,
+              customerCnic: buyerCnic || null,
+              customerAddress: buyerAddress || customerCity || null,
+              vehicleName: `${finalVehicleMaker} ${finalVehicleModel}`.trim(),
+              registrationNo: registrationNo || carRegNumber || null,
+              chassisNumber: chassisNumber || null,
+              totalPrice: numericTotalPrice,
+              advanceAmount: numericAdvance,
+              remainingAmount: numericRemaining,
+              totalInstallments: numInstallments,
+              installmentAmount: calculatedInstallmentAmt,
+              frequency: instFrequency,
+              startDate: start,
+              status: 'ACTIVE',
+              notes: `Auto-generated from Sales Receipt ${invoiceNumber}`,
+              createdById: req.user.id,
+              items: { create: scheduleItems }
+            }
+          });
+
+          await prisma.invoice.update({
+            where: { id: newInvoice.id },
+            data: { installmentPlanId: createdPlan.id }
+          });
+        }
+      }
+    } catch (accountError) {
+      console.error('Automated ledger posting error (non-fatal):', accountError);
+    }
+
     await prisma.activityLog.create({
       data: {
         userId: req.user.id,
         action: 'CREATE_SALES_RECEIPT',
-        details: `Created Sales Receipt ${invoiceNumber} for ${finalBuyerName} (${finalVehicleMaker} ${finalVehicleModel} - Total: Rs. ${numericTotalPrice})`
+        details: `Created ${category || 'Sales Receipt'} ${invoiceNumber} for ${finalBuyerName} (${finalVehicleMaker} ${finalVehicleModel} - Total: Rs. ${numericTotalPrice})`
       }
     });
 
-    return res.status(201).json(newInvoice);
+    const finalResult = await prisma.invoice.findUnique({
+      where: { id: newInvoice.id },
+      include: {
+        createdByUser: { select: { id: true, name: true, email: true } },
+        images: { orderBy: { uploadedAt: 'desc' } }
+      }
+    });
+
+    return res.status(201).json(finalResult);
   } catch (error) {
+    console.error('createInvoice error:', error);
     return res.status(500).json({ message: 'Failed to create sales receipt', error: error.message });
   }
 };
@@ -405,7 +735,20 @@ const updateInvoice = async (req, res) => {
       witness1Name,
       witness1Cnic,
       witness2Name,
-      witness2Cnic
+      witness2Cnic,
+      // Accounts & Payment Mode Fields
+      paymentMethod,
+      bankAccountId,
+      cashAmountReceived,
+      bankAmountReceived,
+      isInstallmentSale,
+      totalInstallments,
+      installmentAmount,
+      installmentFrequency,
+      installmentStartDate,
+      deliveryStatus,
+      isDoubleSaleLiability,
+      linkedChassisSaleId
     } = req.body;
 
     const finalSellerPhoto = sellerPhoto ? await handleCloudinaryUpload(sellerPhoto, 'sellers') : existing.sellerPhoto;
@@ -476,6 +819,15 @@ const updateInvoice = async (req, res) => {
         remainingAmount: remainingAmount !== undefined ? (remainingAmount ? String(parsePakistaniPrice(remainingAmount)) : '') : (existing.remainingAmount || String(numericRemaining)),
         paymentDuration: paymentDuration !== undefined ? paymentDuration : existing.paymentDuration,
         dated: dated !== undefined ? dated : existing.dated,
+
+        paymentMethod: paymentMethod !== undefined ? paymentMethod : existing.paymentMethod,
+        bankAccountId: bankAccountId !== undefined ? bankAccountId : existing.bankAccountId,
+        cashAmountReceived: cashAmountReceived !== undefined ? (cashAmountReceived ? String(parsePakistaniPrice(cashAmountReceived)) : null) : existing.cashAmountReceived,
+        bankAmountReceived: bankAmountReceived !== undefined ? (bankAmountReceived ? String(parsePakistaniPrice(bankAmountReceived)) : null) : existing.bankAmountReceived,
+        isInstallmentSale: isInstallmentSale !== undefined ? Boolean(isInstallmentSale) : existing.isInstallmentSale,
+        deliveryStatus: deliveryStatus !== undefined ? deliveryStatus : existing.deliveryStatus,
+        isDoubleSaleLiability: isDoubleSaleLiability !== undefined ? Boolean(isDoubleSaleLiability) : existing.isDoubleSaleLiability,
+        linkedChassisSaleId: linkedChassisSaleId !== undefined ? linkedChassisSaleId : existing.linkedChassisSaleId,
 
         witness1Name: witness1Name !== undefined ? witness1Name : existing.witness1Name,
         witness1Cnic: witness1Cnic !== undefined ? witness1Cnic : existing.witness1Cnic,

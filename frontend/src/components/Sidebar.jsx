@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, 
   Car, 
@@ -17,16 +17,49 @@ import {
   Clock,
   Truck,
   ShieldCheck,
+  Landmark,
+  Wallet,
+  CheckCircle2,
   Settings as SettingsIcon,
+  Bell,
   X
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../services/api';
 
 export default function Sidebar({ currentTab, setCurrentTab, isMobileOpen, setIsMobileOpen }) {
-  const { user, logout, isSuperAdmin, isAdmin } = useAuth();
+  const { 
+    user, 
+    logout, 
+    isSuperAdmin, 
+    isAdmin, 
+    isAccountsHead, 
+    isAccountant, 
+    canAccessAccounts 
+  } = useAuth();
+
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 20000); // 20s live sync
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchUnreadCount = async () => {
+    try {
+      const res = await api.getNotifications();
+      setUnreadCount(res.unreadCount || 0);
+    } catch (err) {
+      // quiet fail
+    }
+  };
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, role: 'ALL' },
+    { id: 'notifications', label: 'Inflow Notifications', icon: Bell, role: 'ALL', badge: unreadCount },
+    { id: 'accounts', label: 'Accounts & Finance Hub', icon: Landmark, role: 'ACCOUNTS' },
+    { id: 'invoices', label: 'Invoices & Vouchers', icon: Receipt, role: 'ACCOUNTS' },
     { id: 'all_sellers', label: 'All Sellers Inventory', icon: Car, role: 'ALL' },
     { id: 'my_sellers', label: 'My Sellers Leads', icon: UserCheck, role: 'ALL' },
     { id: 'commercial_sellers', label: 'Commercial Vehicle Sellers', icon: Truck, role: 'ALL' },
@@ -41,18 +74,20 @@ export default function Sidebar({ currentTab, setCurrentTab, isMobileOpen, setIs
     { id: 'deals', label: 'Closed Deals', icon: Handshake, role: 'ALL' },
     { id: 'collaboration', label: 'Collaboration Center', icon: Handshake, role: 'ALL' },
     { id: 'stock', label: 'Showroom Current Stock', icon: Package, role: 'ALL' },
-    { id: 'invoices', label: 'Invoices & Vouchers', icon: Receipt, role: 'SUPER_ADMIN' },
+    { id: 'sold_cars', label: 'Sold Cars', icon: CheckCircle2, role: 'ALL' },
     { id: 'approvals', label: 'Approval Requests', icon: ShieldCheck, role: 'ADMIN' },
     { id: 'users', label: 'User & Salesmen', icon: UserCheck, role: 'ADMIN' },
     { id: 'reports', label: 'Sales Reports', icon: BarChart3, role: 'ADMIN' },
     { id: 'settings', label: 'Account Settings', icon: SettingsIcon, role: 'ALL' },
   ];
 
-  const visibleItems = navItems.filter(item => 
-    item.role === 'ALL' || 
-    (item.role === 'ADMIN' && isAdmin) || 
-    (item.role === 'SUPER_ADMIN' && isSuperAdmin)
-  );
+  const visibleItems = navItems.filter(item => {
+    if (item.role === 'ALL') return true;
+    if (item.role === 'ACCOUNTS') return canAccessAccounts;
+    if (item.role === 'SUPER_ADMIN') return isSuperAdmin;
+    if (item.role === 'ADMIN') return isAdmin;
+    return false;
+  });
 
   const handleNavClick = (id) => {
     setCurrentTab(id);
@@ -111,6 +146,14 @@ export default function Sidebar({ currentTab, setCurrentTab, isMobileOpen, setIs
                   <span className="inline-flex items-center text-[9px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30">
                     <Crown className="w-2.5 h-2.5 mr-1" /> SUPER ADMIN
                   </span>
+                ) : isAccountsHead ? (
+                  <span className="inline-flex items-center text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                    <Landmark className="w-2.5 h-2.5 mr-1" /> ACCOUNTS HEAD
+                  </span>
+                ) : isAccountant ? (
+                  <span className="inline-flex items-center text-[9px] font-mono text-cyan-300 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/30">
+                    <Wallet className="w-2.5 h-2.5 mr-1" /> ACCOUNTANT
+                  </span>
                 ) : isAdmin ? (
                   <span className="inline-flex items-center text-[9px] font-mono text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/30">
                     <Shield className="w-2.5 h-2.5 mr-1" /> ADMIN
@@ -143,8 +186,13 @@ export default function Sidebar({ currentTab, setCurrentTab, isMobileOpen, setIs
                 {isActive && (
                   <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-cyan-400 rounded-r-full shadow-glow"></span>
                 )}
-                <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-cyan-400' : 'text-slate-400 group-hover:text-slate-200'}`} />
-                <span className="truncate">{item.label}</span>
+                <Icon className={`w-4 h-4 flex-shrink-0 transition-colors ${isActive ? 'text-cyan-400' : 'text-slate-400 group-hover:text-slate-200'}`} />
+                <span className="truncate flex-1 text-left">{item.label}</span>
+                {item.badge > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-rose-500 to-amber-500 text-white text-[10px] font-mono font-bold shadow-md shadow-rose-500/30 animate-pulse flex-shrink-0">
+                    {item.badge > 99 ? '99+' : item.badge}
+                  </span>
+                )}
               </button>
             );
           })}

@@ -18,6 +18,14 @@ const attendanceRoutes = require('./routes/attendanceRoutes');
 const approvalRoutes = require('./routes/approvalRoutes');
 const incentiveApprovalRoutes = require('./routes/incentiveApprovalRoutes');
 
+// Accounts & Finance Routes
+const accountRoutes = require('./routes/accountRoutes');
+const securityChequeRoutes = require('./routes/securityChequeRoutes');
+const installmentRoutes = require('./routes/installmentRoutes');
+const auditTrailRoutes = require('./routes/auditTrailRoutes');
+const soldCarsRoutes = require('./routes/soldCarsRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+
 const app = express();
 
 // Middleware
@@ -31,7 +39,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'Velocity DMS Express API', timestamp: new Date() });
+  res.json({ status: 'ok', service: 'AL ASR MOTORS DMS Express API', timestamp: new Date() });
 });
 
 // API Routes
@@ -50,6 +58,14 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/approvals', approvalRoutes);
 app.use('/api/incentive-approvals', incentiveApprovalRoutes);
 
+// Accounts & Finance Routes
+app.use('/api/accounts', accountRoutes);
+app.use('/api/security-cheques', securityChequeRoutes);
+app.use('/api/installments', installmentRoutes);
+app.use('/api/audit-trail', auditTrailRoutes);
+app.use('/api/sold-cars', soldCarsRoutes);
+app.use('/api/notifications', notificationRoutes);
+
 // Global Error Handler
 app.use((err, req, res, next) => {
   console.error('Unhandled Server Error:', err);
@@ -62,7 +78,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 if (process.env.NODE_ENV !== 'production' || require.main === module) {
   app.listen(PORT, () => {
-    console.log(`🚀 Velocity DMS Backend Express Server running on port ${PORT}`);
+    console.log(`🚀 AL ASR MOTORS DMS Backend Express Server running on port ${PORT}`);
   });
 }
 
