@@ -132,13 +132,14 @@ export default function Reports({ defaultTab = 'salesmen' }) {
             .stat-box { flex: 1; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; }
             .stat-label { font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: bold; }
             .stat-val { font-size: 16px; font-weight: bold; color: #0284c7; margin-top: 4px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            th { background: #0f172a; color: #ffffff; text-align: left; padding: 8px 10px; font-size: 10px; text-transform: uppercase; }
-            td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 1.5px solid #0f172a; font-size: 10.5px; font-weight: bold; }
+            th { background: #0f172a; color: #ffffff; text-align: left; padding: 7px 10px; font-size: 10.5px; font-weight: 800; text-transform: uppercase; border: 1px solid #334155; }
+            td { padding: 7px 10px; border: 1px solid #cbd5e1; font-size: 10.5px; font-weight: 700; color: #0f172a; }
+            td * { font-size: 10.5px !important; font-weight: 700 !important; }
             tr:nth-child(even) { background: #f8fafc; }
-            .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; }
-            .badge-conv { background: #dcfce7; color: #15803d; }
-            .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+            .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10.5px; font-weight: 800; }
+            .badge-conv { background: #dcfce7; color: #15803d; font-weight: 800; }
+            .footer { margin-top: 30px; text-align: center; font-size: 9.5px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; font-weight: bold; }
           </style>
         </head>
         <body>
@@ -152,7 +153,7 @@ export default function Reports({ defaultTab = 'salesmen' }) {
             </div>
             <div style="text-align: right;">
               <div style="font-size: 13px; font-weight: bold; color: #0284c7;">AL ASR Motors Executive Board</div>
-              <div style="font-size: 10px; color: #64748b;">Sahiwal, Pakistan</div>
+              <div style="font-size: 10px; color: #64748b; font-weight: bold;">Sahiwal, Pakistan</div>
             </div>
           </div>
 
@@ -191,7 +192,7 @@ export default function Reports({ defaultTab = 'salesmen' }) {
             <tbody>
               ${reportData.map(sm => `
                 <tr>
-                  <td><strong>${sm.salesmanName}</strong><br/><span style="color: #64748b; font-size: 9px;">${sm.email}</span></td>
+                  <td><strong>${sm.salesmanName}</strong><br/><span style="color: #64748b;">${sm.email}</span></td>
                   <td>${sm.totalLeads}</td>
                   <td style="color: #15803d; font-weight: bold;">${sm.dealsClosed}</td>
                   <td>${sm.activeLeads}</td>
@@ -240,25 +241,26 @@ export default function Reports({ defaultTab = 'salesmen' }) {
           <title>AL ASR MOTORS - Bank Financing & Ledger Cases Report (${selectedRange})</title>
           <style>
             @page { size: landscape; margin: 10mm; }
-            body { font-family: Arial, sans-serif; padding: 15px; color: #0f172a; background: #ffffff; font-size: 11px; }
+            body { font-family: Arial, sans-serif; padding: 15px; color: #0f172a; background: #ffffff; font-size: 10.5px; }
             .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 15px; }
             .logo-box { display: flex; align-items: center; gap: 15px; }
             .title { font-size: 20px; font-weight: bold; color: #0f172a; }
-            .subtitle { font-size: 11px; color: #64748b; font-family: monospace; }
+            .subtitle { font-size: 10px; color: #64748b; font-family: monospace; font-weight: bold; }
             .stats { display: flex; gap: 10px; margin-bottom: 15px; }
             .stat-box { flex: 1; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; }
-            .stat-label { font-size: 9px; color: #64748b; text-transform: uppercase; font-weight: bold; }
+            .stat-label { font-size: 9.5px; color: #64748b; text-transform: uppercase; font-weight: bold; }
             .stat-val { font-size: 15px; font-weight: bold; color: #0284c7; margin-top: 3px; }
             .bank-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
-            .bank-chip { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; font-size: 10px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-            th { background: #0f172a; color: #ffffff; text-align: left; padding: 7px 8px; font-size: 9px; text-transform: uppercase; }
-            td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; font-size: 10px; vertical-align: top; }
+            .bank-chip { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; font-size: 10px; font-weight: bold; }
+            table { width: 100%; border-collapse: collapse; margin-top: 8px; border: 1.5px solid #0f172a; font-size: 10px; font-weight: bold; }
+            th { background: #0f172a; color: #ffffff; text-align: left; padding: 7px 8px; font-size: 10px; font-weight: 800; text-transform: uppercase; border: 1px solid #334155; }
+            td { padding: 6px 8px; border: 1px solid #cbd5e1; font-size: 10px; font-weight: 700; vertical-align: middle; color: #0f172a; }
+            td * { font-size: 10px !important; font-weight: 700 !important; }
             tr:nth-child(even) { background: #f8fafc; }
-            .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; }
-            .badge-confirmed { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
-            .badge-pending { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
-            .footer { margin-top: 20px; text-align: center; font-size: 9px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; }
+            .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800; }
+            .badge-confirmed { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; font-weight: 800; }
+            .badge-pending { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-weight: 800; }
+            .footer { margin-top: 20px; text-align: center; font-size: 9px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; font-weight: bold; }
           </style>
         </head>
         <body>

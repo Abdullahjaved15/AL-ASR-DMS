@@ -274,10 +274,11 @@ export default function ReceivingLetterPage() {
             .company-name { font-size: 22px; font-weight: 900; color: #0f172a; letter-spacing: 1px; }
             .company-sub { font-size: 11px; font-weight: 700; color: #0284c7; text-transform: uppercase; margin-top: 2px; }
             .doc-title { text-align: center; font-size: 16px; font-weight: 900; background: #0f172a; color: #ffffff; padding: 6px; border-radius: 4px; margin: 12px 0 15px 0; text-transform: uppercase; letter-spacing: 1px; }
-            .grid-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-            .grid-table td { padding: 8px 10px; border: 1px solid #cbd5e1; vertical-align: top; }
-            .label { font-weight: 700; color: #475569; font-size: 10px; text-transform: uppercase; margin-bottom: 2px; }
-            .val { font-size: 12px; font-weight: 700; color: #0f172a; }
+            .grid-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; border: 1.5px solid #0f172a; font-size: 11.5px; font-weight: bold; }
+            .grid-table td { padding: 8px 10px; border: 1px solid #cbd5e1; vertical-align: middle; font-size: 11.5px; font-weight: bold; color: #0f172a; }
+            .grid-table td * { font-size: 11.5px !important; font-weight: bold !important; }
+            .label { font-weight: 800; color: #475569; font-size: 11.5px; text-transform: uppercase; margin-bottom: 2px; }
+            .val { font-size: 11.5px; font-weight: 800; color: #0f172a; }
           </style>
         </head>
         <body>

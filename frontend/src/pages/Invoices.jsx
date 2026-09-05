@@ -1362,22 +1362,19 @@ export default function Invoices({ onNavigate }) {
               font-weight: 600;
             }
 
-            .meta-strip {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
+            .meta-row {
               background: #f0f9ff;
               border: 1px solid #bae6fd;
               border-radius: 6px;
               padding: 5px 12px;
               margin-bottom: 6px;
               font-size: 9.5px;
-              font-weight: bold;
+              font-weight: 800;
             }
             .meta-val {
               color: #0284c7;
               font-family: monospace;
-              font-size: 11px;
+              font-size: 9.5px;
               font-weight: 800;
               margin-left: 4px;
             }
@@ -1401,23 +1398,33 @@ export default function Invoices({ onNavigate }) {
             table.grid-tbl {
               width: 100%;
               border-collapse: collapse;
-              border: 1px solid #64748b;
+              border: 1.5px solid #0f172a;
+              font-size: 9.5px;
+              font-weight: bold;
             }
             table.grid-tbl td {
-              padding: 3.5px 6px;
+              padding: 4px 6px;
               border: 1px solid #64748b;
-              font-size: 9px;
+              font-size: 9.5px;
+              font-weight: 700;
               vertical-align: middle;
+              color: #0f172a;
+            }
+            table.grid-tbl td * {
+              font-size: 9.5px !important;
+              font-weight: 700 !important;
             }
             table.grid-tbl td.lbl {
-              color: #475569;
+              color: #334155;
               background-color: #f8fafc;
-              font-weight: 700;
+              font-weight: 800;
+              font-size: 9.5px;
               width: 23%;
             }
             table.grid-tbl td.val {
               font-weight: 800;
               color: #0f172a;
+              font-size: 9.5px;
               width: 27%;
             }
 
@@ -1444,7 +1451,7 @@ export default function Invoices({ onNavigate }) {
             }
             .cnic-hyphen {
               font-weight: 900;
-              font-size: 11px;
+              font-size: 9.5px;
               color: #0284c7;
               padding: 0 1px;
             }
@@ -1465,7 +1472,8 @@ export default function Invoices({ onNavigate }) {
               margin-bottom: 2px;
             }
             .agr-en {
-              font-size: 8.5px;
+              font-size: 9.5px;
+              font-weight: 700;
               color: #475569;
             }
 
@@ -1473,11 +1481,15 @@ export default function Invoices({ onNavigate }) {
               width: 100%;
               border-collapse: collapse;
               margin-bottom: 6px;
+              border: 1.5px solid #0f172a;
+              font-size: 9.5px;
+              font-weight: bold;
             }
             .fin-tbl th {
               background: #0284c7;
               color: #ffffff;
-              font-size: 9px;
+              font-size: 9.5px;
+              font-weight: 800;
               padding: 4px 6px;
               text-align: center;
               border: 1px solid #0284c7;
@@ -1485,9 +1497,10 @@ export default function Invoices({ onNavigate }) {
             .fin-tbl td {
               padding: 5px 6px;
               border: 1px solid #cbd5e1;
-              font-size: 10px;
+              font-size: 9.5px;
               font-weight: 800;
               text-align: center;
+              color: #0f172a;
             }
 
             .terms-card {
@@ -1502,7 +1515,7 @@ export default function Invoices({ onNavigate }) {
               color: #fff;
               padding: 2px 6px;
               border-radius: 3px;
-              font-size: 9px;
+              font-size: 9.5px;
               font-weight: 800;
               display: inline-block;
               margin-bottom: 4px;

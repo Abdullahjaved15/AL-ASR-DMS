@@ -349,14 +349,21 @@ export default function IncentiveApprovalSheetPage() {
             table {
               width: 100%;
               border-collapse: collapse;
+              font-size: 11.5px;
+              font-weight: bold;
             }
             td {
               border-bottom: 1px solid #000000;
               border-right: 1px solid #000000;
               padding: 5px 10px;
               font-size: 11.5px;
+              font-weight: bold;
               height: 26px;
               vertical-align: middle;
+            }
+            td * {
+              font-size: 11.5px !important;
+              font-weight: bold !important;
             }
             td:last-child {
               border-right: none;
@@ -365,14 +372,17 @@ export default function IncentiveApprovalSheetPage() {
               border-bottom: none;
             }
             .lbl-col {
-              font-weight: bold;
+              font-weight: 800;
               width: 38%;
               background-color: #ffffff;
               text-align: left;
+              font-size: 11.5px;
             }
             .val-col {
               width: 31%;
               text-align: left;
+              font-weight: 800;
+              font-size: 11.5px;
             }
           </style>
         </head>

@@ -850,23 +850,24 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
             .kpi-value.blue { color: #0284c7; }
             
             /* Excel Grid Table */
-            table { width: 100%; border-collapse: collapse; border: 1.5px solid #334155; margin-top: 4px; font-size: 9px; }
-            thead th { background-color: #1e293b; color: #ffffff; text-align: left; padding: 6px 8px; font-size: 8.5px; font-weight: 700; text-transform: uppercase; border: 1px solid #475569; letter-spacing: 0.3px; }
+            table { width: 100%; border-collapse: collapse; border: 1.5px solid #0f172a; margin-top: 4px; font-size: 9.5px; font-weight: bold; }
+            thead th { background-color: #1e293b; color: #ffffff; text-align: left; padding: 6px 8px; font-size: 9.5px; font-weight: 800; text-transform: uppercase; border: 1px solid #475569; letter-spacing: 0.3px; }
             thead th.num { text-align: right; }
-            tbody td { padding: 5px 8px; border: 1px solid #cbd5e1; vertical-align: middle; }
-            tbody td.num { text-align: right; font-family: monospace; font-weight: 700; }
+            tbody td { padding: 5px 8px; border: 1px solid #cbd5e1; vertical-align: middle; font-size: 9.5px; font-weight: 700; color: #0f172a; }
+            tbody td * { font-size: 9.5px !important; font-weight: 700 !important; }
+            tbody td.num { text-align: right; font-family: monospace; font-weight: 800; }
             tbody tr:nth-child(even) { background-color: #f8fafc; }
             tbody tr:hover { background-color: #f1f5f9; }
             
             /* Footer Totals Row */
             tfoot tr { background-color: #f1f5f9; font-weight: 800; border-top: 2px solid #0f172a; }
-            tfoot td { padding: 6px 8px; border: 1px solid #cbd5e1; font-size: 9.5px; }
+            tfoot td { padding: 6px 8px; border: 1px solid #cbd5e1; font-size: 9.5px; font-weight: 800; }
             tfoot td.num { text-align: right; font-family: monospace; }
             
             .signatures-box { display: flex; justify-content: space-between; margin-top: 35px; padding-top: 10px; page-break-inside: avoid; }
             .signature-col { width: 28%; text-align: center; border-top: 1px dashed #64748b; padding-top: 4px; font-size: 8.5px; font-weight: 700; color: #334155; }
             
-            .print-footer { margin-top: 12px; text-align: center; font-size: 8px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 4px; font-family: monospace; }
+            .print-footer { margin-top: 12px; text-align: center; font-size: 8px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 4px; font-family: monospace; font-weight: bold; }
           </style>
         </head>
         <body>
@@ -1086,39 +1087,40 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
           <style>
             @page { size: landscape; margin: 8mm 8mm; }
             * { box-sizing: border-box; }
-            body { font-family: 'Segoe UI', Calibri, Arial, sans-serif; padding: 0; margin: 0; color: #0f172a; background: #ffffff; font-size: 9px; line-height: 1.3; }
+            body { font-family: 'Segoe UI', Calibri, Arial, sans-serif; padding: 0; margin: 0; color: #0f172a; background: #ffffff; font-size: 9.5px; line-height: 1.3; }
             
             .header-container { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 8px; }
             .logo-title-box { display: flex; align-items: center; gap: 12px; }
             .title { font-size: 15px; font-weight: 800; color: #0f172a; letter-spacing: 0.5px; text-transform: uppercase; }
-            .subtitle { font-size: 9px; color: #475569; font-family: monospace; }
+            .subtitle { font-size: 9px; color: #475569; font-family: monospace; font-weight: bold; }
             
             .kpi-row { display: flex; gap: 10px; margin-bottom: 10px; }
             .kpi-box { flex: 1; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; background: #f8fafc; }
-            .kpi-title { font-size: 8px; font-weight: 700; color: #64748b; text-transform: uppercase; font-family: monospace; }
+            .kpi-title { font-size: 8.5px; font-weight: 700; color: #64748b; text-transform: uppercase; font-family: monospace; }
             .kpi-value { font-size: 13px; font-weight: 800; font-family: monospace; margin-top: 2px; }
             .kpi-value.green { color: #15803d; }
             .kpi-value.red { color: #b91c1c; }
             .kpi-value.blue { color: #0284c7; }
             
             /* Excel Grid Table */
-            table { width: 100%; border-collapse: collapse; border: 1.5px solid #334155; margin-top: 4px; font-size: 9px; }
-            thead th { background-color: #1e293b; color: #ffffff; text-align: left; padding: 6px 8px; font-size: 8.5px; font-weight: 700; text-transform: uppercase; border: 1px solid #475569; letter-spacing: 0.3px; }
+            table { width: 100%; border-collapse: collapse; border: 1.5px solid #0f172a; margin-top: 4px; font-size: 9.5px; font-weight: bold; }
+            thead th { background-color: #1e293b; color: #ffffff; text-align: left; padding: 6px 8px; font-size: 9.5px; font-weight: 800; text-transform: uppercase; border: 1px solid #475569; letter-spacing: 0.3px; }
             thead th.num { text-align: right; }
-            tbody td { padding: 5px 8px; border: 1px solid #cbd5e1; vertical-align: middle; }
-            tbody td.num { text-align: right; font-family: monospace; font-weight: 700; }
+            tbody td { padding: 5px 8px; border: 1px solid #cbd5e1; vertical-align: middle; font-size: 9.5px; font-weight: 700; color: #0f172a; }
+            tbody td * { font-size: 9.5px !important; font-weight: 700 !important; }
+            tbody td.num { text-align: right; font-family: monospace; font-weight: 800; }
             tbody tr:nth-child(even) { background-color: #f8fafc; }
             tbody tr:hover { background-color: #f1f5f9; }
             
-            .badge-type { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 8px; font-weight: 700; font-family: monospace; }
-            .badge-green { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-            .badge-red { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
-            .badge-blue { background: #e0f2fe; color: #075985; border: 1px solid #bae6fd; }
-            .badge-purple { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+            .badge-type { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 9.5px; font-weight: 800; font-family: monospace; }
+            .badge-green { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; font-weight: 800; }
+            .badge-red { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; font-weight: 800; }
+            .badge-blue { background: #e0f2fe; color: #075985; border: 1px solid #bae6fd; font-weight: 800; }
+            .badge-purple { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; font-weight: 800; }
 
             /* Footer Totals Row */
             tfoot tr { background-color: #f1f5f9; font-weight: 800; border-top: 2px solid #0f172a; }
-            tfoot td { padding: 6px 8px; border: 1px solid #cbd5e1; font-size: 9.5px; }
+            tfoot td { padding: 6px 8px; border: 1px solid #cbd5e1; font-size: 9.5px; font-weight: 800; }
             tfoot td.num { text-align: right; font-family: monospace; }
             
             .signatures-box { display: flex; justify-content: space-between; margin-top: 30px; padding-top: 10px; page-break-inside: avoid; }
