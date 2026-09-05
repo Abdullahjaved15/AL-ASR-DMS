@@ -267,7 +267,6 @@ const updateAccount = async (req, res) => {
 const deleteAccount = async (req, res) => {
   try {
     const { id } = req.params;
-    const { force = 'false' } = req.query;
 
     const account = await prisma.account.findUnique({
       where: { id },
@@ -278,23 +277,30 @@ const deleteAccount = async (req, res) => {
       return res.status(404).json({ message: 'Account not found' });
     }
 
-    if (account.isSystem && force !== 'true') {
-      return res.status(400).json({ message: 'System core accounts are protected. To delete, please confirm force delete.' });
-    }
-
-    if ((account._count.entries > 0 || account._count.securityCheques > 0) && force !== 'true') {
-      return res.status(400).json({ 
-        message: `Account has ${account._count.entries} transaction entries and ${account._count.securityCheques} cheques. Please confirm force delete to remove all linked records.`,
-        requiresForce: true
-      });
-    }
-
-    // Cascade delete linked entries & security cheques if forced
+    // Direct cascade delete & cleanup for all linked entries and references
     await prisma.$transaction(async (tx) => {
+      // 1. Delete associated transaction entries for this account
       await tx.transactionEntry.deleteMany({ where: { accountId: id } });
+
+      // 2. Clean up transactions that now have zero entries (orphaned transactions)
+      const emptyTransactions = await tx.transaction.findMany({
+        where: {
+          entries: { none: {} }
+        },
+        select: { id: true }
+      });
+      if (emptyTransactions.length > 0) {
+        await tx.transaction.deleteMany({
+          where: { id: { in: emptyTransactions.map(t => t.id) } }
+        });
+      }
+
+      // 3. Nullify references in linked models
       await tx.securityCheque.updateMany({ where: { bankAccountId: id }, data: { bankAccountId: null } });
       await tx.installmentItem.updateMany({ where: { bankAccountId: id }, data: { bankAccountId: null } });
       await tx.invoice.updateMany({ where: { bankAccountId: id }, data: { bankAccountId: null } });
+
+      // 4. Delete the account
       await tx.account.delete({ where: { id } });
     });
 
