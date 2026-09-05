@@ -140,6 +140,8 @@ export default function Header({ currentTab, search, setSearch, onOpenModal, onT
     collaboration: '50-50% Commission Collaboration Center',
     stock: 'Showroom Current Stock Floor',
     sold_cars: 'Sold Cars & Buyback Lifecycle Registry',
+    salesman_incentives: 'Salesman Incentives & Commissions',
+    customer_history: 'Buyer & Seller Trade History Registry',
     accounts: 'Accounts & Finance Hub',
     invoices: 'Invoices & Financial Vouchers',
     approvals: 'Super Admin Approval Requests',

@@ -34,8 +34,14 @@ const getInvoices = async (req, res) => {
     const skip = (pageNum - 1) * limitNum;
 
     const whereClause = {};
-    if (category && category !== 'ALL') {
-      whereClause.category = category;
+    if (category === 'CANCELLED_BOOKINGS' || category === 'CANCELLED_BOOKING') {
+      whereClause.category = 'BOOKING_RECEIPT';
+      whereClause.bookingStatus = 'CANCELLED';
+    } else {
+      whereClause.isDeleted = false;
+      if (category && category !== 'ALL') {
+        whereClause.category = category;
+      }
     }
 
     if (search) {
@@ -126,6 +132,42 @@ const getInvoiceById = async (req, res) => {
     return res.json(invoice);
   } catch (error) {
     return res.status(500).json({ message: 'Failed to fetch invoice details', error: error.message });
+  }
+};
+
+// Search active booking receipts by customer phone number
+const findActiveBookingByPhone = async (req, res) => {
+  try {
+    const { phone } = req.query;
+    if (!phone || String(phone).trim() === '') {
+      return res.json({ bookings: [] });
+    }
+
+    const cleanDigits = String(phone).replace(/\D/g, '');
+    if (cleanDigits.length < 5) {
+      return res.json({ bookings: [] });
+    }
+
+    // Fetch candidate booking receipts that are active and not deleted/converted
+    const allBookings = await prisma.invoice.findMany({
+      where: {
+        category: 'BOOKING_RECEIPT',
+        isDeleted: false,
+        bookingStatus: 'ACTIVE'
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 30
+    });
+
+    const matched = allBookings.filter(b => {
+      const bDigits = String(b.buyerPhone || b.customerPhone || '').replace(/\D/g, '');
+      return bDigits && (bDigits.includes(cleanDigits) || cleanDigits.includes(bDigits));
+    });
+
+    return res.json({ bookings: matched });
+  } catch (error) {
+    console.error('findActiveBookingByPhone error:', error);
+    return res.status(500).json({ message: 'Failed to search booking receipts', error: error.message });
   }
 };
 
@@ -317,20 +359,60 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
     // SALES_RECEIPT, BOOKING_RECEIPT, DELIVERY_LETTER
     const numericTotalPrice = parsePakistaniPrice(inv.totalPrice || inv.agreedAmount || inv.saleAmount || 0);
     const numericAdvance = parsePakistaniPrice(inv.advanceAmount || 0);
-    const effectiveTotalReceived = numericAdvance > 0 ? numericAdvance : numericTotalPrice;
+    const numericRemaining = inv.remainingAmount !== undefined && inv.remainingAmount !== null && inv.remainingAmount !== ''
+      ? parsePakistaniPrice(inv.remainingAmount)
+      : Math.max(0, numericTotalPrice - numericAdvance);
+
+    const isConsignment = Boolean(inv.category === 'SALES_RECEIPT' && inv.isCustomerVehicle);
+    let effectiveTotalReceived = 0;
+
+    if (isConsignment) {
+      // Customer-owned vehicle: Dealership does NOT receive total car price into Safe/Bank.
+      // The car sale price is paid directly to the customer/seller who brought the vehicle.
+      // ONLY the commission earned by dealership is deposited into Safe/Bank.
+      effectiveTotalReceived = parsePakistaniPrice(inv.commissionAmount || 0);
+    } else if (inv.category === 'BOOKING_RECEIPT') {
+      // For Booking Receipt, the initial inflow into cash safe / bank is the advance payment
+      effectiveTotalReceived = numericAdvance > 0 ? numericAdvance : numericTotalPrice;
+    } else if (inv.category === 'SALES_RECEIPT') {
+      // For standard showroom Sales Receipt, if an advance was already collected in booking receipt (advance > 0),
+      // ONLY the remaining balance is collected and deposited into cash safe / bank now!
+      effectiveTotalReceived = numericAdvance > 0 ? numericRemaining : numericTotalPrice;
+    } else {
+      // DELIVERY_LETTER or fallback
+      effectiveTotalReceived = numericAdvance > 0 ? numericRemaining : numericTotalPrice;
+    }
 
     let cashReceived = 0;
     let bankReceived = 0;
 
-    if (inv.paymentMethod === 'CASH') {
-      cashReceived = effectiveTotalReceived;
-    } else if (inv.paymentMethod === 'BANK') {
-      bankReceived = effectiveTotalReceived;
-    } else if (inv.paymentMethod === 'SPLIT') {
-      cashReceived = parsePakistaniPrice(inv.cashAmountReceived);
-      bankReceived = parsePakistaniPrice(inv.bankAmountReceived);
-      if (cashReceived === 0 && bankReceived === 0) {
+    if (isConsignment) {
+      if (inv.paymentMethod === 'BANK') {
+        bankReceived = effectiveTotalReceived;
+      } else if (inv.paymentMethod === 'SPLIT') {
+        const splitCash = parsePakistaniPrice(inv.cashAmountReceived);
+        const splitBank = parsePakistaniPrice(inv.bankAmountReceived);
+        if (splitCash + splitBank > 0) {
+          const ratio = splitCash / (splitCash + splitBank);
+          cashReceived = Math.round(effectiveTotalReceived * ratio);
+          bankReceived = effectiveTotalReceived - cashReceived;
+        } else {
+          cashReceived = effectiveTotalReceived;
+        }
+      } else {
         cashReceived = effectiveTotalReceived;
+      }
+    } else {
+      if (inv.paymentMethod === 'CASH') {
+        cashReceived = effectiveTotalReceived;
+      } else if (inv.paymentMethod === 'BANK') {
+        bankReceived = effectiveTotalReceived;
+      } else if (inv.paymentMethod === 'SPLIT') {
+        cashReceived = parsePakistaniPrice(inv.cashAmountReceived);
+        bankReceived = parsePakistaniPrice(inv.bankAmountReceived);
+        if (cashReceived === 0 && bankReceived === 0) {
+          cashReceived = effectiveTotalReceived;
+        }
       }
     }
 
@@ -365,19 +447,37 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
         }
       }
 
-      let revenueAccount = await prisma.account.findFirst({ where: { code: '4001' } }) 
-        || await prisma.account.findFirst({ where: { type: 'REVENUE' } });
-      if (!revenueAccount) {
-        revenueAccount = await prisma.account.create({
-          data: {
-            code: '4001',
-            name: 'Vehicle Sales Revenue',
-            type: 'REVENUE',
-            subType: 'REVENUE',
-            currentBalance: 0,
-            description: 'Primary revenue from vehicle sales & bookings'
-          }
-        });
+      let revenueAccount = null;
+      if (isConsignment) {
+        revenueAccount = await prisma.account.findFirst({ where: { code: '4002' } })
+          || await prisma.account.findFirst({ where: { name: { contains: 'Commission', mode: 'insensitive' } } });
+        if (!revenueAccount) {
+          revenueAccount = await prisma.account.create({
+            data: {
+              code: '4002',
+              name: 'Vehicle Sales Commission Revenue',
+              type: 'REVENUE',
+              subType: 'REVENUE',
+              currentBalance: 0,
+              description: 'Commission revenue on customer-owned / consignment vehicle sales'
+            }
+          });
+        }
+      } else {
+        revenueAccount = await prisma.account.findFirst({ where: { code: '4001' } }) 
+          || await prisma.account.findFirst({ where: { type: 'REVENUE' } });
+        if (!revenueAccount) {
+          revenueAccount = await prisma.account.create({
+            data: {
+              code: '4001',
+              name: 'Vehicle Sales Revenue',
+              type: 'REVENUE',
+              subType: 'REVENUE',
+              currentBalance: 0,
+              description: 'Primary revenue from vehicle sales & bookings'
+            }
+          });
+        }
       }
 
       const entriesToCreate = [];
@@ -386,7 +486,9 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
           accountId: cashAccount.id,
           type: 'DEBIT',
           amount: cashReceived,
-          description: `Cash received from ${inv.buyerName || 'Customer'} for ${inv.vehicleMaker || ''} ${inv.vehicleModel || ''}`
+          description: isConsignment
+            ? `Consignment Commission Cash (Vehicle: ${inv.vehicleMaker || ''} ${inv.vehicleModel || ''}, Seller: ${inv.sellerName || 'Customer'})`
+            : `Cash received from ${inv.buyerName || 'Customer'} for ${inv.vehicleMaker || ''} ${inv.vehicleModel || ''}`
         });
       }
 
@@ -395,7 +497,9 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
           accountId: bankAccount.id,
           type: 'DEBIT',
           amount: bankReceived,
-          description: `Bank transfer from ${inv.buyerName || 'Customer'} into ${bankAccount.name}`
+          description: isConsignment
+            ? `Consignment Commission Bank (Vehicle: ${inv.vehicleMaker || ''} ${inv.vehicleModel || ''}, Seller: ${inv.sellerName || 'Customer'})`
+            : `Bank transfer from ${inv.buyerName || 'Customer'} into ${bankAccount.name}`
         });
       }
 
@@ -404,18 +508,24 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
           accountId: revenueAccount.id,
           type: 'CREDIT',
           amount: totalReceived,
-          description: `Sales revenue from ${inv.buyerName || 'Customer'}`
+          description: isConsignment
+            ? `Commission earned on customer vehicle sale (${inv.vehicleMaker || ''} ${inv.vehicleModel || ''} - Reg: ${inv.registrationNo || 'N/A'}, Seller: ${inv.sellerName || 'Customer'}, Buyer: ${inv.buyerName || 'Customer'})`
+            : `Sales revenue from ${inv.buyerName || 'Customer'}`
         });
       }
 
       if (entriesToCreate.length > 0) {
+        const txnDesc = isConsignment
+          ? `Consignment Sale Commission ${inv.invoiceNumber} for [${inv.vehicleMaker || ''} ${inv.vehicleModel || ''}] (Seller: ${inv.sellerName || 'Customer'} -> Buyer: ${inv.buyerName || 'Customer'}) - Comm: Rs. ${totalReceived} (Car Sale Price Rs. ${numericTotalPrice} directly given to seller)`
+          : `Receipt ${inv.invoiceNumber} for [${inv.buyerName || 'Customer'}] (${inv.vehicleMaker || ''} ${inv.vehicleModel || ''} - Chassis: ${inv.chassisNumber || 'N/A'}) - Cash: Rs. ${cashReceived}, Bank: Rs. ${bankReceived}`;
+
         await prisma.transaction.create({
           data: {
             transactionNumber: `REC-${dateCode}-${txnSeq}`,
             date: todayDate,
             type: 'RECEIPT_VOUCHER',
             amount: totalReceived,
-            description: `Receipt ${inv.invoiceNumber} for [${inv.buyerName || 'Customer'}] (${inv.vehicleMaker || ''} ${inv.vehicleModel || ''} - Chassis: ${inv.chassisNumber || 'N/A'}) - Cash: Rs. ${cashReceived}, Bank: Rs. ${bankReceived}`,
+            description: txnDesc,
             referenceType: 'INVOICE',
             referenceId: inv.id,
             referenceNumber: inv.invoiceNumber,
@@ -537,7 +647,15 @@ const createInvoice = async (req, res) => {
       installmentStartDate,
       deliveryStatus,
       isDoubleSaleLiability,
-      linkedChassisSaleId
+      linkedChassisSaleId,
+      // Booking & Sales Receipt Linking Fields
+      linkedBookingId,
+      linkedBookingNumber,
+      bookingStatus,
+      // Consignment & Salesman Fields
+      isCustomerVehicle,
+      salesmanName,
+      salesmanId
     } = req.body;
 
     const finalSellerPhoto = sellerPhoto ? await handleCloudinaryUpload(sellerPhoto, 'sellers') : null;
@@ -550,11 +668,45 @@ const createInvoice = async (req, res) => {
     const numericTotalPrice = parsePakistaniPrice(totalPrice || agreedAmount || saleAmount);
     const numericAdvance = parsePakistaniPrice(advanceAmount);
     const numericRemaining = remainingAmount !== undefined && remainingAmount !== null && remainingAmount !== '' 
-      ? parsePakistaniPrice(remainingAmount)
+      ? parsePakistaniPrice(remainingAmount) 
       : Math.max(0, numericTotalPrice - numericAdvance);
     const numericCommPercent = parseFloat(String(commissionPercent || 0).replace(/[^0-9.]/g, '')) || 0;
-    const commissionAmount = (numericTotalPrice * numericCommPercent) / 100;
-    const totalAmountCalculated = numericTotalPrice + commissionAmount;
+    
+    // If commissionAmount is explicitly provided (or calculated from percentage)
+    let calculatedCommission = 0;
+    if (req.body.commissionAmount !== undefined && req.body.commissionAmount !== null && String(req.body.commissionAmount).trim() !== '') {
+      calculatedCommission = parsePakistaniPrice(req.body.commissionAmount);
+    } else if (numericCommPercent > 0) {
+      calculatedCommission = (numericTotalPrice * numericCommPercent) / 100;
+    }
+    const totalAmountCalculated = numericTotalPrice + calculatedCommission;
+
+    // Auto-detect matching active booking receipt if creating a sales receipt
+    let finalLinkedBookingId = linkedBookingId || null;
+    let finalLinkedBookingNumber = linkedBookingNumber || null;
+
+    if (category === 'SALES_RECEIPT' && !finalLinkedBookingId && (buyerPhone || customerPhone)) {
+      const cleanDigits = String(buyerPhone || customerPhone).replace(/\D/g, '');
+      if (cleanDigits.length >= 7) {
+        const potentialBookings = await prisma.invoice.findMany({
+          where: {
+            category: 'BOOKING_RECEIPT',
+            isDeleted: false,
+            bookingStatus: 'ACTIVE'
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 10
+        });
+        const matched = potentialBookings.find(b => {
+          const bDigits = String(b.buyerPhone || b.customerPhone || '').replace(/\D/g, '');
+          return bDigits && (bDigits.includes(cleanDigits) || cleanDigits.includes(bDigits));
+        });
+        if (matched) {
+          finalLinkedBookingId = matched.id;
+          finalLinkedBookingNumber = matched.invoiceNumber;
+        }
+      }
+    }
 
     // Generate unique prefix based on category
     let prefix = 'REC';
@@ -648,9 +800,10 @@ const createInvoice = async (req, res) => {
         carRegNumber: registrationNo || carRegNumber || null,
         saleAmount: saleAmount !== undefined && saleAmount !== null ? String(saleAmount) : String(numericTotalPrice),
         commissionPercent: commissionPercent !== undefined && commissionPercent !== null ? String(commissionPercent) : String(numericCommPercent),
-        commissionAmount: String(commissionAmount),
+        commissionAmount: String(calculatedCommission),
         totalAmount: String(totalAmountCalculated),
         paymentStatus: paymentStatus || 'PAID',
+
         // Accounts & Payment Mode Fields
         paymentMethod: paymentMethod || 'CASH',
         bankAccountId: bankAccountId || null,
@@ -661,6 +814,18 @@ const createInvoice = async (req, res) => {
         deliveryStatus: deliveryStatus || (category === 'DELIVERY_LETTER' ? 'DELIVERED' : 'DELIVERED'),
         isDoubleSaleLiability: Boolean(isDoubleSaleLiability || deliveryStatus === 'UNDELIVERED'),
         linkedChassisSaleId: linkedChassisSaleId || null,
+
+        // Consignment & Salesman Attribution
+        isCustomerVehicle: Boolean(isCustomerVehicle),
+        salesmanName: salesmanName || null,
+        salesmanId: salesmanId || null,
+
+        // Booking & Sales Receipt Linking Fields
+        linkedBookingId: finalLinkedBookingId,
+        linkedBookingNumber: finalLinkedBookingNumber,
+        bookingStatus: category === 'BOOKING_RECEIPT' ? (bookingStatus || 'ACTIVE') : (finalLinkedBookingId ? 'CONVERTED_TO_SALE' : (bookingStatus || 'ACTIVE')),
+        linkedSaleId: null,
+        linkedSaleNumber: null,
 
         // Witnesses
         witness1Name: witness1Name || null,
@@ -674,6 +839,26 @@ const createInvoice = async (req, res) => {
         createdByUser: { select: { id: true, name: true, email: true } }
       }
     });
+
+    // If this Sales Receipt was linked to a Booking Receipt, mark the Booking Receipt as deleted/converted
+    // so it disappears from active invoices & active bookings list, while preserving it in customer trade history!
+    if (finalLinkedBookingId) {
+      try {
+        await prisma.invoice.update({
+          where: { id: finalLinkedBookingId },
+          data: {
+            bookingStatus: 'CONVERTED_TO_SALE',
+            isDeleted: true,
+            deletedAt: new Date(),
+            deletedReason: `CONVERTED_TO_SALE_${newInvoice.invoiceNumber}`,
+            linkedSaleId: newInvoice.id,
+            linkedSaleNumber: newInvoice.invoiceNumber
+          }
+        });
+      } catch (bkUpdateErr) {
+        console.warn('Failed to delete/convert linked booking receipt:', bkUpdateErr.message);
+      }
+    }
 
     // ----------------------------------------------------
     // AUTOMATED FINANCIAL LEDGER POSTINGS (DOUBLE ENTRY)
@@ -692,25 +877,26 @@ const createInvoice = async (req, res) => {
             type: 'PAYMENT_VOUCHER',
             category: paymentMethod || 'CASH',
             amount: paymentAmt,
-            referenceId: newInvoice.id,
-            linkUrl: '/invoices'
+            referenceId: newInvoice.id
           }
         });
       } else if (category !== 'PAYMENT_VOUCHER') {
-        const totalReceived = (numericAdvance > 0 ? numericAdvance : numericTotalPrice);
+        const isBooking = category === 'BOOKING_RECEIPT';
+        const totalReceived = isBooking 
+          ? (numericAdvance > 0 ? numericAdvance : numericTotalPrice)
+          : (numericAdvance > 0 ? numericRemaining : numericTotalPrice);
+
         if (totalReceived > 0) {
-          const isBooking = category === 'BOOKING_RECEIPT';
           const typeLabel = isBooking ? 'Booking Receipt' : 'Sales Receipt';
           await prisma.notification.create({
             data: {
               targetRole: 'ACCOUNTS_HEAD',
               title: isBooking ? `📅 New Booking Inflow: Rs. ${totalReceived.toLocaleString()}` : `💰 New Sales Inflow: Rs. ${totalReceived.toLocaleString()}`,
-              message: `${typeLabel} #${invoiceNumber} generated for ${finalVehicleMaker} ${finalVehicleModel} (Chassis: ${chassisNumber || 'N/A'}). Received Rs. ${totalReceived.toLocaleString()} from Customer ${finalBuyerName} by ${req.user.name || 'Sales Officer'}.`,
+              message: `${typeLabel} #${invoiceNumber} generated for ${finalVehicleMaker} ${finalVehicleModel} (Chassis: ${chassisNumber || 'N/A'}). Received Rs. ${totalReceived.toLocaleString()} from Customer ${finalBuyerName} by ${req.user.name || 'Sales Officer'}.${finalLinkedBookingNumber ? ' (Adjusted Booking: #' + finalLinkedBookingNumber + ')' : ''}`,
               type: category || 'FINANCIAL_INFLOW',
               category: paymentMethod || 'CASH',
               amount: totalReceived,
-              referenceId: newInvoice.id,
-              linkUrl: '/invoices'
+              referenceId: newInvoice.id
             }
           });
         }
@@ -879,7 +1065,17 @@ const updateInvoice = async (req, res) => {
       installmentStartDate,
       deliveryStatus,
       isDoubleSaleLiability,
-      linkedChassisSaleId
+      linkedChassisSaleId,
+      // Booking & Sales Receipt Linking Fields
+      linkedBookingId,
+      linkedBookingNumber,
+      bookingStatus,
+      // Consignment & Salesman Fields
+      isCustomerVehicle,
+      salesmanName,
+      salesmanId,
+      commissionAmount,
+      commissionPercent
     } = req.body;
 
     const finalSellerPhoto = sellerPhoto ? await handleCloudinaryUpload(sellerPhoto, 'sellers') : existing.sellerPhoto;
@@ -951,6 +1147,9 @@ const updateInvoice = async (req, res) => {
         paymentDuration: paymentDuration !== undefined ? paymentDuration : existing.paymentDuration,
         dated: dated !== undefined ? dated : existing.dated,
 
+        commissionAmount: commissionAmount !== undefined ? (commissionAmount !== null && String(commissionAmount).trim() !== '' ? String(parsePakistaniPrice(commissionAmount)) : '') : existing.commissionAmount,
+        commissionPercent: commissionPercent !== undefined ? (commissionPercent ? String(commissionPercent) : '') : existing.commissionPercent,
+
         paymentMethod: paymentMethod !== undefined ? paymentMethod : existing.paymentMethod,
         bankAccountId: bankAccountId !== undefined ? bankAccountId : existing.bankAccountId,
         cashAmountReceived: cashAmountReceived !== undefined ? (cashAmountReceived ? String(parsePakistaniPrice(cashAmountReceived)) : null) : existing.cashAmountReceived,
@@ -960,12 +1159,38 @@ const updateInvoice = async (req, res) => {
         isDoubleSaleLiability: isDoubleSaleLiability !== undefined ? Boolean(isDoubleSaleLiability) : existing.isDoubleSaleLiability,
         linkedChassisSaleId: linkedChassisSaleId !== undefined ? linkedChassisSaleId : existing.linkedChassisSaleId,
 
+        // Consignment & Salesman Attribution
+        isCustomerVehicle: isCustomerVehicle !== undefined ? Boolean(isCustomerVehicle) : existing.isCustomerVehicle,
+        salesmanName: salesmanName !== undefined ? salesmanName : existing.salesmanName,
+        salesmanId: salesmanId !== undefined ? salesmanId : existing.salesmanId,
+
+        // Booking & Sales Receipt Linking Fields
+        linkedBookingId: linkedBookingId !== undefined ? linkedBookingId : existing.linkedBookingId,
+        linkedBookingNumber: linkedBookingNumber !== undefined ? linkedBookingNumber : existing.linkedBookingNumber,
+        bookingStatus: bookingStatus !== undefined ? bookingStatus : existing.bookingStatus,
+
         witness1Name: witness1Name !== undefined ? witness1Name : existing.witness1Name,
         witness1Cnic: witness1Cnic !== undefined ? witness1Cnic : existing.witness1Cnic,
         witness2Name: witness2Name !== undefined ? witness2Name : existing.witness2Name,
         witness2Cnic: witness2Cnic !== undefined ? witness2Cnic : existing.witness2Cnic
       }
     });
+
+    if (linkedBookingId || existing.linkedBookingId) {
+      const targetBookingId = linkedBookingId || existing.linkedBookingId;
+      try {
+        await prisma.invoice.update({
+          where: { id: targetBookingId },
+          data: {
+            bookingStatus: 'CONVERTED_TO_SALE',
+            linkedSaleId: id,
+            linkedSaleNumber: existing.invoiceNumber
+          }
+        });
+      } catch (bkErr) {
+        console.warn('Failed to update linked booking receipt state on update:', bkErr.message);
+      }
+    }
 
     try {
       await syncInvoiceLedgerTransactions(id, req.user.id);
@@ -994,6 +1219,22 @@ const deleteInvoice = async (req, res) => {
 
     if (!existing) {
       return res.status(404).json({ message: 'Invoice not found' });
+    }
+
+    // If this was a Sales Receipt linked to a Booking Receipt, roll back the booking receipt to ACTIVE
+    if (existing.linkedBookingId) {
+      try {
+        await prisma.invoice.update({
+          where: { id: existing.linkedBookingId },
+          data: {
+            bookingStatus: 'ACTIVE',
+            linkedSaleId: null,
+            linkedSaleNumber: null
+          }
+        });
+      } catch (revertErr) {
+        console.warn('Failed to revert linked booking receipt status on deletion:', revertErr.message);
+      }
     }
 
     // Revert and delete any linked transactions from the ledger
@@ -1058,6 +1299,154 @@ const deleteInvoice = async (req, res) => {
     return res.json({ message: 'Invoice deleted successfully' });
   } catch (error) {
     return res.status(500).json({ message: 'Failed to delete invoice', error: error.message });
+  }
+};
+
+// ----------------------------------------------------
+// CANCEL BOOKING RECEIPT & ISSUE REFUND PAYMENT VOUCHER
+// ----------------------------------------------------
+const cancelBookingAndIssueRefund = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { 
+      refundPaymentMethod = 'CASH', 
+      bankAccountId = null, 
+      cancellationReason = '', 
+      refundDate = null 
+    } = req.body;
+
+    const booking = await prisma.invoice.findUnique({ where: { id } });
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking receipt not found' });
+    }
+
+    if (booking.category !== 'BOOKING_RECEIPT') {
+      return res.status(400).json({ message: 'Only booking receipts can be cancelled via this refund procedure' });
+    }
+
+    if (booking.bookingStatus === 'CANCELLED') {
+      return res.status(400).json({ message: 'This booking receipt is already cancelled' });
+    }
+
+    if (booking.bookingStatus === 'CONVERTED_TO_SALE') {
+      return res.status(400).json({ message: 'Cannot cancel a booking that has already been converted to a completed sale' });
+    }
+
+    const advancePaid = parsePakistaniPrice(booking.advanceAmount || booking.totalPrice || booking.agreedAmount || 0);
+
+    // 1. Generate Payment Voucher for the Refund
+    const today = refundDate ? new Date(refundDate) : new Date();
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const voucherNumber = `PV-${dateStr}-${randomSuffix}`;
+
+    const finalPayeeName = booking.buyerName || booking.customerName || 'Customer';
+    const vehicleDesc = `${booking.vehicleMaker || ''} ${booking.vehicleModel || ''}`.trim() || 'Vehicle';
+
+    const refundVoucher = await prisma.invoice.create({
+      data: {
+        invoiceNumber: voucherNumber,
+        category: 'PAYMENT_VOUCHER',
+        date: today,
+        registrationNo: booking.registrationNo || null,
+        
+        // Payee & Buyer Info
+        buyerName: finalPayeeName,
+        buyerPhone: booking.buyerPhone || booking.customerPhone || null,
+        buyerCnic: booking.buyerCnic || null,
+        buyerAddress: booking.buyerAddress || booking.customerCity || null,
+        payeeName: finalPayeeName,
+
+        // Head of Account
+        headOfAccount: 'Booking Advance Refund (کسٹمر بکنگ ایڈوانس واپسی)',
+        onAccount: `Advance refund for cancelled booking #${booking.invoiceNumber}`,
+        remarks: `Refund of advance payment on cancellation of Booking #${booking.invoiceNumber} (${vehicleDesc})${cancellationReason ? ' - ' + cancellationReason : ''}`,
+
+        // Vehicle info
+        vehicleMaker: booking.vehicleMaker || null,
+        vehicleModel: booking.vehicleModel || null,
+        carYear: booking.carYear || null,
+        chassisNumber: booking.chassisNumber || null,
+        color: booking.color || null,
+
+        // Financials (Amount Refunded)
+        totalPrice: String(advancePaid),
+        agreedAmount: String(advancePaid),
+        cashAmount: String(advancePaid),
+        saleAmount: String(advancePaid),
+        totalAmount: String(advancePaid),
+        paymentStatus: 'PAID',
+
+        // Payment Mode
+        paymentMethod: refundPaymentMethod || 'CASH',
+        bankAccountId: refundPaymentMethod === 'BANK' ? bankAccountId : null,
+
+        // References
+        linkedBookingId: booking.id,
+        linkedBookingNumber: booking.invoiceNumber,
+
+        createdBy: req.user.id
+      }
+    });
+
+    // 2. Synchronize Double-Entry Ledger Transactions for the Payment Voucher (Debits Refund/Expense, Credits Safe/Bank)
+    if (advancePaid > 0) {
+      try {
+        await syncInvoiceLedgerTransactions(refundVoucher.id, req.user.id);
+      } catch (ledgerErr) {
+        console.error('Ledger sync error on refund voucher (non-fatal):', ledgerErr.message);
+      }
+    }
+
+    // 3. Mark the Booking Receipt as CANCELLED and Deleted from Active Invoices
+    const updatedBooking = await prisma.invoice.update({
+      where: { id: booking.id },
+      data: {
+        bookingStatus: 'CANCELLED',
+        isDeleted: true,
+        deletedAt: new Date(),
+        deletedReason: `CANCELLED_REFUNDED_${refundVoucher.invoiceNumber}`,
+        linkedVoucherId: refundVoucher.id,
+        linkedVoucherNumber: refundVoucher.invoiceNumber,
+        cancellationReason: cancellationReason || 'Customer requested booking cancellation',
+        cancelledAt: new Date()
+      }
+    });
+
+    // 4. Log Activity
+    await prisma.activityLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'CANCEL_BOOKING_REFUND',
+        details: `Cancelled Booking ${booking.invoiceNumber} and issued Refund Payment Voucher ${refundVoucher.invoiceNumber} for Rs. ${advancePaid.toLocaleString()}`
+      }
+    });
+
+    // 5. Notification Dispatch
+    try {
+      await prisma.notification.create({
+        data: {
+          targetRole: 'ACCOUNTS_HEAD',
+          title: `❌ Booking Cancelled & Refunded: Rs. ${advancePaid.toLocaleString()}`,
+          message: `Booking #${booking.invoiceNumber} (${vehicleDesc}) was cancelled for Customer ${finalPayeeName}. Payment Voucher #${refundVoucher.invoiceNumber} issued for refund via [${refundPaymentMethod}].`,
+          type: 'PAYMENT_VOUCHER',
+          category: refundPaymentMethod,
+          amount: advancePaid,
+          referenceId: refundVoucher.id
+        }
+      });
+    } catch (notifErr) {
+      console.warn('Notification error on cancellation:', notifErr.message);
+    }
+
+    return res.json({
+      message: 'Booking cancelled successfully and refund Payment Voucher generated',
+      paymentVoucher: refundVoucher,
+      bookingReceipt: updatedBooking
+    });
+  } catch (error) {
+    console.error('cancelBookingAndIssueRefund error:', error);
+    return res.status(500).json({ message: 'Failed to cancel booking and generate refund voucher', error: error.message });
   }
 };
 
@@ -1154,13 +1543,411 @@ const deleteInvoiceImage = async (req, res) => {
   }
 };
 
+// ----------------------------------------------------
+// SALESMAN INCENTIVES AGGREGATION CONTROLLER
+// ----------------------------------------------------
+const getSalesmanIncentives = async (req, res) => {
+  try {
+    const { salesman, search, startDate, endDate } = req.query;
+
+    const whereClause = {
+      category: 'SALES_RECEIPT'
+    };
+
+    if (startDate || endDate) {
+      whereClause.date = {};
+      if (startDate) whereClause.date.gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        whereClause.date.lte = end;
+      }
+    }
+
+    const [allSales, users] = await Promise.all([
+      prisma.invoice.findMany({
+        where: whereClause,
+        orderBy: { date: 'desc' },
+        include: {
+          createdByUser: { select: { id: true, name: true, email: true, role: true } }
+        }
+      }),
+      prisma.user.findMany({
+        select: { id: true, name: true, email: true, role: true }
+      })
+    ]);
+
+    // Group sales by Salesman Name (case-insensitive / normalized)
+    const salesmanMap = new Map();
+
+    allSales.forEach(inv => {
+      const sName = (inv.salesmanName && inv.salesmanName.trim() !== '')
+        ? inv.salesmanName.trim()
+        : (inv.createdByUser?.name || 'Direct Showroom Staff');
+
+      const sKey = sName.toLowerCase();
+      if (!salesmanMap.has(sKey)) {
+        const matchedUser = users.find(u => u.name.toLowerCase() === sKey || u.id === inv.salesmanId);
+        salesmanMap.set(sKey, {
+          salesmanName: sName,
+          salesmanId: inv.salesmanId || matchedUser?.id || null,
+          role: matchedUser?.role || 'SALES_EXECUTIVE',
+          email: matchedUser?.email || null,
+          totalVehiclesSold: 0,
+          totalSalesVolume: 0,
+          totalCommissionEarned: 0,
+          consignmentSalesCount: 0,
+          showroomSalesCount: 0,
+          soldVehicles: []
+        });
+      }
+
+      const sm = salesmanMap.get(sKey);
+      const vehiclePrice = parsePakistaniPrice(inv.totalPrice || inv.agreedAmount || inv.saleAmount || 0);
+      const commAmt = parsePakistaniPrice(inv.commissionAmount || 0);
+
+      sm.totalVehiclesSold += 1;
+      sm.totalSalesVolume += vehiclePrice;
+      sm.totalCommissionEarned += commAmt;
+
+      if (inv.isCustomerVehicle) {
+        sm.consignmentSalesCount += 1;
+      } else {
+        sm.showroomSalesCount += 1;
+      }
+
+      sm.soldVehicles.push({
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        date: inv.date,
+        registrationNo: inv.registrationNo,
+        vehicleMaker: inv.vehicleMaker,
+        vehicleModel: inv.vehicleModel,
+        carYear: inv.carYear,
+        color: inv.color,
+        chassisNumber: inv.chassisNumber,
+        price: vehiclePrice,
+        isCustomerVehicle: Boolean(inv.isCustomerVehicle),
+        commissionAmount: commAmt,
+        commissionPercent: inv.commissionPercent || '0',
+        buyerName: inv.buyerName,
+        buyerPhone: inv.buyerPhone,
+        sellerName: inv.sellerName,
+        sellerPhone: inv.sellerPhone,
+        paymentMethod: inv.paymentMethod,
+        deliveryStatus: inv.deliveryStatus
+      });
+    });
+
+    let salesmenList = Array.from(salesmanMap.values());
+
+    if (search && search.trim() !== '') {
+      const q = search.toLowerCase().trim();
+      salesmenList = salesmenList.filter(s => 
+        s.salesmanName.toLowerCase().includes(q) ||
+        s.soldVehicles.some(v => 
+          (v.vehicleMaker && v.vehicleMaker.toLowerCase().includes(q)) ||
+          (v.vehicleModel && v.vehicleModel.toLowerCase().includes(q)) ||
+          (v.registrationNo && v.registrationNo.toLowerCase().includes(q)) ||
+          (v.buyerName && v.buyerName.toLowerCase().includes(q)) ||
+          (v.sellerName && v.sellerName.toLowerCase().includes(q))
+        )
+      );
+    }
+
+    if (salesman && salesman !== 'ALL') {
+      salesmenList = salesmenList.filter(s => s.salesmanName.toLowerCase() === salesman.toLowerCase());
+    }
+
+    // Sort by total sold cars descending
+    salesmenList.sort((a, b) => b.totalVehiclesSold - a.totalVehiclesSold || b.totalSalesVolume - a.totalSalesVolume);
+
+    const overallStats = {
+      totalSalesmenCount: salesmenList.length,
+      totalVehiclesSold: salesmenList.reduce((acc, s) => acc + s.totalVehiclesSold, 0),
+      totalSalesVolume: salesmenList.reduce((acc, s) => acc + s.totalSalesVolume, 0),
+      totalCommissionEarned: salesmenList.reduce((acc, s) => acc + s.totalCommissionEarned, 0)
+    };
+
+    return res.json({
+      salesmen: salesmenList,
+      overallStats
+    });
+  } catch (error) {
+    console.error('getSalesmanIncentives error:', error);
+    return res.status(500).json({ message: 'Failed to fetch salesman incentives', error: error.message });
+  }
+};
+
+// ----------------------------------------------------
+// CUSTOMER & TRADE HISTORY CONTROLLER (BUYERS & SELLERS)
+// ----------------------------------------------------
+const getCustomerTradeHistory = async (req, res) => {
+  try {
+    const { search = '', type = 'ALL' } = req.query;
+
+    const [salesInvoices, bookingInvoices] = await Promise.all([
+      prisma.invoice.findMany({
+        where: { category: 'SALES_RECEIPT' },
+        orderBy: { date: 'desc' }
+      }),
+      prisma.invoice.findMany({
+        where: { category: 'BOOKING_RECEIPT' },
+        orderBy: { date: 'desc' }
+      })
+    ]);
+
+    const buyerMap = new Map();
+    const sellerMap = new Map();
+
+    salesInvoices.forEach(inv => {
+      const price = parsePakistaniPrice(inv.totalPrice || inv.agreedAmount || inv.saleAmount || 0);
+      const commAmt = parsePakistaniPrice(inv.commissionAmount || 0);
+
+      // 1. BUYER MAPPING
+      const bName = inv.buyerName ? inv.buyerName.trim() : null;
+      const bPhone = inv.buyerPhone ? inv.buyerPhone.trim() : '';
+      const bCnic = inv.buyerCnic ? inv.buyerCnic.trim() : '';
+      const bAddress = inv.buyerAddress ? inv.buyerAddress.trim() : '';
+
+      if (bName && bName.toLowerCase() !== 'n/a') {
+        const bKey = (bPhone.replace(/\D/g, '').length >= 7)
+          ? `PHONE_${bPhone.replace(/\D/g, '')}`
+          : (bCnic.replace(/\D/g, '').length >= 9)
+            ? `CNIC_${bCnic.replace(/\D/g, '')}`
+            : `NAME_${bName.toLowerCase()}`;
+
+        if (!buyerMap.has(bKey)) {
+          buyerMap.set(bKey, {
+            customerKey: bKey,
+            type: 'BUYER',
+            name: bName,
+            fatherName: inv.buyerFatherName || '',
+            phone: bPhone,
+            cnic: bCnic,
+            address: bAddress,
+            totalVehiclesBought: 0,
+            totalSpent: 0,
+            totalBookingsCount: 0,
+            purchasedVehicles: [],
+            bookingHistory: []
+          });
+        }
+
+        const bData = buyerMap.get(bKey);
+        bData.totalVehiclesBought += 1;
+        bData.totalSpent += price;
+        if (!bData.phone && bPhone) bData.phone = bPhone;
+        if (!bData.cnic && bCnic) bData.cnic = bCnic;
+        if (!bData.address && bAddress) bData.address = bAddress;
+
+        bData.purchasedVehicles.push({
+          id: inv.id,
+          invoiceNumber: inv.invoiceNumber,
+          date: inv.date,
+          vehicleMaker: inv.vehicleMaker || '',
+          vehicleModel: inv.vehicleModel || '',
+          carYear: inv.carYear || '',
+          registrationNo: inv.registrationNo || '',
+          chassisNumber: inv.chassisNumber || '',
+          color: inv.color || '',
+          price,
+          advanceAmount: parsePakistaniPrice(inv.advanceAmount || 0),
+          remainingAmount: parsePakistaniPrice(inv.remainingAmount || 0),
+          linkedBookingNumber: inv.linkedBookingNumber || null,
+          sellerName: inv.sellerName || 'AL-ASR Showroom Stock',
+          sellerPhone: inv.sellerPhone || '',
+          salesmanName: inv.salesmanName || 'Showroom Staff',
+          paymentMethod: inv.paymentMethod || 'CASH',
+          deliveryStatus: inv.deliveryStatus || 'DELIVERED',
+          isCustomerVehicle: Boolean(inv.isCustomerVehicle)
+        });
+      }
+
+      // 2. SELLER MAPPING
+      const sName = inv.sellerName ? inv.sellerName.trim() : null;
+      const sPhone = inv.sellerPhone ? inv.sellerPhone.trim() : '';
+      const sCnic = inv.sellerCnic ? inv.sellerCnic.trim() : '';
+      const sAddress = inv.sellerAddress ? inv.sellerAddress.trim() : '';
+
+      if (sName && sName.toLowerCase() !== 'n/a') {
+        const sKey = (sPhone.replace(/\D/g, '').length >= 7)
+          ? `PHONE_${sPhone.replace(/\D/g, '')}`
+          : (sCnic.replace(/\D/g, '').length >= 9)
+            ? `CNIC_${sCnic.replace(/\D/g, '')}`
+            : `NAME_${sName.toLowerCase()}`;
+
+        if (!sellerMap.has(sKey)) {
+          sellerMap.set(sKey, {
+            customerKey: sKey,
+            type: 'SELLER',
+            name: sName,
+            fatherName: inv.sellerFatherName || '',
+            phone: sPhone,
+            cnic: sCnic,
+            address: sAddress,
+            totalVehiclesSold: 0,
+            totalVolume: 0,
+            totalCommissionPaid: 0,
+            consignmentCount: 0,
+            directShowroomCount: 0,
+            soldVehicles: []
+          });
+        }
+
+        const sData = sellerMap.get(sKey);
+        sData.totalVehiclesSold += 1;
+        sData.totalVolume += price;
+        sData.totalCommissionPaid += commAmt;
+        if (inv.isCustomerVehicle) sData.consignmentCount += 1;
+        else sData.directShowroomCount += 1;
+        if (!sData.phone && sPhone) sData.phone = sPhone;
+        if (!sData.cnic && sCnic) sData.cnic = sCnic;
+        if (!sData.address && sAddress) sData.address = sAddress;
+
+        sData.soldVehicles.push({
+          id: inv.id,
+          invoiceNumber: inv.invoiceNumber,
+          date: inv.date,
+          vehicleMaker: inv.vehicleMaker || '',
+          vehicleModel: inv.vehicleModel || '',
+          carYear: inv.carYear || '',
+          registrationNo: inv.registrationNo || '',
+          chassisNumber: inv.chassisNumber || '',
+          color: inv.color || '',
+          price,
+          commissionAmount: commAmt,
+          isCustomerVehicle: Boolean(inv.isCustomerVehicle),
+          buyerName: inv.buyerName || 'Customer',
+          buyerPhone: inv.buyerPhone || '',
+          salesmanName: inv.salesmanName || 'Showroom Staff',
+          paymentMethod: inv.paymentMethod || 'CASH',
+          deliveryStatus: inv.deliveryStatus || 'DELIVERED'
+        });
+      }
+    });
+
+    // Populate Booking History for Buyers
+    bookingInvoices.forEach(bk => {
+      const bkName = bk.buyerName || bk.customerName ? (bk.buyerName || bk.customerName).trim() : null;
+      const bkPhone = bk.buyerPhone || bk.customerPhone ? (bk.buyerPhone || bk.customerPhone).trim() : '';
+      const bkCnic = bk.buyerCnic ? bk.buyerCnic.trim() : '';
+      const bkAddress = bk.buyerAddress ? bk.buyerAddress.trim() : '';
+
+      if (bkName && bkName.toLowerCase() !== 'n/a') {
+        const bKey = (bkPhone.replace(/\D/g, '').length >= 7)
+          ? `PHONE_${bkPhone.replace(/\D/g, '')}`
+          : (bkCnic.replace(/\D/g, '').length >= 9)
+            ? `CNIC_${bkCnic.replace(/\D/g, '')}`
+            : `NAME_${bkName.toLowerCase()}`;
+
+        if (!buyerMap.has(bKey)) {
+          buyerMap.set(bKey, {
+            customerKey: bKey,
+            type: 'BUYER',
+            name: bkName,
+            fatherName: bk.buyerFatherName || '',
+            phone: bkPhone,
+            cnic: bkCnic,
+            address: bkAddress,
+            totalVehiclesBought: 0,
+            totalSpent: 0,
+            totalBookingsCount: 0,
+            purchasedVehicles: [],
+            bookingHistory: []
+          });
+        }
+
+        const bData = buyerMap.get(bKey);
+        bData.totalBookingsCount = (bData.totalBookingsCount || 0) + 1;
+        if (!bData.phone && bkPhone) bData.phone = bkPhone;
+        if (!bData.cnic && bkCnic) bData.cnic = bkCnic;
+        if (!bData.address && bkAddress) bData.address = bkAddress;
+
+        bData.bookingHistory.push({
+          id: bk.id,
+          bookingNumber: bk.invoiceNumber,
+          date: bk.date,
+          vehicleMaker: bk.vehicleMaker || '',
+          vehicleModel: bk.vehicleModel || '',
+          carYear: bk.carYear || '',
+          registrationNo: bk.registrationNo || '',
+          chassisNumber: bk.chassisNumber || '',
+          advanceAmount: parsePakistaniPrice(bk.advanceAmount || 0),
+          totalPrice: parsePakistaniPrice(bk.totalPrice || 0),
+          isDeleted: Boolean(bk.isDeleted),
+          bookingStatus: bk.bookingStatus || (bk.isDeleted ? 'CONVERTED_TO_SALE' : 'ACTIVE'),
+          linkedSaleId: bk.linkedSaleId || null,
+          linkedSaleNumber: bk.linkedSaleNumber || null,
+          linkedVoucherId: bk.linkedVoucherId || null,
+          linkedVoucherNumber: bk.linkedVoucherNumber || null,
+          cancellationReason: bk.cancellationReason || null,
+          cancelledAt: bk.cancelledAt || null,
+          salesmanName: bk.salesmanName || 'Showroom Staff'
+        });
+      }
+    });
+
+    let buyersList = Array.from(buyerMap.values());
+    let sellersList = Array.from(sellerMap.values());
+
+    if (search && search.trim() !== '') {
+      const q = search.toLowerCase().trim();
+      buyersList = buyersList.filter(b => 
+        b.name.toLowerCase().includes(q) ||
+        (b.phone && b.phone.includes(q)) ||
+        (b.cnic && b.cnic.includes(q)) ||
+        b.purchasedVehicles.some(v => 
+          v.vehicleMaker.toLowerCase().includes(q) ||
+          v.vehicleModel.toLowerCase().includes(q) ||
+          v.registrationNo.toLowerCase().includes(q) ||
+          v.chassisNumber.toLowerCase().includes(q)
+        )
+      );
+
+      sellersList = sellersList.filter(s => 
+        s.name.toLowerCase().includes(q) ||
+        (s.phone && s.phone.includes(q)) ||
+        (s.cnic && s.cnic.includes(q)) ||
+        s.soldVehicles.some(v => 
+          v.vehicleMaker.toLowerCase().includes(q) ||
+          v.vehicleModel.toLowerCase().includes(q) ||
+          v.registrationNo.toLowerCase().includes(q) ||
+          v.chassisNumber.toLowerCase().includes(q)
+        )
+      );
+    }
+
+    buyersList.sort((a, b) => b.totalVehiclesBought - a.totalVehiclesBought || b.totalSpent - a.totalSpent);
+    sellersList.sort((a, b) => b.totalVehiclesSold - a.totalVehiclesSold || b.totalVolume - a.totalVolume);
+
+    return res.json({
+      buyers: buyersList,
+      sellers: sellersList,
+      stats: {
+        totalUniqueBuyers: buyerMap.size,
+        totalUniqueSellers: sellerMap.size,
+        totalPurchasesRecorded: salesInvoices.length
+      }
+    });
+  } catch (error) {
+    console.error('getCustomerTradeHistory error:', error);
+    return res.status(500).json({ message: 'Failed to fetch customer trade history', error: error.message });
+  }
+};
+
 module.exports = {
   getInvoices,
   getInvoiceById,
+  findActiveBookingByPhone,
   createInvoice,
   updateInvoice,
   deleteInvoice,
+  cancelBookingAndIssueRefund,
   uploadInvoiceImages,
   deleteInvoiceImage,
-  syncInvoiceLedgerTransactions
+  syncInvoiceLedgerTransactions,
+  getSalesmanIncentives,
+  getCustomerTradeHistory
 };
+

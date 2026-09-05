@@ -23,6 +23,8 @@ import IncentiveApprovalSheet from './pages/IncentiveApprovalSheet';
 import Attendance from './pages/Attendance';
 import Approvals from './pages/Approvals';
 import Settings from './pages/Settings';
+import SalesmanIncentives from './pages/SalesmanIncentives';
+import CustomerHistory from './pages/CustomerHistory';
 
 function MainLayout() {
   const { user, isAdmin, isSuperAdmin, canAccessAccounts, loading } = useAuth();
@@ -201,6 +203,14 @@ function MainLayout() {
 
           <div className={(currentTab === 'invoices' && canAccessAccounts) ? 'block' : 'hidden'}>
             <Invoices onNavigate={(tab) => setCurrentTab(tab)} />
+          </div>
+
+          <div className={currentTab === 'salesman_incentives' ? 'block' : 'hidden'}>
+            <SalesmanIncentives onNavigate={(tab) => setCurrentTab(tab)} />
+          </div>
+
+          <div className={currentTab === 'customer_history' ? 'block' : 'hidden'}>
+            <CustomerHistory onNavigate={(tab) => setCurrentTab(tab)} />
           </div>
 
           <div className={currentTab === 'notifications' ? 'block' : 'hidden'}>

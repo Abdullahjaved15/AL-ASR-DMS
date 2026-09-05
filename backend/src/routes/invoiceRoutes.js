@@ -8,10 +8,14 @@ const upload = require('../middleware/upload');
 // Invoices & Vouchers accessible by SUPER_ADMIN, ACCOUNTS_HEAD, and ACCOUNTANT
 router.use(authenticateToken, requireAccountsAccess);
 
+router.get('/booking-by-phone', invoiceController.findActiveBookingByPhone);
+router.get('/salesman-incentives', invoiceController.getSalesmanIncentives);
+router.get('/customer-history', invoiceController.getCustomerTradeHistory);
 router.get('/', invoiceController.getInvoices);
 router.get('/:id', invoiceController.getInvoiceById);
 router.post('/', invoiceController.createInvoice);
 router.put('/:id', invoiceController.updateInvoice);
+router.post('/:id/cancel-booking', invoiceController.cancelBookingAndIssueRefund);
 
 // Delete Invoice restricted to ACCOUNTS_HEAD and SUPER_ADMIN
 router.delete('/:id', requireAccountsHeadOrSuperAdmin, invoiceController.deleteInvoice);

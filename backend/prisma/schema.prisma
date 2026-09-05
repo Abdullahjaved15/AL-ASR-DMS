@@ -265,6 +265,26 @@ model Invoice {
   isDoubleSaleLiability Boolean  @default(false)
   linkedChassisSaleId  String?
 
+  // Booking & Sales Receipt Linking Fields
+  linkedBookingId      String?   // If this is a Sales Receipt, references the Booking Receipt ID
+  linkedBookingNumber  String?   // e.g. BK-20260905-1234
+  bookingStatus        String?   @default("ACTIVE") // ACTIVE, CONVERTED_TO_SALE, SETTLED, CANCELLED
+  linkedSaleId         String?   // If this is a Booking Receipt, references the created Sales Receipt ID
+  linkedSaleNumber     String?   // e.g. REC-20260905-5678
+  linkedVoucherId      String?   // If this is a Booking Receipt, references the refund Payment Voucher ID (or vice versa)
+  linkedVoucherNumber  String?   // e.g. PV-20260905-5678
+  cancellationReason   String?   // Reason for booking cancellation
+  cancelledAt          DateTime? // Cancellation timestamp
+
+  // Consignment / Customer-Owned Vehicle Fields & Salesman Attribution
+  isCustomerVehicle    Boolean   @default(false)
+  salesmanName         String?
+  salesmanId           String?
+  // Deletion / Archival Status (for converted bookings or soft-deletes)
+  isDeleted            Boolean   @default(false)
+  deletedAt            DateTime?
+  deletedReason        String?
+
   // Witnesses
   witness1Name     String?
   witness1Cnic     String?
@@ -283,6 +303,11 @@ model Invoice {
   @@index([createdAt])
   @@index([chassisNumber])
   @@index([deliveryStatus])
+  @@index([buyerPhone])
+  @@index([linkedBookingId])
+  @@index([isCustomerVehicle])
+  @@index([isDeleted])
+  @@index([salesmanName])
 }
 
 model InvoiceImage {

@@ -24,7 +24,9 @@ import {
   Bell,
   X,
   Layers,
-  FileText
+  FileText,
+  Award,
+  History
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
@@ -64,6 +66,8 @@ export default function Sidebar({ currentTab, setCurrentTab, isMobileOpen, setIs
     { id: 'accounts_stock', label: 'Accounts Current Stock', icon: Layers, role: 'ACCOUNTS' },
     { id: 'invoices', label: 'Invoices & Payment Vouchers', icon: Receipt, role: 'ACCOUNTS' },
     { id: 'audit_trail', label: 'Audit Trail & Day Book', icon: FileText, role: 'ACCOUNTS' },
+    { id: 'salesman_incentives', label: 'Salesman Incentives', icon: Award, role: 'ALL' },
+    { id: 'customer_history', label: 'Trade & Customer History', icon: History, role: 'ALL' },
     { id: 'all_sellers', label: 'All Sellers Inventory', icon: Car, role: 'ALL' },
     { id: 'my_sellers', label: 'My Sellers Leads', icon: UserCheck, role: 'ALL' },
     { id: 'commercial_sellers', label: 'Commercial Vehicle Sellers', icon: Truck, role: 'ALL' },

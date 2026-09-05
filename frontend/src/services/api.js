@@ -353,6 +353,23 @@ export const api = {
     return handleResponse(res);
   },
 
+  getSalesmanIncentives: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/invoices/salesman-incentives?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  getCustomerTradeHistory: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/invoices/customer-history?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  getActiveBookingByPhone: async (phone) => {
+    const res = await fetch(`${API_BASE}/invoices/booking-by-phone?phone=${encodeURIComponent(phone || '')}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
   getInvoiceById: async (id) => {
     const res = await fetch(`${API_BASE}/invoices/${id}`, { headers: getHeaders() });
     return handleResponse(res);
@@ -380,6 +397,15 @@ export const api = {
     const res = await fetch(`${API_BASE}/invoices/${id}`, {
       method: 'DELETE',
       headers: getHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  cancelBooking: async (id, data = {}) => {
+    const res = await fetch(`${API_BASE}/invoices/${id}/cancel-booking`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
     });
     return handleResponse(res);
   },

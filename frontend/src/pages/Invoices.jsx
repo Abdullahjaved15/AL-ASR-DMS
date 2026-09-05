@@ -19,7 +19,8 @@ import {
   Edit3,
   Camera,
   Upload,
-  X
+  X,
+  Building2
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -100,7 +101,7 @@ const CameraCaptureWidget = ({ label, currentPhoto, onPhotoCaptured, onPhotoRemo
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = async () => {
+      reader.onloadend = async () => {
         const compressed = await compressDataUrl(reader.result);
         onPhotoCaptured(compressed);
       };
@@ -109,40 +110,34 @@ const CameraCaptureWidget = ({ label, currentPhoto, onPhotoCaptured, onPhotoRemo
   };
 
   return (
-    <div className="bg-slate-900/60 p-3.5 rounded-xl border border-white/10 space-y-2">
-      <div className="flex justify-between items-center text-xs font-semibold text-slate-300">
-        <span>{label}</span>
-        {currentPhoto && (
-          <button type="button" onClick={onPhotoRemoved} className="text-rose-400 hover:underline text-[11px] font-mono cursor-pointer">
-            Remove Photo
-          </button>
-        )}
-      </div>
+    <div className="space-y-2">
+      <label className="block text-xs font-semibold text-slate-300">{label}</label>
 
       {currentPhoto ? (
-        <div className="relative group w-32 h-32 rounded-xl overflow-hidden border-2 border-cyan-500/50 bg-black shadow-lg">
-          <img src={currentPhoto} alt={label} className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={startCamera}
-              className="px-2.5 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-xs rounded-lg shadow cursor-pointer"
-            >
-              Retake
-            </button>
-          </div>
+        <div className="relative inline-block border border-cyan-500/40 rounded-xl overflow-hidden shadow-lg group">
+          <img src={currentPhoto} alt="Captured preview" className="w-40 h-32 object-cover" />
+          <button
+            type="button"
+            onClick={onPhotoRemoved}
+            className="absolute top-1.5 right-1.5 p-1 bg-rose-500 text-white rounded-full hover:bg-rose-600 transition-all opacity-90 group-hover:opacity-100 shadow"
+            title="Remove photo"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       ) : isCameraActive ? (
-        <div className="space-y-2">
-          <video ref={videoRef} autoPlay playsInline className="w-full max-h-52 rounded-xl border-2 border-cyan-500/50 bg-black shadow-inner" />
+        <div className="space-y-3 p-3 bg-slate-900 rounded-xl border border-cyan-500/30">
+          <div className="relative w-full max-w-sm rounded-lg overflow-hidden bg-black aspect-video">
+            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+          </div>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={takeSnapshot}
-              className="px-3.5 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 cursor-pointer shadow-md"
+              className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg flex items-center gap-1.5 cursor-pointer shadow"
             >
               <Camera className="w-4 h-4" />
-              <span>📸 Snap Photo Now</span>
+              Capture
             </button>
             <button
               type="button"
@@ -182,6 +177,7 @@ export default function Invoices({ onNavigate }) {
   const [loading, setLoading] = useState(true);
   const [bankAccounts, setBankAccounts] = useState([]);
   const [allLedgers, setAllLedgers] = useState([]);
+  const [staffUsers, setStaffUsers] = useState([]);
 
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
@@ -194,6 +190,16 @@ export default function Invoices({ onNavigate }) {
   const [selectedReceiptForImages, setSelectedReceiptForImages] = useState(null);
   const [uploadingReceiptImages, setUploadingReceiptImages] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(-1);
+
+  // Cancellation & Refund Modal States
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [bookingToCancel, setBookingToCancel] = useState(null);
+  const [cancelFormData, setCancelFormData] = useState({
+    refundPaymentMethod: 'CASH',
+    bankAccountId: '',
+    cancellationReason: ''
+  });
+  const [cancellingBooking, setCancellingBooking] = useState(false);
 
   const [formData, setFormData] = useState({
     category: 'SALES_RECEIPT',
@@ -252,6 +258,16 @@ export default function Invoices({ onNavigate }) {
     installmentFrequency: 'MONTHLY',
     installmentStartDate: new Date().toISOString().slice(0, 10),
     deliveryStatus: 'DELIVERED',
+    // Consignment & Salesman Fields
+    isCustomerVehicle: false,
+    salesmanName: '',
+    salesmanId: '',
+    commissionAmount: '',
+    commissionPercent: '',
+    // Booking & Sales Receipt Linking Fields
+    linkedBookingId: '',
+    linkedBookingNumber: '',
+    bookingStatus: 'ACTIVE',
     // Imported Vehicle
     isImported: false,
     billOfEntryNo: '',
@@ -271,11 +287,81 @@ export default function Invoices({ onNavigate }) {
     witness2Cnic: ''
   });
 
+  const [matchingBookings, setMatchingBookings] = useState([]);
+  const [searchingBookings, setSearchingBookings] = useState(false);
+  const [activeLinkedBooking, setActiveLinkedBooking] = useState(null);
+
   useEffect(() => {
     fetchInvoices();
     api.getBankAndCashAccounts().then(data => setBankAccounts(data || [])).catch(() => {});
     api.getAccounts().then(data => setAllLedgers(data?.accounts || [])).catch(() => {});
+    api.getUsers().then(data => setStaffUsers(data || [])).catch(() => {});
   }, [search, selectedCategory]);
+
+  const checkBookingByPhone = async (phone) => {
+    if (!phone || String(phone).replace(/\D/g, '').length < 5) {
+      setMatchingBookings([]);
+      return;
+    }
+    setSearchingBookings(true);
+    try {
+      const res = await api.getActiveBookingByPhone(phone);
+      if (res && res.bookings) {
+        setMatchingBookings(res.bookings);
+      } else {
+        setMatchingBookings([]);
+      }
+    } catch (err) {
+      console.warn('Booking phone lookup warning:', err.message);
+    } finally {
+      setSearchingBookings(false);
+    }
+  };
+
+  const importAndLinkBooking = (bk) => {
+    setActiveLinkedBooking(bk);
+    setMatchingBookings([]);
+    setFormData(prev => {
+      const totalNum = parsePakistaniPrice(bk.totalPrice || bk.agreedAmount || 0);
+      const advNum = parsePakistaniPrice(bk.advanceAmount || bk.cashAmount || 0);
+      const remNum = parsePakistaniPrice(bk.remainingAmount) || Math.max(0, totalNum - advNum);
+
+      return {
+        ...prev,
+        linkedBookingId: bk.id,
+        linkedBookingNumber: bk.invoiceNumber,
+        buyerName: bk.buyerName || bk.customerName || prev.buyerName,
+        buyerFatherName: bk.buyerFatherName || prev.buyerFatherName,
+        buyerCnic: bk.buyerCnic || prev.buyerCnic,
+        buyerAddress: bk.buyerAddress || bk.customerCity || prev.buyerAddress,
+        buyerPhone: bk.buyerPhone || bk.customerPhone || prev.buyerPhone,
+        vehicleMaker: bk.vehicleMaker || bk.carVehicle || prev.vehicleMaker,
+        vehicleModel: bk.vehicleModel || bk.carModel || prev.vehicleModel,
+        carYear: bk.carYear || prev.carYear,
+        registrationNo: bk.registrationNo || bk.carRegNumber || prev.registrationNo,
+        engineNumber: bk.engineNumber || prev.engineNumber,
+        chassisNumber: bk.chassisNumber || prev.chassisNumber,
+        powerCapacity: bk.powerCapacity || prev.powerCapacity,
+        color: bk.color || prev.color,
+        totalPrice: String(totalNum),
+        advanceAmount: String(advNum),
+        remainingAmount: String(remNum),
+        agreedAmount: String(totalNum),
+        agreedAmountHalf: String(Math.round(totalNum / 2)),
+        agreedAmountWords: bk.agreedAmountWords || bk.inWords || prev.agreedAmountWords,
+        inWords: bk.inWords || bk.agreedAmountWords || prev.inWords
+      };
+    });
+  };
+
+  const unlinkBooking = () => {
+    setActiveLinkedBooking(null);
+    setFormData(prev => ({
+      ...prev,
+      linkedBookingId: '',
+      linkedBookingNumber: ''
+    }));
+  };
 
   const openImageGalleryModal = (inv) => {
     setSelectedReceiptForImages(inv);
@@ -335,7 +421,38 @@ export default function Invoices({ onNavigate }) {
     }
   };
 
+  const openCancelBookingModal = (booking) => {
+    setBookingToCancel(booking);
+    setCancelFormData({
+      refundPaymentMethod: booking.paymentMethod === 'BANK' ? 'BANK' : 'CASH',
+      bankAccountId: booking.bankAccountId || '',
+      cancellationReason: ''
+    });
+    setCancelModalOpen(true);
+  };
+
+  const handleConfirmCancelBooking = async (e) => {
+    e.preventDefault();
+    if (!bookingToCancel) return;
+    setCancellingBooking(true);
+    try {
+      const res = await api.cancelBooking(bookingToCancel.id, cancelFormData);
+      setCancelModalOpen(false);
+      setBookingToCancel(null);
+      fetchInvoices();
+      alert(`Booking #${bookingToCancel.invoiceNumber} cancelled successfully!\nRefund Payment Voucher #${res.paymentVoucher?.invoiceNumber || ''} generated for PKR ${parsePakistaniPrice(bookingToCancel.advanceAmount || bookingToCancel.totalPrice || 0).toLocaleString()}.`);
+    } catch (err) {
+      alert(err.message || 'Failed to cancel booking and generate refund payment voucher');
+    } finally {
+      setCancellingBooking(false);
+    }
+  };
+
   const handleInputChange = (field, value) => {
+    if (field === 'buyerPhone' || field === 'customerPhone') {
+      checkBookingByPhone(value);
+    }
+
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
       
@@ -367,6 +484,8 @@ export default function Invoices({ onNavigate }) {
   const openEditModal = (inv) => {
     api.getBankAndCashAccounts().then(data => setBankAccounts(data || [])).catch(() => {});
     setSelectedInvoice(inv);
+    setMatchingBookings([]);
+    setActiveLinkedBooking(inv.linkedBookingNumber ? { invoiceNumber: inv.linkedBookingNumber, id: inv.linkedBookingId } : null);
     setFormData({
       category: inv.category || 'SALES_RECEIPT',
       registrationNo: inv.registrationNo || '',
@@ -430,6 +549,14 @@ export default function Invoices({ onNavigate }) {
       installmentFrequency: inv.installmentFrequency || 'MONTHLY',
       installmentStartDate: inv.installmentStartDate || new Date().toISOString().slice(0, 10),
       deliveryStatus: inv.deliveryStatus || 'DELIVERED',
+      isCustomerVehicle: Boolean(inv.isCustomerVehicle),
+      salesmanName: inv.salesmanName || '',
+      salesmanId: inv.salesmanId || '',
+      commissionAmount: formatPKRShort(inv.commissionAmount) || '',
+      commissionPercent: inv.commissionPercent || '',
+      linkedBookingId: inv.linkedBookingId || '',
+      linkedBookingNumber: inv.linkedBookingNumber || '',
+      bookingStatus: inv.bookingStatus || 'ACTIVE',
       witness1Name: inv.witness1Name || '',
       witness1Cnic: inv.witness1Cnic || '',
       witness2Name: inv.witness2Name || '',
@@ -441,7 +568,10 @@ export default function Invoices({ onNavigate }) {
 
   const resetForm = () => {
     api.getBankAndCashAccounts().then(data => setBankAccounts(data || [])).catch(() => {});
+    api.getUsers().then(data => setStaffUsers(data || [])).catch(() => {});
     setSelectedInvoice(null);
+    setMatchingBookings([]);
+    setActiveLinkedBooking(null);
     setFormData({
       category: 'SALES_RECEIPT',
       registrationNo: '',
@@ -505,6 +635,14 @@ export default function Invoices({ onNavigate }) {
       installmentFrequency: 'MONTHLY',
       installmentStartDate: new Date().toISOString().slice(0, 10),
       deliveryStatus: 'DELIVERED',
+      isCustomerVehicle: false,
+      salesmanName: '',
+      salesmanId: '',
+      commissionAmount: '',
+      commissionPercent: '',
+      linkedBookingId: '',
+      linkedBookingNumber: '',
+      bookingStatus: 'ACTIVE',
       witness1Name: '',
       witness1Cnic: '',
       witness2Name: '',
@@ -527,7 +665,9 @@ export default function Invoices({ onNavigate }) {
         agreedAmount: cleanPrice(formData.agreedAmount || effectiveAmount),
         agreedAmountHalf: cleanPrice(formData.agreedAmountHalf),
         saleAmount: cleanPrice(formData.saleAmount || effectiveAmount),
-        cashAmount: cleanPrice(formData.cashAmount || effectiveAmount)
+        cashAmount: cleanPrice(formData.cashAmount || effectiveAmount),
+        commissionAmount: cleanPrice(formData.commissionAmount),
+        isCustomerVehicle: Boolean(formData.isCustomerVehicle)
       };
 
       let savedResult;
@@ -1538,15 +1678,20 @@ export default function Invoices({ onNavigate }) {
             { id: 'SALES_RECEIPT', label: '📜 Sales Receipt (سیل رسید)' },
             { id: 'DELIVERY_LETTER', label: '📄 Delivery Letter (ڈیلیوری لیٹر)' },
             { id: 'PAYMENT_VOUCHER', label: '💵 Payment Voucher (P.V.)' },
-            { id: 'BOOKING_RECEIPT', label: '🧾 Booking Receipt (رسید)' }
+            { id: 'BOOKING_RECEIPT', label: '🧾 Booking Receipt (رسید)' },
+            { id: 'CANCELLED_BOOKINGS', label: '❌ Cancelled Bookings & Refunds (منسوخ شدہ بکنگز)' }
           ].map(cat => (
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
               className={`px-4 py-2 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
                 selectedCategory === cat.id
-                  ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
-                  : 'bg-slate-900/60 text-slate-300 hover:bg-slate-800 hover:text-white border border-white/5'
+                  ? cat.id === 'CANCELLED_BOOKINGS'
+                    ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/25'
+                    : 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
+                  : cat.id === 'CANCELLED_BOOKINGS'
+                    ? 'bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 hover:text-white border border-rose-500/20'
+                    : 'bg-slate-900/60 text-slate-300 hover:bg-slate-800 hover:text-white border border-white/5'
               }`}
             >
               {cat.label}
@@ -1615,14 +1760,36 @@ export default function Invoices({ onNavigate }) {
                     <tr key={inv.id} className="hover:bg-white/[0.02] transition-colors">
                       <td className="p-3.5">
                         <div className="font-mono text-cyan-400 font-bold">{receiptNo}</div>
-                        <span className={`inline-block text-[9px] px-2 py-0.5 rounded font-bold uppercase mt-1 ${
-                          cat === 'DELIVERY_LETTER' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
-                          cat === 'PAYMENT_VOUCHER' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
-                          cat === 'BOOKING_RECEIPT' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
-                          'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                        }`}>
-                          {cat.replace('_', ' ')}
-                        </span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          <span className={`inline-block text-[9px] px-2 py-0.5 rounded font-bold uppercase ${
+                            cat === 'DELIVERY_LETTER' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
+                            cat === 'PAYMENT_VOUCHER' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                            cat === 'BOOKING_RECEIPT' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                            'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                          }`}>
+                            {cat.replace('_', ' ')}
+                          </span>
+                          {cat === 'BOOKING_RECEIPT' && inv.bookingStatus === 'CONVERTED_TO_SALE' && (
+                            <span className="inline-block text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold">
+                              ✅ Sold ({inv.linkedSaleNumber || 'Sale'})
+                            </span>
+                          )}
+                          {cat === 'BOOKING_RECEIPT' && inv.bookingStatus === 'CANCELLED' && (
+                            <span className="inline-block text-[9px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold">
+                              ❌ Cancelled ({inv.linkedVoucherNumber || 'Refunded'})
+                            </span>
+                          )}
+                          {cat === 'PAYMENT_VOUCHER' && inv.linkedBookingNumber && (
+                            <span className="inline-block text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
+                              ↩️ Refund: {inv.linkedBookingNumber}
+                            </span>
+                          )}
+                          {cat === 'SALES_RECEIPT' && inv.linkedBookingNumber && (
+                            <span className="inline-block text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                              🔗 BK: {inv.linkedBookingNumber}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="p-3.5 font-mono text-slate-200">{regNo}</td>
                       <td className="p-3.5 font-semibold text-white">
@@ -1684,6 +1851,18 @@ export default function Invoices({ onNavigate }) {
                       </td>
                       <td className="p-3.5">
                         <div className="flex items-center space-x-2">
+                          {/* Cancel & Refund Booking Button */}
+                          {cat === 'BOOKING_RECEIPT' && inv.bookingStatus === 'ACTIVE' && (
+                            <button
+                              onClick={() => openCancelBookingModal(inv)}
+                              className="p-1.5 rounded-lg bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 border border-rose-500/40 font-medium text-[11px] flex items-center space-x-1 cursor-pointer transition-all shadow-sm"
+                              title="Cancel Booking & Issue Refund Payment Voucher"
+                            >
+                              <X className="w-3.5 h-3.5 text-rose-400" />
+                              <span>Cancel & Refund</span>
+                            </button>
+                          )}
+
                           <button
                             onClick={() => exportInvoicePDF(inv)}
                             className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/30 font-medium text-[11px] flex items-center space-x-1"
@@ -2642,12 +2821,72 @@ export default function Invoices({ onNavigate }) {
               {/* ------------------------------------------------------------- */}
               {formData.category === 'SALES_RECEIPT' && (
                 <>
+                  {/* ACTIVE LINKED BOOKING RECEIPT NOTIFICATION BANNER */}
+                  {formData.linkedBookingNumber ? (
+                    <div className="p-3.5 bg-emerald-500/10 border-2 border-emerald-500/40 rounded-xl flex items-center justify-between shadow-lg">
+                      <div className="flex items-center space-x-3">
+                        <span className="p-2 bg-emerald-500/20 text-emerald-300 rounded-lg text-base font-bold">🔗</span>
+                        <div>
+                          <div className="text-xs font-bold text-emerald-300 flex items-center gap-2">
+                            <span>Connected to Booking Receipt #{formData.linkedBookingNumber}</span>
+                            <span className="text-[10px] bg-emerald-500/20 text-emerald-200 px-2 py-0.5 rounded border border-emerald-500/40 font-mono font-bold">Advance Deducted</span>
+                          </div>
+                          <p className="text-[11px] text-slate-300 mt-0.5">
+                            Advance of <strong className="text-emerald-400 font-mono">PKR {parsePakistaniPrice(formData.advanceAmount).toLocaleString()}</strong> was collected at booking. Only the remaining <strong className="text-cyan-400 font-mono">PKR {parsePakistaniPrice(formData.remainingAmount).toLocaleString()}</strong> will enter Cash Safe / Bank.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={unlinkBooking}
+                        className="text-xs px-2.5 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 rounded-lg cursor-pointer font-bold"
+                      >
+                        ✕ Unlink Booking
+                      </button>
+                    </div>
+                  ) : matchingBookings.length > 0 ? (
+                    <div className="p-3.5 bg-gradient-to-r from-cyan-950/90 via-slate-900 to-cyan-950/90 border-2 border-cyan-500/60 rounded-xl space-y-2.5 shadow-xl">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-base animate-bounce">🔔</span>
+                          <h5 className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
+                            Active Booking Receipt Found for Buyer Phone ({formData.buyerPhone})
+                          </h5>
+                        </div>
+                        <span className="text-[10px] font-mono text-cyan-400 font-bold bg-cyan-500/20 px-2 py-0.5 rounded border border-cyan-500/40">1-Click Connect</span>
+                      </div>
+                      <div className="space-y-2">
+                        {matchingBookings.map(bk => (
+                          <div key={bk.id} className="p-3 bg-slate-950/80 rounded-lg border border-cyan-500/40 flex items-center justify-between gap-3">
+                            <div className="text-xs text-slate-200">
+                              <span className="font-bold text-cyan-400 font-mono text-sm">#{bk.invoiceNumber}</span> • <span className="font-bold text-white">{bk.vehicleMaker} {bk.vehicleModel}</span> {bk.chassisNumber ? `(Chassis: ${bk.chassisNumber})` : ''}
+                              <div className="text-[11px] text-slate-400 mt-1 flex flex-wrap gap-2">
+                                <span>Deal: <strong className="font-mono text-white">PKR {parsePakistaniPrice(bk.totalPrice).toLocaleString()}</strong></span>
+                                <span className="text-slate-600">|</span>
+                                <span>Advance Paid: <strong className="font-mono text-emerald-400">PKR {parsePakistaniPrice(bk.advanceAmount).toLocaleString()}</strong></span>
+                                <span className="text-slate-600">|</span>
+                                <span>Remaining Balance: <strong className="font-mono text-rose-400 font-bold">PKR {parsePakistaniPrice(bk.remainingAmount || (parsePakistaniPrice(bk.totalPrice) - parsePakistaniPrice(bk.advanceAmount))).toLocaleString()}</strong></span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => importAndLinkBooking(bk)}
+                              className="px-3.5 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs rounded-lg shadow-lg cursor-pointer whitespace-nowrap flex items-center gap-1.5"
+                            >
+                              ⚡ Import & Connect
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
                   {/* TAB 1: GENERAL DETAILS & PAYMENT MODE */}
                   {activeTab === 'general' && (
                     <div className="space-y-5">
                       <div className="space-y-3">
-                        <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Basic Metadata & Registration</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Basic Metadata & Salesman</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                           <div>
                             <label className="block text-xs font-semibold text-slate-300 mb-1">
                               Date (تاریخ) <span className="text-rose-400">*</span>
@@ -2686,7 +2925,140 @@ export default function Invoices({ onNavigate }) {
                               className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
                             />
                           </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">
+                              👤 Salesman Name (سیلز مین کا نام)
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                list="salesmen-list"
+                                placeholder="Select or type salesman name"
+                                value={formData.salesmanName || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const matchedStaff = staffUsers.find(u => u.name.toLowerCase() === val.toLowerCase());
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    salesmanName: val,
+                                    salesmanId: matchedStaff ? matchedStaff.id : prev.salesmanId
+                                  }));
+                                }}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-cyan-500/40 text-cyan-300 text-xs font-bold focus:border-cyan-400"
+                              />
+                              <datalist id="salesmen-list">
+                                {staffUsers.map(u => (
+                                  <option key={u.id} value={u.name}>{u.name} ({u.role})</option>
+                                ))}
+                              </datalist>
+                            </div>
+                          </div>
                         </div>
+                      </div>
+
+                      {/* CONSIGNMENT / CUSTOMER-OWNED VEHICLE COMMISSION SECTION */}
+                      <div className={`p-4 rounded-xl border-2 transition-all space-y-3 ${
+                        formData.isCustomerVehicle 
+                          ? 'bg-gradient-to-br from-amber-950/40 via-slate-900 to-amber-950/20 border-amber-500/60 shadow-xl' 
+                          : 'bg-slate-900/60 border-white/10'
+                      }`}>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+                          <label className="flex items-center space-x-3 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(formData.isCustomerVehicle)}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                handleInputChange('isCustomerVehicle', checked);
+                              }}
+                              className="w-5 h-5 text-amber-500 rounded bg-slate-950 border-amber-400/40 focus:ring-amber-500 cursor-pointer"
+                            />
+                            <div>
+                              <span className="text-xs font-bold text-white flex items-center gap-2">
+                                🚗 Customer-Owned Vehicle Sale (کسٹمر کی گاڑی / کمیشن پر فروخت)
+                              </span>
+                              <p className="text-[11px] text-amber-300/80 font-mono mt-0.5">
+                                Check this if the car belongs to a customer selling through the dealership
+                              </p>
+                            </div>
+                          </label>
+
+                          {formData.isCustomerVehicle && (
+                            <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold whitespace-nowrap self-start sm:self-center">
+                              ⭐ Direct Seller Payout Mode
+                            </span>
+                          )}
+                        </div>
+
+                        {formData.isCustomerVehicle && (
+                          <div className="space-y-3 pt-1">
+                            {/* Commission Input Boxes */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-950/80 p-3.5 rounded-lg border border-amber-500/30">
+                              <div>
+                                <label className="block text-xs font-semibold text-amber-300 mb-1">
+                                  Dealership Commission Amount (شو روم کمیشن رقم) (PKR) <span className="text-rose-400">*</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. 50,000 / 1 lac"
+                                  value={formData.commissionAmount || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    handleInputChange('commissionAmount', val);
+                                    const tot = parsePakistaniPrice(formData.totalPrice);
+                                    const comm = parsePakistaniPrice(val);
+                                    if (tot > 0 && comm > 0) {
+                                      handleInputChange('commissionPercent', ((comm / tot) * 100).toFixed(2));
+                                    }
+                                  }}
+                                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-amber-500/50 text-amber-300 text-xs font-bold font-mono focus:border-amber-400"
+                                  required={Boolean(formData.isCustomerVehicle)}
+                                />
+                                {Boolean(formData.commissionAmount) && Boolean(getPriceHint(formData.commissionAmount)) && (
+                                  <div className="mt-1 px-2 py-0.5 bg-amber-950/70 border border-amber-500/30 rounded text-[10px] font-mono text-amber-300">
+                                    <span>{getPriceHint(formData.commissionAmount)}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-semibold text-amber-300 mb-1">
+                                  Commission % (کمیشن فیصد)
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. 1% or 1.5%"
+                                  value={formData.commissionPercent || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    handleInputChange('commissionPercent', val);
+                                    const pct = parseFloat(val.replace(/[^0-9.]/g, '')) || 0;
+                                    const tot = parsePakistaniPrice(formData.totalPrice);
+                                    if (tot > 0 && pct > 0) {
+                                      handleInputChange('commissionAmount', String(Math.round((tot * pct) / 100)));
+                                    }
+                                  }}
+                                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-amber-500/50 text-amber-300 text-xs font-bold font-mono focus:border-amber-400"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Informational Guidance Alert */}
+                            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs space-y-1">
+                              <div className="font-bold text-amber-300 flex items-center gap-1.5">
+                                <span>💡</span>
+                                <span>محفوظ اور درست اکاؤنٹس کا طریقہ کار:</span>
+                              </div>
+                              <p className="text-slate-300 text-[11px] leading-relaxed">
+                                گاڑی کی کل قیمت (<strong>PKR {parsePakistaniPrice(formData.totalPrice).toLocaleString()}</strong>) براہ راست گاڑی کے مالک (فروخت کنندہ) کو دی جائے گی اور شو روم سیف/بینک میں داخل نہیں ہوگی۔ شو روم میں <strong>صرف کمیشن کی رقم (PKR {parsePakistaniPrice(formData.commissionAmount || 0).toLocaleString()})</strong> کیش یا بینک کھاتے میں جمع ہوگی۔
+                              </p>
+                              <p className="text-[10px] text-rose-300 font-bold">
+                                🔒 پرنٹ کی گئی سیل رسید پر کمیشن نہیں لکھا جائے گا تاکہ خریدار کے سامنے رازداری برقرار رہے۔
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* PROMINENT MONEY ALLOCATION & BANK ACCOUNT CARD */}
@@ -3191,7 +3563,72 @@ export default function Invoices({ onNavigate }) {
                   {/* TAB 6: FINANCIALS & PAYMENT ALLOCATION */}
                   {activeTab === 'financials' && (
                     <div className="space-y-4">
-                      <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Financial Balances & Payment Mode</h3>
+                      <div className="flex items-center justify-between border-b border-cyan-500/20 pb-2">
+                        <h3 className="text-sm font-bold text-cyan-400">Financial Balances & Payment Mode</h3>
+                        <span className="text-[10px] font-mono text-emerald-400 font-bold">Auto Remaining Balance Calculation</span>
+                      </div>
+
+                      {/* PROMINENT INFLOW BREAKDOWN CARD */}
+                      <div className="p-4 bg-gradient-to-r from-slate-900/95 via-slate-900/80 to-cyan-950/40 rounded-xl border border-cyan-500/30 space-y-2.5 shadow-md">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                          <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                            <span>📊</span> {formData.isCustomerVehicle ? 'Customer-Owned Consignment Flow' : 'Safe / Bank Cash Inflow Calculation'}
+                          </span>
+                          <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
+                            formData.isCustomerVehicle ? 'text-amber-300 bg-amber-500/10 border-amber-500/30' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                          }`}>
+                            {formData.isCustomerVehicle ? 'Commission Only Inflow' : 'No Double Counting'}
+                          </span>
+                        </div>
+
+                        {formData.isCustomerVehicle ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                            <div className="p-2.5 bg-slate-950/60 rounded-lg border border-white/5">
+                              <div className="text-[10px] text-slate-400 font-medium">Total Vehicle Deal (کل قیمت)</div>
+                              <div className="font-mono font-bold text-white text-sm mt-0.5">
+                                PKR {parsePakistaniPrice(formData.totalPrice || 0).toLocaleString()}
+                              </div>
+                            </div>
+                            <div className="p-2.5 bg-slate-950/60 rounded-lg border border-white/5">
+                              <div className="text-[10px] text-slate-400 font-medium">Paid Directly to Seller (مالک کو ادائیگی)</div>
+                              <div className="font-mono font-bold text-amber-300 text-sm mt-0.5">
+                                PKR {Math.max(0, parsePakistaniPrice(formData.totalPrice || 0) - parsePakistaniPrice(formData.commissionAmount || 0)).toLocaleString()}
+                              </div>
+                              <div className="text-[9px] text-slate-400 mt-0.5">Does NOT enter showroom safe/bank</div>
+                            </div>
+                            <div className="p-2.5 bg-emerald-500/10 rounded-lg border border-emerald-500/40">
+                              <div className="text-[10px] text-emerald-300 font-bold">Commission Deposited in Safe/Bank</div>
+                              <div className="font-mono font-bold text-emerald-400 text-sm mt-0.5">
+                                PKR {parsePakistaniPrice(formData.commissionAmount || 0).toLocaleString()}
+                              </div>
+                              <div className="text-[9px] text-emerald-300/80 mt-0.5">Showroom Commission Revenue</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                            <div className="p-2.5 bg-slate-950/60 rounded-lg border border-white/5">
+                              <div className="text-[10px] text-slate-400 font-medium">Total Vehicle Deal (کل قیمت)</div>
+                              <div className="font-mono font-bold text-white text-sm mt-0.5">
+                                PKR {parsePakistaniPrice(formData.totalPrice || 0).toLocaleString()}
+                              </div>
+                            </div>
+                            <div className="p-2.5 bg-slate-950/60 rounded-lg border border-white/5">
+                              <div className="text-[10px] text-slate-400 font-medium">
+                                Less Advance (Already In Hand/Bank) {formData.linkedBookingNumber ? `(#${formData.linkedBookingNumber})` : ''}
+                              </div>
+                              <div className="font-mono font-bold text-rose-400 text-sm mt-0.5">
+                                - PKR {parsePakistaniPrice(formData.advanceAmount || 0).toLocaleString()}
+                              </div>
+                            </div>
+                            <div className="p-2.5 bg-cyan-500/10 rounded-lg border border-cyan-500/40">
+                              <div className="text-[10px] text-cyan-300 font-bold">Net Inflow Entering Safe/Bank Now</div>
+                              <div className="font-mono font-bold text-emerald-400 text-sm mt-0.5">
+                                PKR {parsePakistaniPrice(formData.remainingAmount !== undefined && formData.remainingAmount !== null && formData.remainingAmount !== '' ? formData.remainingAmount : (parsePakistaniPrice(formData.totalPrice || 0) - parsePakistaniPrice(formData.advanceAmount || 0))).toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                       
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
@@ -3668,6 +4105,143 @@ export default function Invoices({ onNavigate }) {
 
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-slate-900/80 border border-white/20 px-4 py-2 rounded-full text-white text-xs font-mono">
             Photo {lightboxIndex + 1} of {selectedReceiptForImages.images.length}
+          </div>
+        </div>
+      )}
+      {/* CANCEL BOOKING & ISSUE REFUND MODAL */}
+      {cancelModalOpen && bookingToCancel && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-rose-500/30 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400">
+                  <Receipt className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Cancel Booking & Issue Refund</h3>
+                  <p className="text-xs text-rose-400/80 font-urdu">منسوخی بکنگ اور ایڈوانس واپسی واؤچر</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setCancelModalOpen(false);
+                  setBookingToCancel(null);
+                }}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Booking Summary Box */}
+            <div className="bg-slate-950/60 border border-white/10 rounded-xl p-4 space-y-2.5">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400">Booking Receipt:</span>
+                <span className="font-mono font-bold text-cyan-400">#{bookingToCancel.receiptNo || bookingToCancel.invoiceNumber}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400">Customer (Buyer):</span>
+                <span className="font-semibold text-white">{bookingToCancel.buyerName || bookingToCancel.customerName || 'N/A'} ({bookingToCancel.buyerPhone || bookingToCancel.customerPhone || 'N/A'})</span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400">Vehicle:</span>
+                <span className="text-slate-300">{bookingToCancel.vehicleMaker} {bookingToCancel.vehicleModel} {bookingToCancel.registrationNo ? `(${bookingToCancel.registrationNo})` : ''}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs pt-2 border-t border-white/5">
+                <span className="text-slate-300 font-medium">Advance Amount to Refund:</span>
+                <span className="text-base font-bold text-amber-400 font-mono">
+                  PKR {Number(bookingToCancel.advanceAmount || 0).toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-300/90 leading-relaxed">
+              ⚠️ <strong>Important:</strong> Cancelling will automatically generate an official <strong>Payment Voucher (PV)</strong> for PKR {Number(bookingToCancel.advanceAmount || 0).toLocaleString()}, disburse the amount from the selected ledger safe/bank, and record the cancellation in the customer's trade history.
+            </div>
+
+            {/* Refund Options Form */}
+            <div className="space-y-4 text-xs">
+              <div>
+                <label className="block font-medium text-slate-300 mb-1.5">
+                  Disburse Refund From (ادائیگی کا ذریعہ) <span className="text-rose-400">*</span>
+                </label>
+                <select
+                  value={cancelFormData.refundPaymentMethod}
+                  onChange={(e) => setCancelFormData(prev => ({ ...prev, refundPaymentMethod: e.target.value }))}
+                  className="w-full bg-slate-800/80 border border-white/10 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="CASH">Cash in Hand Safe (کیش سیف - 1001)</option>
+                  <option value="BANK">Bank Account (بینک اکاؤنٹ)</option>
+                </select>
+              </div>
+
+              {cancelFormData.refundPaymentMethod === 'BANK' && (
+                <div>
+                  <label className="block font-medium text-slate-300 mb-1.5">
+                    Select Bank Account (بینک اکاؤنٹ منتخب کریں) <span className="text-rose-400">*</span>
+                  </label>
+                  <select
+                    value={cancelFormData.bankAccountId}
+                    onChange={(e) => setCancelFormData(prev => ({ ...prev, bankAccountId: e.target.value }))}
+                    className="w-full bg-slate-800/80 border border-white/10 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-cyan-500"
+                  >
+                    <option value="">-- Choose Bank Account --</option>
+                    {bankAccounts.filter(b => b.type === 'BANK' || b.accountType === 'BANK' || b.code?.startsWith('1002') || b.code?.startsWith('1003') || b.accountName?.toLowerCase().includes('bank')).map(acc => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.accountName || acc.name} {acc.accountNumber ? `(${acc.accountNumber})` : ''} - Bal: PKR {Number(acc.balance || 0).toLocaleString()}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block font-medium text-slate-300 mb-1.5">
+                  Cancellation Reason / Notes (منسوخی کی وجہ)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Customer cancelled purchase, deal called off, refund issued in full..."
+                  value={cancelFormData.cancellationReason}
+                  onChange={(e) => setCancelFormData(prev => ({ ...prev, cancellationReason: e.target.value }))}
+                  className="w-full bg-slate-800/80 border border-white/10 rounded-xl px-3.5 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end space-x-3 pt-3 border-t border-white/10">
+              <button
+                type="button"
+                disabled={cancellingBooking}
+                onClick={() => {
+                  setCancelModalOpen(false);
+                  setBookingToCancel(null);
+                }}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition-colors"
+              >
+                Dismiss
+              </button>
+              <button
+                type="button"
+                disabled={cancellingBooking}
+                onClick={handleConfirmCancelBooking}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-bold text-xs shadow-lg shadow-rose-600/30 flex items-center space-x-2 transition-all disabled:opacity-50"
+              >
+                {cancellingBooking ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Processing Refund...</span>
+                  </>
+                ) : (
+                  <>
+                    <Receipt className="w-4 h-4" />
+                    <span>Confirm & Issue Refund Voucher</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
