@@ -540,6 +540,7 @@ const receiveAmountInLedger = async (req, res) => {
     const isTargetNormalDebit = ['ASSET', 'EXPENSE'].includes(targetAccount.type);
 
     const result = await prisma.$transaction(async (tx) => {
+      // 1. Primary Entry (Inflow into Cash / Bank / Target Asset)
       const entriesToCreate = [
         {
           accountId: targetAccount.id,
@@ -549,13 +550,14 @@ const receiveAmountInLedger = async (req, res) => {
         }
       ];
 
+      // 2. Offsetting Double-Entry (Revenue / Income / Offset Account)
       if (sourceAccount) {
         const isSourceNormalDebit = ['ASSET', 'EXPENSE'].includes(sourceAccount.type);
         entriesToCreate.push({
           accountId: sourceAccount.id,
           type: isSourceNormalDebit ? 'CREDIT' : 'DEBIT',
           amount: numAmount,
-          description: `Paid/Settled into [${targetAccount.name}]`
+          description: `Credit/Settled into [${targetAccount.name}] from ${receivedFrom || 'Party'}`
         });
 
         const sourceDelta = isSourceNormalDebit ? -numAmount : numAmount;
@@ -563,6 +565,34 @@ const receiveAmountInLedger = async (req, res) => {
           where: { id: sourceAccount.id },
           data: { currentBalance: { increment: sourceDelta } }
         });
+      } else {
+        // Fallback offset revenue/income ledger if no offset was explicitly selected
+        let defaultIncome = await tx.account.findFirst({ where: { code: '4001' } })
+          || await tx.account.findFirst({ where: { type: 'REVENUE' } });
+        if (!defaultIncome) {
+          defaultIncome = await tx.account.create({
+            data: {
+              code: '4001',
+              name: 'Vehicle Sales & Inflow Revenue',
+              type: 'REVENUE',
+              subType: 'REVENUE',
+              currentBalance: 0,
+              description: 'Primary revenue and customer payment inflows'
+            }
+          });
+        }
+        if (defaultIncome.id !== targetAccount.id) {
+          entriesToCreate.push({
+            accountId: defaultIncome.id,
+            type: 'CREDIT',
+            amount: numAmount,
+            description: `Revenue inflow from ${receivedFrom || 'Party'}`
+          });
+          await tx.account.update({
+            where: { id: defaultIncome.id },
+            data: { currentBalance: { increment: numAmount } }
+          });
+        }
       }
 
       const transaction = await tx.transaction.create({
@@ -625,7 +655,7 @@ const receiveAmountInLedger = async (req, res) => {
   }
 };
 
-// 9. Pay Amount / Record Outflow from any Ledger or Bank Account
+// 9. Pay Amount / Record Outflow through Payment Voucher (PV)
 const payAmountFromLedger = async (req, res) => {
   try {
     const {
@@ -662,27 +692,29 @@ const payAmountFromLedger = async (req, res) => {
 
     const txnDate = date ? new Date(date) : new Date();
     const txnNumber = await generateTxnNumber('PV');
-    const fullDesc = description || `Payment from [${sourceAccount.name}] to ${paidTo || 'Party'}${notes ? ` - ${notes}` : ''}`;
+    const fullDesc = description || `Payment Voucher from [${sourceAccount.name}] to ${paidTo || 'Party'}${notes ? ` - ${notes}` : ''}`;
 
     const isSourceNormalDebit = ['ASSET', 'EXPENSE'].includes(sourceAccount.type);
 
     const result = await prisma.$transaction(async (tx) => {
+      // 1. Primary Entry (Outflow Credit from Cash Safe / Bank)
       const entriesToCreate = [
         {
           accountId: sourceAccount.id,
           type: isSourceNormalDebit ? 'CREDIT' : 'DEBIT',
           amount: numAmount,
-          description: `Payment to ${paidTo || 'Party'}: ${fullDesc}`
+          description: `Payment Voucher to ${paidTo || 'Party'}: ${fullDesc}`
         }
       ];
 
+      // 2. Offsetting Double-Entry (Expense / Liability / Target Account)
       if (targetAccount) {
         const isTargetNormalDebit = ['ASSET', 'EXPENSE'].includes(targetAccount.type);
         entriesToCreate.push({
           accountId: targetAccount.id,
           type: isTargetNormalDebit ? 'DEBIT' : 'CREDIT',
           amount: numAmount,
-          description: `Paid from [${sourceAccount.name}]`
+          description: `Paid from [${sourceAccount.name}] to ${paidTo || 'Party'}`
         });
 
         const targetDelta = isTargetNormalDebit ? numAmount : -numAmount;
@@ -690,6 +722,34 @@ const payAmountFromLedger = async (req, res) => {
           where: { id: targetAccount.id },
           data: { currentBalance: { increment: targetDelta } }
         });
+      } else {
+        // Fallback default expense ledger if no expense was explicitly selected
+        let defaultExpense = await tx.account.findFirst({ where: { code: '5001' } })
+          || await tx.account.findFirst({ where: { type: 'EXPENSE' } });
+        if (!defaultExpense) {
+          defaultExpense = await tx.account.create({
+            data: {
+              code: '5001',
+              name: 'General Showroom Expenses & Payouts',
+              type: 'EXPENSE',
+              subType: 'EXPENSE',
+              currentBalance: 0,
+              description: 'General operational and showroom expense payouts'
+            }
+          });
+        }
+        if (defaultExpense.id !== sourceAccount.id) {
+          entriesToCreate.push({
+            accountId: defaultExpense.id,
+            type: 'DEBIT',
+            amount: numAmount,
+            description: `Expense payout to ${paidTo || 'Party'}`
+          });
+          await tx.account.update({
+            where: { id: defaultExpense.id },
+            data: { currentBalance: { increment: numAmount } }
+          });
+        }
       }
 
       const transaction = await tx.transaction.create({
@@ -699,7 +759,7 @@ const payAmountFromLedger = async (req, res) => {
           type: 'PAYMENT_VOUCHER',
           amount: numAmount,
           description: fullDesc,
-          referenceType: 'MANUAL',
+          referenceType: 'PAYMENT_VOUCHER',
           referenceNumber: referenceNumber || txnNumber,
           chassisNumber: chassisNumber || null,
           createdById: req.user.id,
@@ -719,7 +779,7 @@ const payAmountFromLedger = async (req, res) => {
         data: {
           userId: req.user.id,
           action: 'PAY_AMOUNT_LEDGER',
-          details: `Paid Rs. ${numAmount.toLocaleString()} from ${sourceAccount.name} (${sourceAccount.code}) to ${paidTo || 'Party'}`
+          details: `Generated Payment Voucher ${txnNumber} for Rs. ${numAmount.toLocaleString()} from ${sourceAccount.name} (${sourceAccount.code}) to ${paidTo || 'Party'}`
         }
       });
 
@@ -727,7 +787,7 @@ const payAmountFromLedger = async (req, res) => {
     });
 
     return res.status(201).json({
-      message: `Successfully paid Rs. ${numAmount.toLocaleString()} from ${sourceAccount.name}`,
+      message: `Successfully generated Payment Voucher (${result.transaction.transactionNumber}) for Rs. ${numAmount.toLocaleString()} from ${sourceAccount.name}`,
       transaction: result.transaction,
       account: result.updatedAccount
     });

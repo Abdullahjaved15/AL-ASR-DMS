@@ -1418,20 +1418,20 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
           <button
             onClick={() => openReceiveModal()}
             className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black text-xs font-mono font-bold transition-all flex items-center space-x-1.5 shadow-lg shadow-emerald-500/20 cursor-pointer"
-            title="Receive money / deposit into any ledger or bank account"
+            title="Receive money into Cash in Hand or Bank Account"
           >
             <ArrowDownLeft className="w-3.5 h-3.5" />
-            <span>+ Receive Money</span>
+            <span>+ Receive (آمد / وصولی)</span>
           </button>
 
-          {/* Pay Amount / Outflow Button */}
+          {/* Pay Amount / Payment Voucher Button */}
           <button
             onClick={() => openPayModal()}
             className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-400 hover:to-red-500 text-white text-xs font-mono font-bold transition-all flex items-center space-x-1.5 shadow-lg shadow-rose-500/20 cursor-pointer"
-            title="Record payment / outflow from any ledger or bank account"
+            title="Issue a Payment Voucher (PV) from Cash in Hand or Bank Account"
           >
             <ArrowUpRight className="w-3.5 h-3.5" />
-            <span>- Record Payment</span>
+            <span>- Payment Voucher (ادائیگی واؤچر)</span>
           </button>
 
           {/* Transfer Funds Button */}
@@ -4024,8 +4024,8 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                   <ArrowDownLeft className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">Receive Money in Ledger</h3>
-                  <p className="text-xs text-slate-400 font-mono">Record incoming payment, deposit, or customer receipt into any account ledger</p>
+                  <h3 className="text-lg font-bold text-white">Receive Payment (آمد و وصولی واؤچر)</h3>
+                  <p className="text-xs text-emerald-300/80 font-mono">Deposit incoming payment directly into Cash in Hand Safe (1001) or Bank Account</p>
                 </div>
               </div>
               <button onClick={() => setIsReceiveModalOpen(false)} className="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-800">
@@ -4232,8 +4232,8 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                   <ArrowUpRight className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">Record Payment / Outflow</h3>
-                  <p className="text-xs text-slate-400 font-mono">Record expense, vendor payment, or cash/bank withdrawal from any ledger</p>
+                  <h3 className="text-lg font-bold text-white">Issue Payment Voucher (ادائیگی واؤچر)</h3>
+                  <p className="text-xs text-rose-300/80 font-mono">Disburse payment from Cash in Hand Safe or Bank Account with an official Payment Voucher (PV)</p>
                 </div>
               </div>
               <button onClick={() => setIsPayModalOpen(false)} className="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-800">
