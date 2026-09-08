@@ -266,6 +266,14 @@ const updateReceivingLetter = async (req, res) => {
         }
       });
 
+      // Notify Super Admin
+      try {
+        const { notifySuperAdminOnApproval } = require('./approvalController');
+        if (notifySuperAdminOnApproval) {
+          await notifySuperAdminOnApproval(request, req.user?.name);
+        }
+      } catch (e) {}
+
       await prisma.activityLog.create({
         data: {
           userId: req.user.id,
@@ -323,6 +331,14 @@ const deleteReceivingLetter = async (req, res) => {
           reason: req.body?.reason || 'Admin requested deletion of receiving letter'
         }
       });
+
+      // Notify Super Admin
+      try {
+        const { notifySuperAdminOnApproval } = require('./approvalController');
+        if (notifySuperAdminOnApproval) {
+          await notifySuperAdminOnApproval(request, req.user?.name);
+        }
+      } catch (e) {}
 
       await prisma.activityLog.create({
         data: {

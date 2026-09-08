@@ -43,19 +43,29 @@ export default function Sidebar({ currentTab, setCurrentTab, isMobileOpen, setIs
   } = useAuth();
 
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
 
   useEffect(() => {
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 20000); // 20s live sync
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 20000); // 20s live sync
     return () => clearInterval(interval);
-  }, []);
+  }, [isAdmin, isSuperAdmin]);
 
-  const fetchUnreadCount = async () => {
+  const fetchCounts = async () => {
     try {
       const res = await api.getNotifications();
       setUnreadCount(res.unreadCount || 0);
     } catch (err) {
       // quiet fail
+    }
+
+    if (isAdmin || isSuperAdmin) {
+      try {
+        const appRes = await api.getApprovals({ status: 'PENDING' });
+        setPendingApprovalsCount(appRes?.counts?.pending || 0);
+      } catch (err) {
+        // quiet fail
+      }
     }
   };
 
@@ -83,7 +93,7 @@ export default function Sidebar({ currentTab, setCurrentTab, isMobileOpen, setIs
     { id: 'collaboration', label: 'Collaboration Center', icon: Handshake, role: 'ALL' },
     { id: 'stock', label: 'Showroom Current Stock', icon: Package, role: 'ALL' },
     { id: 'sold_cars', label: 'Sold Cars', icon: CheckCircle2, role: 'ALL' },
-    { id: 'approvals', label: 'Approval Requests', icon: ShieldCheck, role: 'ADMIN' },
+    { id: 'approvals', label: 'Approval Requests', icon: ShieldCheck, role: 'ADMIN', badge: pendingApprovalsCount },
     { id: 'users', label: 'User & Salesmen', icon: UserCheck, role: 'ADMIN' },
     { id: 'reports', label: 'Sales Reports', icon: BarChart3, role: 'ADMIN' },
     { id: 'settings', label: 'Account Settings', icon: SettingsIcon, role: 'ALL' },

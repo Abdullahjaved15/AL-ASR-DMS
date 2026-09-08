@@ -17,7 +17,8 @@ import {
   Calendar, 
   Sparkles, 
   X,
-  ExternalLink
+  ExternalLink,
+  ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
@@ -30,6 +31,7 @@ export default function Header({ currentTab, search, setSearch, onOpenModal, onT
   // Notification States
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [loadingNotifs, setLoadingNotifs] = useState(false);
   const notificationDropdownRef = useRef(null);
@@ -52,7 +54,7 @@ export default function Header({ currentTab, search, setSearch, onOpenModal, onT
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 20000); // 20s live poll
     return () => clearInterval(interval);
-  }, []);
+  }, [isAdmin, isSuperAdmin]);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -72,6 +74,15 @@ export default function Header({ currentTab, search, setSearch, onOpenModal, onT
       setUnreadCount(res.unreadCount || 0);
     } catch (err) {
       console.warn('Failed to fetch notifications:', err.message);
+    }
+
+    if (isAdmin || isSuperAdmin) {
+      try {
+        const appRes = await api.getApprovals({ status: 'PENDING' });
+        setPendingApprovalsCount(appRes?.counts?.pending || 0);
+      } catch (err) {
+        // quiet fail
+      }
     }
   };
 
@@ -228,6 +239,18 @@ export default function Header({ currentTab, search, setSearch, onOpenModal, onT
           </>
         )}
 
+        {/* SUPER ADMIN / ADMIN APPROVAL REQUESTS BADGE */}
+        {(isSuperAdmin || isAdmin) && pendingApprovalsCount > 0 && (
+          <button
+            onClick={() => onNavigate && onNavigate('approvals')}
+            className="px-3 py-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-mono font-bold flex items-center space-x-2 transition-all shadow-glow"
+            title="Pending Change Approval Requests"
+          >
+            <ShieldCheck className="w-4 h-4 text-amber-400 animate-pulse" />
+            <span>{pendingApprovalsCount} Approval{pendingApprovalsCount === 1 ? '' : 's'} Pending</span>
+          </button>
+        )}
+
         {/* NOTIFICATION BELL WITH UNREAD BADGE COUNT */}
         <div className="relative" ref={notificationDropdownRef}>
           <button
@@ -259,7 +282,7 @@ export default function Header({ currentTab, search, setSearch, onOpenModal, onT
               {/* Header */}
               <div className="p-3.5 border-b border-white/10 flex items-center justify-between bg-slate-900/90">
                 <div className="flex items-center space-x-2">
-                  <span className="text-sm font-bold text-white">Inflow & Receipt Alerts</span>
+                  <span className="text-sm font-bold text-white">Alerts & Notifications</span>
                   {unreadCount > 0 && (
                     <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold border border-amber-500/30">
                       {unreadCount} New
@@ -283,18 +306,25 @@ export default function Header({ currentTab, search, setSearch, onOpenModal, onT
                 {notifications.length === 0 ? (
                   <div className="py-12 text-center text-slate-500 font-mono">
                     <Bell className="w-8 h-8 text-slate-600 mx-auto mb-2 opacity-50" />
-                    <p>No new financial notifications.</p>
+                    <p>No new notifications.</p>
                   </div>
                 ) : (
                   notifications.map(notif => {
                     const isUnread = !notif.isRead && (!notif.readBy || !notif.readBy.includes(user?.id));
+                    const isApproval = notif.type === 'APPROVAL_REQUEST' || notif.title.includes('Approval');
                     const isSales = notif.type === 'SALES_RECEIPT' || notif.title.includes('Sales');
                     const isBooking = notif.type === 'BOOKING_RECEIPT' || notif.title.includes('Booking');
 
                     return (
                       <div
                         key={notif.id}
-                        onClick={() => handleMarkAsRead(notif.id)}
+                        onClick={async () => {
+                          await handleMarkAsRead(notif.id);
+                          if (isApproval) {
+                            setIsNotificationOpen(false);
+                            if (onNavigate) onNavigate('approvals');
+                          }
+                        }}
                         className={`p-3.5 hover:bg-white/5 transition-colors cursor-pointer relative group ${
                           isUnread ? 'bg-cyan-500/5' : 'opacity-80'
                         }`}
@@ -307,11 +337,12 @@ export default function Header({ currentTab, search, setSearch, onOpenModal, onT
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-start space-x-2.5">
                             <div className={`p-1.5 rounded-lg flex-shrink-0 mt-0.5 ${
+                              isApproval ? 'bg-amber-500/20 text-amber-400' :
                               isSales ? 'bg-emerald-500/20 text-emerald-400' :
                               isBooking ? 'bg-cyan-500/20 text-cyan-400' :
                               'bg-amber-500/20 text-amber-400'
                             }`}>
-                              <DollarSign className="w-3.5 h-3.5" />
+                              {isApproval ? <ShieldCheck className="w-3.5 h-3.5" /> : <DollarSign className="w-3.5 h-3.5" />}
                             </div>
 
                             <div>

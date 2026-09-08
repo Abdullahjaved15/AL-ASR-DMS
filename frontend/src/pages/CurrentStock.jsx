@@ -186,10 +186,10 @@ export default function CurrentStock() {
             .stats-inline { display: flex; gap: 10px; font-size: 8px; background: #f8fafc; padding: 3px 8px; border-radius: 4px; border: 1px solid #e2e8f0; }
             .stat-item { font-weight: 600; color: #334155; }
             .stat-item strong { color: #0284c7; font-weight: 800; }
-            table { width: 100%; border-collapse: collapse; margin-top: 2px; border: 1.5px solid #0f172a; font-size: 8.5px; font-weight: bold; }
+            table { width: 100%; border-collapse: collapse; margin-top: 2px; border: 1.5px solid #0f172a; font-size: 8.5px; font-weight: 800; }
             th { background: #0f172a; color: #ffffff; text-align: left; padding: 4px 5px; font-size: 8.5px; font-weight: 800; text-transform: uppercase; border: 1px solid #334155; }
-            td { padding: 3.5px 5px; border: 1px solid #64748b; font-size: 8.5px; font-weight: 700; vertical-align: middle; color: #0f172a; }
-            td * { font-size: 8.5px !important; font-weight: 700 !important; }
+            td { padding: 3.5px 5px; border: 1px solid #64748b; font-size: 8.5px; font-weight: 800; vertical-align: middle; color: #0f172a; }
+            td * { font-size: 8.5px !important; font-weight: 800 !important; color: #0f172a !important; }
             tr:nth-child(even) { background: #f8fafc; }
             .badge { display: inline-block; padding: 1px 4px; border-radius: 3px; font-size: 8.5px; font-weight: 800; }
             .badge-available { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; font-weight: 800; }
@@ -244,24 +244,17 @@ export default function CurrentStock() {
                         </tr>
                       ` : chunk.map((item, idx) => {
                         const globalIdx = startIdx + idx + 1;
-                        const badgeClass = item.status === 'AVAILABLE'
-                          ? 'badge-available'
-                          : (item.status === 'At Customer' || item.status === 'AT_CUSTOMER')
-                          ? 'badge-customer'
-                          : item.status === 'RESERVED'
-                          ? 'badge-reserved'
-                          : 'badge-sold';
                         return `
                         <tr>
                           <td><strong>${globalIdx}</strong></td>
                           <td><strong>${item.vehicle || ''} ${item.model || ''}</strong></td>
-                          <td>${item.year || 'N/A'}</td>
-                          <td>${item.color || 'N/A'}</td>
-                          <td>${item.mileage ? item.mileage.toLocaleString() + ' km' : '0 km'}</td>
-                          <td><strong style="color: #0f172a;">${formatPKR(item.askingPrice)}</strong></td>
-                          <td><span class="badge badge-care">${item.careOf || 'AL Asr'}</span></td>
-                          <td><strong style="color: #0284c7; font-family: monospace;">${item.regNumber || 'UNREGISTERED'}</strong></td>
-                          <td><span class="badge ${badgeClass}">${item.status}</span></td>
+                          <td><strong>${item.year || 'N/A'}</strong></td>
+                          <td><strong>${item.color || 'N/A'}</strong></td>
+                          <td><strong>${item.mileage ? item.mileage.toLocaleString() + ' km' : '0 km'}</strong></td>
+                          <td><strong>${formatPKR(item.askingPrice)}</strong></td>
+                          <td><strong>${item.careOf || 'AL Asr'}</strong></td>
+                          <td><strong>${item.regNumber || 'UNREGISTERED'}</strong></td>
+                          <td><strong>${item.status || 'AVAILABLE'}</strong></td>
                         </tr>
                         `;
                       }).join('')}

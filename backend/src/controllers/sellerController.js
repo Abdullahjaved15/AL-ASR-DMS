@@ -348,6 +348,14 @@ const updateSeller = async (req, res) => {
         }
       });
 
+      // Notify Super Admin
+      try {
+        const { notifySuperAdminOnApproval } = require('./approvalController');
+        if (notifySuperAdminOnApproval) {
+          await notifySuperAdminOnApproval(request, req.user?.name);
+        }
+      } catch (e) {}
+
       await prisma.activityLog.create({
         data: {
           userId: req.user.id,
@@ -414,6 +422,14 @@ const deleteSeller = async (req, res) => {
           reason: req.body?.reason || 'Admin requested deletion of seller lead'
         }
       });
+
+      // Notify Super Admin
+      try {
+        const { notifySuperAdminOnApproval } = require('./approvalController');
+        if (notifySuperAdminOnApproval) {
+          await notifySuperAdminOnApproval(request, req.user?.name);
+        }
+      } catch (e) {}
 
       await prisma.activityLog.create({
         data: {

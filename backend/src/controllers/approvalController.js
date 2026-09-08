@@ -12,6 +12,25 @@ const invalidateSellersCache = () => {
   }
 };
 
+// Helper to notify Super Admin when an approval request occurs
+const notifySuperAdminOnApproval = async (approvalRequest, requesterName) => {
+  try {
+    const actionLabel = approvalRequest.action ? approvalRequest.action.toUpperCase() : 'CHANGE';
+    const entityLabel = approvalRequest.entityName || approvalRequest.entityType || 'Record';
+    await prisma.notification.create({
+      data: {
+        title: `Pending Approval: ${actionLabel} ${entityLabel}`,
+        message: `${requesterName || 'An Admin'} submitted an approval request for ${actionLabel.toLowerCase()} on ${approvalRequest.entityType || 'record'} "${entityLabel}".`,
+        type: 'APPROVAL_REQUEST',
+        targetRole: 'SUPER_ADMIN',
+        referenceId: approvalRequest.id
+      }
+    });
+  } catch (e) {
+    console.error('Failed to create notification for approval request:', e);
+  }
+};
+
 // Fetch list of approval requests
 const getApprovalRequests = async (req, res) => {
   try {
@@ -123,6 +142,9 @@ const createApprovalRequest = async (req, res) => {
         requestedByUser: { select: { id: true, name: true, email: true, role: true } }
       }
     });
+
+    // Notify Super Admin
+    await notifySuperAdminOnApproval(newRequest, req.user?.name);
 
     await prisma.activityLog.create({
       data: {
@@ -330,5 +352,6 @@ module.exports = {
   getApprovalRequests,
   createApprovalRequest,
   approveRequest,
-  rejectRequest
+  rejectRequest,
+  notifySuperAdminOnApproval
 };
