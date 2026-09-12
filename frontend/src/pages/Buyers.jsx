@@ -91,7 +91,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
     bankName: '',
     bankCaseStatus: 'Not Confirmed',
     processingFees: 0,
-    downpaymentPercent: 20,
+    downpaymentPercent: 30,
     buyerName: '',
     buyerPhone: '',
     buyerCity: '',
@@ -130,9 +130,9 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
       let filteredData = data;
       if (scope === 'mine' && user?.id) {
         const cleanUserName = user?.name ? user.name.replace(/^(mr\.|ma'am|mrs\.)\s+/i, '').toLowerCase().trim() : '';
-        const mine = data.filter(b => 
-          b.assignedTo === user.id || 
-          b.createdBy === user.id || 
+        const mine = data.filter(b =>
+          b.assignedTo === user.id ||
+          b.createdBy === user.id ||
           (cleanUserName && b.leadReference?.toLowerCase().includes(cleanUserName)) ||
           (cleanUserName && b.leadReferredBy?.toLowerCase().includes(cleanUserName))
         );
@@ -179,7 +179,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
       bankName: '',
       bankCaseStatus: 'Not Confirmed',
       processingFees: 0,
-      downpaymentPercent: 20,
+      downpaymentPercent: 30,
       buyerName: '',
       buyerPhone: '',
       buyerCity: '',
@@ -330,7 +330,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
     if (searchCaseNo || q) {
       result = result.filter(b => {
         const caseNo = b.isBankCase ? getBankCaseNo(b.id) : null;
-        
+
         let matchCase = false;
         if (searchCaseNo && caseNo !== null) {
           matchCase = (
@@ -418,8 +418,8 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
         </head>
         <body>
           ${pageChunks.map((chunk, pageIdx) => {
-            const startIdx = pageIdx * pageSize;
-            return `
+      const startIdx = pageIdx * pageSize;
+      return `
               <div class="sheet">
                 <div>
                   <div class="header">
@@ -456,9 +456,9 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                           <td colspan="8" style="text-align: center; padding: 20px; color: #64748b;">No buyer records found.</td>
                         </tr>
                       ` : chunk.map((b, idx) => {
-                        const globalIdx = startIdx + idx + 1;
-                        const caseNo = b.isBankCase ? getBankCaseNo(b.id) : null;
-                        return `
+        const globalIdx = startIdx + idx + 1;
+        const caseNo = b.isBankCase ? getBankCaseNo(b.id) : null;
+        return `
                         <tr>
                           <td><strong>${globalIdx}</strong></td>
                           <td style="color:#0284c7; font-family:monospace; font-weight:600;">${formatDateStr(b.registrationDate || b.createdAt)}</td>
@@ -466,16 +466,16 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                           <td><strong>${b.vehicle} ${b.model}</strong> (${b.year})<br/><span style="color:#64748b; font-size:7.5px;">${b.carCondition || 'Used'} ${b.carCondition === 'Zero Meter' ? `(${b.zeroMeterType || 'Cash'})` : ''}</span></td>
                           <td><strong style="color:#0f172a;">${formatPKR(b.budget)}</strong></td>
                           <td>
-                            ${b.isBankCase 
-                              ? `<span class="badge bank-badge">CASE #${caseNo || globalIdx} • ${b.bankName || 'Bank Case'}</span>` 
-                              : `<span class="badge cash-badge">CASH SALE</span>`
-                            }
+                            ${b.isBankCase
+            ? `<span class="badge bank-badge">CASE #${caseNo || globalIdx} • ${b.bankName || 'Bank Case'}</span>`
+            : `<span class="badge cash-badge">CASH SALE</span>`
+          }
                           </td>
                           <td>${b.assignedUser?.name || 'Unassigned'}</td>
                           <td><strong>${b.leadStatus}</strong></td>
                         </tr>
                         `;
-                      }).join('')}
+      }).join('')}
                     </tbody>
                   </table>
                 </div>
@@ -485,7 +485,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                 </div>
               </div>
             `;
-          }).join('')}
+    }).join('')}
 
           <script>
             window.onload = function() { window.print(); };
@@ -577,8 +577,8 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                 </tr>
               ) : (
                 displayBuyers.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((buyer) => (
-                  <tr 
-                    key={buyer.id} 
+                  <tr
+                    key={buyer.id}
                     onClick={() => openDetailModal(buyer)}
                     className="hover:bg-cyan-500/5 cursor-pointer transition-colors group"
                   >
@@ -865,17 +865,16 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                     value={formData.isCommercial ? 'Commercial' : 'Personal'}
                     onChange={(e) => {
                       const isComm = e.target.value === 'Commercial';
-                      setFormData({ 
-                        ...formData, 
+                      setFormData({
+                        ...formData,
                         isCommercial: isComm,
                         vehicleType: isComm ? 'Commercial' : 'Personal'
                       });
                     }}
-                    className={`w-full bg-slate-900 border rounded-xl px-3 py-2 text-sm font-bold focus:outline-none ${
-                      formData.isCommercial 
-                        ? 'border-amber-500/50 text-amber-300 focus:border-amber-400' 
+                    className={`w-full bg-slate-900 border rounded-xl px-3 py-2 text-sm font-bold focus:outline-none ${formData.isCommercial
+                        ? 'border-amber-500/50 text-amber-300 focus:border-amber-400'
                         : 'border-white/10 text-white focus:border-cyan-500'
-                    }`}
+                      }`}
                   >
                     <option value="Personal">🚗 Passenger / Personal Vehicle</option>
                     <option value="Commercial">🚚 Commercial Vehicle (Hiace, Van, Pickup, Truck, Bus, Loader)</option>
