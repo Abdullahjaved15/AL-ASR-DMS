@@ -1001,7 +1001,7 @@ const createInvoice = async (req, res) => {
         customerCity: buyerAddress || customerCity || null,
         carVehicle: finalVehicleMaker,
         carModel: finalVehicleModel,
-        carYear: carYear ? String(carYear) : String(new Date().getFullYear()),
+        carYear: carYear ? String(carYear) : null,
         carRegNumber: registrationNo || carRegNumber || null,
         saleAmount: saleAmount !== undefined && saleAmount !== null ? String(saleAmount) : String(numericTotalPrice),
         commissionPercent: commissionPercent !== undefined && commissionPercent !== null ? String(commissionPercent) : String(numericCommPercent),

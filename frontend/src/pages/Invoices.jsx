@@ -868,12 +868,11 @@ export default function Invoices({ onNavigate }) {
     let innerHTMLBody = '';
 
     if (category === 'DELIVERY_LETTER') {
-      const sellerDisplayName = (inv.sellerName && inv.sellerName !== 'N/A') ? inv.sellerName : 'AL-ASR MOTORS SAHIWAL';
-      const sellerDisplayFather = (inv.sellerFatherName && inv.sellerFatherName !== 'N/A') ? inv.sellerFatherName : '—';
-      const sellerDisplayAddress = (inv.sellerAddress && inv.sellerAddress !== 'N/A') ? inv.sellerAddress : '450 - A/B, Lahore Road (By Pass near McDonald\'s), Sahiwal';
-      const sellerDisplayPhone = (inv.sellerPhone && inv.sellerPhone !== 'N/A') ? inv.sellerPhone : '040-4403799, 4403899';
       const effectiveTime = inv.time || inv.agreementTime || agreementTime || 'N/A';
       const effectiveDay = inv.agreementDay || agreementDay || '';
+      const displayModelYear = (inv.carYear && inv.carYear !== '2026' && !String(vehicleModel).includes(inv.carYear))
+        ? `${vehicleModel} (${inv.carYear})`
+        : vehicleModel;
 
       innerHTMLBody = `
         <div class="receipt-card" style="border: 2px solid #0f172a; padding: 14px 18px; font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; background: #ffffff; box-sizing: border-box;">
@@ -926,7 +925,7 @@ export default function Invoices({ onNavigate }) {
               </tr>
               <tr>
                 <td style="padding: 4px 6px; border: 1px solid #cbd5e1; background: #f8fafc; font-weight: 800;">Model (ماڈل):</td>
-                <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 800;">${vehicleModel} ${inv.carYear ? `(${inv.carYear})` : ''}</td>
+                <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 800;">${displayModelYear}</td>
                 <td style="padding: 4px 6px; border: 1px solid #cbd5e1; background: #f8fafc; font-weight: 800;">Reg No (رجسٹریشن نمبر):</td>
                 <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 900; color: #0284c7; font-family: monospace;">${regNo}</td>
               </tr>
@@ -949,67 +948,30 @@ export default function Invoices({ onNavigate }) {
             </table>
           </div>
 
-          <!-- Parties Section: First Party (Seller) & Second Party (Buyer) -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
-            
-            <!-- First Party / Seller -->
-            <div style="border: 1.5px solid #0f172a; border-radius: 5px; overflow: hidden;">
-              <div style="background: #1e293b; color: #ffffff; padding: 3px 6px; font-size: 9px; font-weight: 800; text-align: center;">
-                فریق اوّل (مالک / شوروم) — FIRST PARTY (SELLER / DELIVERER)
-              </div>
-              <table style="width: 100%; border-collapse: collapse; font-size: 9px;">
-                <tr>
-                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; width: 34%; font-weight: 700; color: #475569;">نام (Name):</td>
-                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 800; color: #0f172a;">${sellerDisplayName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #475569;">ولدیت (Father):</td>
-                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 800; color: #0f172a;">${sellerDisplayFather}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #475569;">شناختی کارڈ (CNIC):</td>
-                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0;">${renderCNICBoxes(inv.sellerCnic)}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #475569;">پتہ (Address):</td>
-                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a;">${sellerDisplayAddress}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 3px 6px; font-weight: 700; color: #475569;">فون (Phone):</td>
-                  <td style="padding: 3px 6px; font-weight: 800; font-family: monospace; color: #0f172a;">${sellerDisplayPhone}</td>
-                </tr>
-              </table>
+          <!-- Buyer / Recipient Details Section (Full Width) -->
+          <div style="border: 1.5px solid #0f172a; border-radius: 5px; overflow: hidden; margin-bottom: 8px;">
+            <div style="background: #1e293b; color: #ffffff; padding: 4px 8px; font-size: 9.5px; font-weight: 800; display: flex; justify-content: space-between; align-items: center;">
+              <span>خریدار / وصول کنندہ کی تفصیلات — BUYER / RECIPIENT DETAILS (وصول کنندہ گاڑی)</span>
+              <span>DELIVERY RECEIVER</span>
             </div>
-
-            <!-- Second Party / Buyer -->
-            <div style="border: 1.5px solid #0f172a; border-radius: 5px; overflow: hidden;">
-              <div style="background: #1e293b; color: #ffffff; padding: 3px 6px; font-size: 9px; font-weight: 800; text-align: center;">
-                فریق دوئم (خریدار / وصول کنندہ) — SECOND PARTY (BUYER / RECIPIENT)
-              </div>
-              <table style="width: 100%; border-collapse: collapse; font-size: 9px;">
-                <tr>
-                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; width: 34%; font-weight: 700; color: #475569;">نام (Name):</td>
-                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 800; color: #0f172a;">${buyerName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #475569;">ولدیت (Father):</td>
-                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 800; color: #0f172a;">${buyerFather}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #475569;">شناختی کارڈ (CNIC):</td>
-                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0;">${renderCNICBoxes(inv.buyerCnic)}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #475569;">پتہ (Address):</td>
-                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a;">${buyerAddress}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 3px 6px; font-weight: 700; color: #475569;">فون (Phone):</td>
-                  <td style="padding: 3px 6px; font-weight: 800; font-family: monospace; color: #0f172a;">${buyerPhone}</td>
-                </tr>
-              </table>
-            </div>
-
+            <table style="width: 100%; border-collapse: collapse; font-size: 9.5px;">
+              <tr>
+                <td style="padding: 4px 6px; border-bottom: 1px solid #e2e8f0; width: 16%; font-weight: 700; color: #475569; background: #f8fafc;">نام (Buyer Name):</td>
+                <td style="padding: 4px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 800; color: #0f172a; width: 34%;">${buyerName}</td>
+                <td style="padding: 4px 6px; border-bottom: 1px solid #e2e8f0; width: 16%; font-weight: 700; color: #475569; background: #f8fafc;">ولدیت (Father):</td>
+                <td style="padding: 4px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 800; color: #0f172a; width: 34%;">${buyerFather}</td>
+              </tr>
+              <tr>
+                <td style="padding: 4px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #475569; background: #f8fafc;">شناختی کارڈ (CNIC):</td>
+                <td style="padding: 4px 6px; border-bottom: 1px solid #e2e8f0;">${renderCNICBoxes(inv.buyerCnic)}</td>
+                <td style="padding: 4px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #475569; background: #f8fafc;">فون (Phone):</td>
+                <td style="padding: 4px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 800; font-family: monospace; color: #0f172a;">${buyerPhone}</td>
+              </tr>
+              <tr>
+                <td style="padding: 4px 6px; font-weight: 700; color: #475569; background: #f8fafc;">پتہ (Address):</td>
+                <td style="padding: 4px 6px; font-weight: 700; color: #0f172a;" colspan="3">${buyerAddress}</td>
+              </tr>
+            </table>
           </div>
 
           <!-- Urdu Undertaking Statement & Legal Responsibility Clause -->
@@ -1042,22 +1004,22 @@ export default function Invoices({ onNavigate }) {
           </div>
 
           <!-- Signatures Grid -->
-          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 26px; text-align: center;">
+          <div style="display: grid; grid-template-columns: 1.5fr 1fr 1fr 1.5fr; gap: 12px; margin-top: 32px; text-align: center;">
             <div style="border-top: 1.5px solid #0f172a; padding-top: 4px;">
-              <div style="font-size: 8.5px; font-weight: 800; color: #0f172a;">دستخط فریق اوّل (فروخت کنندہ)</div>
-              <div style="font-size: 7.5px; color: #64748b; font-weight: 700;">Seller's Signature</div>
+              <div style="font-size: 8.5px; font-weight: 800; color: #0f172a;">دستخط خریدار / وصول کنندہ</div>
+              <div style="font-size: 7.5px; color: #64748b; font-weight: 700;">Buyer / Receiver Signature</div>
             </div>
             <div style="border-top: 1.5px solid #0f172a; padding-top: 4px;">
-              <div style="font-size: 8.5px; font-weight: 800; color: #0f172a;">دستخط فریق دوئم (خریدار)</div>
-              <div style="font-size: 7.5px; color: #64748b; font-weight: 700;">Buyer's Signature</div>
+              <div style="font-size: 8.5px; font-weight: 800; color: #0f172a;">دستخط گواہ نمبر ۱</div>
+              <div style="font-size: 7.5px; color: #64748b; font-weight: 700;">Witness 1 Signature</div>
             </div>
             <div style="border-top: 1.5px solid #0f172a; padding-top: 4px;">
-              <div style="font-size: 8.5px; font-weight: 800; color: #0f172a;">دستخط گواہان (1 و 2)</div>
-              <div style="font-size: 7.5px; color: #64748b; font-weight: 700;">Witness Signatures</div>
+              <div style="font-size: 8.5px; font-weight: 800; color: #0f172a;">دستخط گواہ نمبر ۲</div>
+              <div style="font-size: 7.5px; color: #64748b; font-weight: 700;">Witness 2 Signature</div>
             </div>
             <div style="border-top: 1.5px solid #0f172a; padding-top: 4px;">
               <div style="font-size: 8.5px; font-weight: 900; color: #0284c7;">دستخط و مہر شوروم</div>
-              <div style="font-size: 7.5px; color: #0284c7; font-weight: 800;">For AL-ASR Motors</div>
+              <div style="font-size: 7.5px; color: #0284c7; font-weight: 800;">Authorized Stamp & Signature</div>
             </div>
           </div>
 
@@ -1288,7 +1250,7 @@ export default function Invoices({ onNavigate }) {
                 <td class="lbl">میکر (Maker / Brand):</td>
                 <td class="val">${vehicleMaker}</td>
                 <td class="lbl">ماڈل (Model & Year):</td>
-                <td class="val">${vehicleModel} ${inv.carYear || ''}</td>
+                <td class="val">${(inv.carYear && inv.carYear !== '2026' && !String(vehicleModel).includes(inv.carYear)) ? `${vehicleModel} (${inv.carYear})` : vehicleModel}</td>
               </tr>
               <tr>
                 <td class="lbl">انجن نمبر (Engine No):</td>
