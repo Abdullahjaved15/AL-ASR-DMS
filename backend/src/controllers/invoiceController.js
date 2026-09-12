@@ -171,6 +171,44 @@ const findActiveBookingByPhone = async (req, res) => {
   }
 };
 
+// Helper to find or auto-create Customer Ledger Account in Chart of Accounts
+const findOrCreateCustomerAccount = async (customerName, customerPhone) => {
+  if (!customerName || customerName === 'N/A' || String(customerName).trim() === '') return null;
+  const cleanName = String(customerName).trim();
+  let acc = await prisma.account.findFirst({
+    where: {
+      name: { equals: cleanName, mode: 'insensitive' },
+      subType: 'CUSTOMER'
+    }
+  }) || await prisma.account.findFirst({
+    where: {
+      name: { equals: cleanName, mode: 'insensitive' }
+    }
+  });
+
+  if (!acc) {
+    const maxAcc = await prisma.account.findFirst({
+      where: { code: { startsWith: '12' } },
+      orderBy: { code: 'desc' }
+    });
+    let nextCode = '1201';
+    if (maxAcc && !isNaN(Number(maxAcc.code))) {
+      nextCode = String(Number(maxAcc.code) + 1);
+    }
+    acc = await prisma.account.create({
+      data: {
+        code: nextCode,
+        name: cleanName,
+        type: 'ASSET',
+        subType: 'CUSTOMER',
+        currentBalance: 0,
+        description: `Customer Ledger for ${cleanName}${customerPhone ? ' (Phone: ' + customerPhone + ')' : ''}`
+      }
+    });
+  }
+  return acc;
+};
+
 // Comprehensive Helper to Synchronize Double-Entry Ledger Transactions for Invoices & Vouchers
 const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
   const inv = await prisma.invoice.findUnique({ where: { id: invoiceId } });
@@ -352,6 +390,171 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
         await prisma.account.update({
           where: { id: targetAccount.id },
           data: { currentBalance: { decrement: paymentAmt } }
+        });
+      }
+    }
+  } else if (inv.category === 'SALES_RECEIPT' && inv.isInstallmentSale) {
+    // ----------------------------------------------------
+    // INSTALLMENT SALE DOUBLE-ENTRY LEDGER POSTING
+    // ----------------------------------------------------
+    // e.g. Buyer bought 70 Lac car, paid 35 Lac Advance, 35 Lac Remaining in Installments.
+    // Inflow: Advance (35 Lac) DEBITs Cash in Hand / Bank.
+    // Receivable: Remaining (35 Lac) DEBITs Buyer / Customer Ledger.
+    // Revenue: Total (70 Lac) CREDITs Vehicle Sales Revenue.
+    const numericTotalPrice = parsePakistaniPrice(inv.totalPrice || inv.agreedAmount || inv.saleAmount || 0);
+    const numericAdvance = parsePakistaniPrice(inv.advanceAmount || 0);
+    const numericRemaining = inv.remainingAmount !== undefined && inv.remainingAmount !== null && inv.remainingAmount !== ''
+      ? parsePakistaniPrice(inv.remainingAmount)
+      : Math.max(0, numericTotalPrice - numericAdvance);
+
+    let cashAdv = 0;
+    let bankAdv = 0;
+
+    if (inv.paymentMethod === 'BANK') {
+      bankAdv = numericAdvance;
+    } else if (inv.paymentMethod === 'SPLIT') {
+      const splitCash = parsePakistaniPrice(inv.cashAmountReceived);
+      const splitBank = parsePakistaniPrice(inv.bankAmountReceived);
+      if (splitCash + splitBank > 0) {
+        const ratio = splitCash / (splitCash + splitBank);
+        cashAdv = Math.round(numericAdvance * ratio);
+        bankAdv = numericAdvance - cashAdv;
+      } else {
+        cashAdv = numericAdvance;
+      }
+    } else {
+      cashAdv = numericAdvance;
+    }
+
+    let cashAccount = null;
+    if (cashAdv > 0) {
+      cashAccount = await prisma.account.findFirst({ where: { subType: 'CASH', isActive: true } })
+        || await prisma.account.findFirst({ where: { subType: 'CASH' } });
+      if (!cashAccount) {
+        cashAccount = await prisma.account.create({
+          data: {
+            code: '1001',
+            name: 'Cash in Hand Safe',
+            type: 'ASSET',
+            subType: 'CASH',
+            currentBalance: 0,
+            description: 'Physical showroom safe cash'
+          }
+        });
+      }
+    }
+
+    let bankAccount = null;
+    if (bankAdv > 0) {
+      if (inv.bankAccountId) {
+        bankAccount = await prisma.account.findUnique({ where: { id: inv.bankAccountId } });
+      }
+      if (!bankAccount) {
+        bankAccount = await prisma.account.findFirst({ where: { subType: 'BANK', isActive: true } })
+          || await prisma.account.findFirst({ where: { subType: 'BANK' } });
+      }
+    }
+
+    // Buyer / Customer Ledger Account
+    const customerAccount = await findOrCreateCustomerAccount(inv.buyerName || inv.customerName, inv.buyerPhone || inv.customerPhone);
+
+    // Sales Revenue Account
+    let revenueAccount = await prisma.account.findFirst({ where: { code: '4001' } }) 
+      || await prisma.account.findFirst({ where: { type: 'REVENUE' } });
+    if (!revenueAccount) {
+      revenueAccount = await prisma.account.create({
+        data: {
+          code: '4001',
+          name: 'Vehicle Sales Revenue',
+          type: 'REVENUE',
+          subType: 'REVENUE',
+          currentBalance: 0,
+          description: 'Primary revenue from vehicle sales & installments'
+        }
+      });
+    }
+
+    const entriesToCreate = [];
+
+    // 1. Debit Cash Safe for Advance
+    if (cashAdv > 0 && cashAccount) {
+      entriesToCreate.push({
+        accountId: cashAccount.id,
+        type: 'DEBIT',
+        amount: cashAdv,
+        description: `Advance Cash received from ${inv.buyerName || 'Customer'} for ${inv.vehicleMaker || ''} ${inv.vehicleModel || ''}`
+      });
+    }
+
+    // 2. Debit Bank Account for Advance
+    if (bankAdv > 0 && bankAccount) {
+      entriesToCreate.push({
+        accountId: bankAccount.id,
+        type: 'DEBIT',
+        amount: bankAdv,
+        description: `Advance Bank transfer from ${inv.buyerName || 'Customer'} into ${bankAccount.name}`
+      });
+    }
+
+    // 3. Debit Customer Ledger for Remaining Installments Receivable
+    if (numericRemaining > 0 && customerAccount) {
+      entriesToCreate.push({
+        accountId: customerAccount.id,
+        type: 'DEBIT',
+        amount: numericRemaining,
+        description: `Installment balance receivable from [${inv.buyerName || 'Customer'}] for [${inv.vehicleMaker || ''} ${inv.vehicleModel || ''} - Chassis: ${inv.chassisNumber || 'N/A'}]`
+      });
+    }
+
+    // 4. Credit Vehicle Sales Revenue for Full Deal Price
+    if (numericTotalPrice > 0 && revenueAccount) {
+      entriesToCreate.push({
+        accountId: revenueAccount.id,
+        type: 'CREDIT',
+        amount: numericTotalPrice,
+        description: `Vehicle Sales Revenue from ${inv.buyerName || 'Customer'} (${inv.vehicleMaker || ''} ${inv.vehicleModel || ''})`
+      });
+    }
+
+    if (entriesToCreate.length > 0) {
+      await prisma.transaction.create({
+        data: {
+          transactionNumber: `INST-SALE-${dateCode}-${txnSeq}`,
+          date: todayDate,
+          type: 'SALES_INVOICE',
+          amount: numericTotalPrice,
+          description: `Installment Sale #${inv.invoiceNumber} to [${inv.buyerName || 'Customer'}] for [${inv.vehicleMaker || ''} ${inv.vehicleModel || ''} - Chassis: ${inv.chassisNumber || 'N/A'}] (Total: Rs. ${numericTotalPrice}, Advance Inflow: Rs. ${numericAdvance}, Installments Balance: Rs. ${numericRemaining})`,
+          referenceType: 'INVOICE',
+          referenceId: inv.id,
+          referenceNumber: inv.invoiceNumber,
+          chassisNumber: inv.chassisNumber || null,
+          createdById: finalUserId,
+          entries: { create: entriesToCreate }
+        }
+      });
+
+      if (cashAdv > 0 && cashAccount) {
+        await prisma.account.update({
+          where: { id: cashAccount.id },
+          data: { currentBalance: { increment: cashAdv } }
+        });
+      }
+      if (bankAdv > 0 && bankAccount) {
+        await prisma.account.update({
+          where: { id: bankAccount.id },
+          data: { currentBalance: { increment: bankAdv } }
+        });
+      }
+      if (numericRemaining > 0 && customerAccount) {
+        await prisma.account.update({
+          where: { id: customerAccount.id },
+          data: { currentBalance: { increment: numericRemaining } }
+        });
+      }
+      if (numericTotalPrice > 0 && revenueAccount) {
+        await prisma.account.update({
+          where: { id: revenueAccount.id },
+          data: { currentBalance: { increment: numericTotalPrice } }
         });
       }
     }
@@ -916,7 +1119,7 @@ const createInvoice = async (req, res) => {
             : Math.round(numericRemaining / numInstallments);
 
           const ipCount = await prisma.installmentPlan.count();
-          const ipPlanNumber = `IP-${dateCode}-${String(ipCount + 1).padStart(4, '0')}`;
+          const ipPlanNumber = `IP-${dateStr}-${String(ipCount + 1).padStart(4, '0')}`;
           const start = req.body.installmentStartDate ? new Date(req.body.installmentStartDate) : new Date();
 
           const scheduleItems = [];
@@ -1176,6 +1379,123 @@ const updateInvoice = async (req, res) => {
       }
     });
 
+    // ----------------------------------------------------
+    // SYNC INSTALLMENT PLAN ON INVOICE UPDATE
+    // ----------------------------------------------------
+    const finalIsInstallment = isInstallmentSale !== undefined ? Boolean(isInstallmentSale) : existing.isInstallmentSale;
+    if (finalIsInstallment && numericRemaining > 0) {
+      const numInstallments = parseInt(req.body.totalInstallments || existing.totalInstallments || 12, 10);
+      const instFrequency = req.body.installmentFrequency || existing.installmentFrequency || 'MONTHLY';
+      const calculatedInstallmentAmt = req.body.installmentAmount 
+        ? parseFloat(req.body.installmentAmount) 
+        : Math.round(numericRemaining / numInstallments);
+      const start = req.body.installmentStartDate ? new Date(req.body.installmentStartDate) : new Date();
+
+      let existingPlan = null;
+      if (existing.installmentPlanId) {
+        existingPlan = await prisma.installmentPlan.findUnique({ where: { id: existing.installmentPlanId } });
+      }
+      if (!existingPlan) {
+        existingPlan = await prisma.installmentPlan.findFirst({ where: { invoiceId: id } });
+      }
+
+      const scheduleItems = [];
+      for (let i = 1; i <= numInstallments; i++) {
+        const dueDate = new Date(start);
+        if (instFrequency === 'MONTHLY') dueDate.setMonth(dueDate.getMonth() + i);
+        else if (instFrequency === 'QUARTERLY') dueDate.setMonth(dueDate.getMonth() + (i * 3));
+        else dueDate.setMonth(dueDate.getMonth() + i);
+
+        const isLast = i === numInstallments;
+        const priorTotal = calculatedInstallmentAmt * (numInstallments - 1);
+        const itemAmt = isLast ? Math.max(0, numericRemaining - priorTotal) : calculatedInstallmentAmt;
+
+        scheduleItems.push({
+          installmentNumber: i,
+          dueDate,
+          amount: itemAmt,
+          paidAmount: 0,
+          status: 'UNPAID'
+        });
+      }
+
+      if (existingPlan) {
+        await prisma.installmentItem.deleteMany({ where: { planId: existingPlan.id } });
+        await prisma.installmentPlan.update({
+          where: { id: existingPlan.id },
+          data: {
+            customerName: finalBuyerName,
+            customerPhone: buyerPhone || customerPhone || existing.buyerPhone || null,
+            customerCnic: buyerCnic || existing.buyerCnic || null,
+            customerAddress: buyerAddress || customerCity || existing.buyerAddress || null,
+            vehicleName: `${finalVehicleMaker} ${finalVehicleModel}`.trim(),
+            registrationNo: registrationNo || existing.registrationNo || null,
+            chassisNumber: chassisNumber || existing.chassisNumber || null,
+            totalPrice: numericTotalPrice,
+            advanceAmount: numericAdvance,
+            remainingAmount: numericRemaining,
+            totalInstallments: numInstallments,
+            installmentAmount: calculatedInstallmentAmt,
+            frequency: instFrequency,
+            startDate: start,
+            status: numericRemaining === 0 ? 'COMPLETED' : 'ACTIVE',
+            items: { create: scheduleItems }
+          }
+        });
+        if (!existing.installmentPlanId) {
+          await prisma.invoice.update({
+            where: { id },
+            data: { installmentPlanId: existingPlan.id }
+          });
+        }
+      } else {
+        const today = new Date();
+        const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+        const ipCount = await prisma.installmentPlan.count();
+        const ipPlanNumber = `IP-${dateStr}-${String(ipCount + 1).padStart(4, '0')}`;
+
+        const createdPlan = await prisma.installmentPlan.create({
+          data: {
+            planNumber: ipPlanNumber,
+            invoiceId: id,
+            customerName: finalBuyerName,
+            customerPhone: buyerPhone || customerPhone || existing.buyerPhone || null,
+            customerCnic: buyerCnic || existing.buyerCnic || null,
+            customerAddress: buyerAddress || customerCity || existing.buyerAddress || null,
+            vehicleName: `${finalVehicleMaker} ${finalVehicleModel}`.trim(),
+            registrationNo: registrationNo || existing.registrationNo || null,
+            chassisNumber: chassisNumber || existing.chassisNumber || null,
+            totalPrice: numericTotalPrice,
+            advanceAmount: numericAdvance,
+            remainingAmount: numericRemaining,
+            totalInstallments: numInstallments,
+            installmentAmount: calculatedInstallmentAmt,
+            frequency: instFrequency,
+            startDate: start,
+            status: 'ACTIVE',
+            notes: `Auto-generated from Sales Receipt ${existing.invoiceNumber}`,
+            createdById: req.user.id,
+            items: { create: scheduleItems }
+          }
+        });
+        await prisma.invoice.update({
+          where: { id },
+          data: { installmentPlanId: createdPlan.id }
+        });
+      }
+    } else if (!finalIsInstallment && existing.installmentPlanId) {
+      try {
+        await prisma.installmentItem.deleteMany({ where: { planId: existing.installmentPlanId } });
+        await prisma.installmentPlan.delete({ where: { id: existing.installmentPlanId } });
+        await prisma.invoice.update({
+          where: { id },
+          data: { installmentPlanId: null }
+        });
+      } catch (ipRemoveErr) {
+        console.warn('Failed to remove installment plan on toggle off:', ipRemoveErr.message);
+      }
+    }
+
     if (linkedBookingId || existing.linkedBookingId) {
       const targetBookingId = linkedBookingId || existing.linkedBookingId;
       try {
@@ -1234,6 +1554,16 @@ const deleteInvoice = async (req, res) => {
         });
       } catch (revertErr) {
         console.warn('Failed to revert linked booking receipt status on deletion:', revertErr.message);
+      }
+    }
+
+    // Delete linked installment plan if any
+    if (existing.installmentPlanId) {
+      try {
+        await prisma.installmentItem.deleteMany({ where: { planId: existing.installmentPlanId } });
+        await prisma.installmentPlan.delete({ where: { id: existing.installmentPlanId } });
+      } catch (ipDelErr) {
+        console.warn('Failed to delete linked installment plan on invoice deletion:', ipDelErr.message);
       }
     }
 

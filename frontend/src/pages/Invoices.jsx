@@ -1329,6 +1329,25 @@ export default function Invoices({ onNavigate }) {
             </tbody>
           </table>
 
+          ${inv.isInstallmentSale ? `
+            <!-- Installment Financing Plan Details on Printed Sales Receipt -->
+            <div style="border: 1.5px solid #0284c7; border-radius: 5px; margin-bottom: 6px; overflow: hidden; background: #ffffff;">
+              <div style="background: #0284c7; color: #ffffff; padding: 3.5px 8px; font-size: 9.5px; font-weight: 800; display: flex; justify-content: space-between; align-items: center;">
+                <span>📅 قسطوں کا شیڈول و باضابطہ تفصیلات (INSTALLMENT FINANCING PLAN)</span>
+                <span>${inv.totalInstallments || 12} Installments (${inv.installmentFrequency || 'MONTHLY'})</span>
+              </div>
+              <div style="padding: 5px 8px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 9px; background: #f0f9ff; border-bottom: 1px solid #bae6fd;">
+                <div><strong>کل قیمت (Total):</strong> <span style="font-family: monospace; font-weight: 800; color: #0f172a;">Rs. ${numericTotal.toLocaleString()}</span></div>
+                <div><strong>پیشگی بیعانہ (Advance):</strong> <span style="font-family: monospace; font-weight: 800; color: #16a34a;">Rs. ${numericAdvance.toLocaleString()}</span></div>
+                <div><strong>بقایا قسطوں میں (Balance):</strong> <span style="font-family: monospace; font-weight: 800; color: #dc2626;">Rs. ${numericRemaining.toLocaleString()}</span></div>
+                <div><strong>ماہانہ قسط (Per Installment):</strong> <span style="font-family: monospace; font-weight: 800; color: #0284c7;">Rs. ${(inv.installmentAmount ? parsePakistaniPrice(inv.installmentAmount) : Math.round(numericRemaining / (inv.totalInstallments || 12))).toLocaleString()}</span></div>
+              </div>
+              <div style="padding: 4px 8px; font-size: 8.5px; color: #334155; font-style: italic; background: #fafafa;">
+                * گاڑی کی فروخت قسطوں کے معاہدے پر طے پائی ہے۔ خریدار ہر ماہ مقررہ تاریخ پر قسط ادا کرنے کا پابند ہوگا۔ بقایا قسطیں اکاؤنٹس و فنانس ہب میں باقاعدہ درج ہیں۔
+              </div>
+            </div>
+          ` : ''}
+
           <!-- Note / Terms & Conditions (8 Official Points) -->
           <div class="terms-card">
             <div class="terms-head">نوٹ و شرائط (TERMS & CONDITIONS)</div>
@@ -3850,56 +3869,244 @@ export default function Invoices({ onNavigate }) {
                     </div>
 
                     {/* INSTALLMENT PLAN OPTION */}
-                    <div className="p-4 bg-slate-950 rounded-xl border border-emerald-500/30 space-y-3">
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id="isInstallmentSale"
-                          checked={Boolean(formData.isInstallmentSale)}
-                          onChange={(e) => handleInputChange('isInstallmentSale', e.target.checked)}
-                          className="w-4 h-4 text-emerald-500 rounded bg-slate-900 border-white/20 focus:ring-emerald-500 cursor-pointer"
-                        />
-                        <label htmlFor="isInstallmentSale" className="text-xs font-bold text-white cursor-pointer select-none">
-                          📅 Is this vehicle sale on Installments? (قسطوں پر فروخت)
+                    <div className={`p-4 rounded-xl border-2 transition-all space-y-3 ${
+                      formData.isInstallmentSale 
+                        ? 'bg-gradient-to-br from-emerald-950/40 via-slate-950 to-emerald-950/20 border-emerald-500/60 shadow-xl' 
+                        : 'bg-slate-950/60 border-white/10'
+                    }`}>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+                        <label className="flex items-center space-x-3 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            id="isInstallmentSale"
+                            checked={Boolean(formData.isInstallmentSale)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              handleInputChange('isInstallmentSale', checked);
+                              if (checked) {
+                                const tot = parsePakistaniPrice(formData.totalPrice || 0);
+                                const adv = parsePakistaniPrice(formData.advanceAmount || 0);
+                                const rem = Math.max(0, tot - adv);
+                                const numInst = parseInt(formData.totalInstallments || 12, 10);
+                                if (!formData.installmentAmount && rem > 0 && numInst > 0) {
+                                  handleInputChange('installmentAmount', String(Math.round(rem / numInst)));
+                                }
+                              }
+                            }}
+                            className="w-5 h-5 text-emerald-500 rounded bg-slate-950 border-emerald-400/40 focus:ring-emerald-500 cursor-pointer"
+                          />
+                          <div>
+                            <span className="text-xs font-bold text-white flex items-center gap-2">
+                              📅 Vehicle Sale on Installment Plan (قسطوں پر گاڑی فروخت)
+                            </span>
+                            <p className="text-[11px] text-emerald-300/80 font-mono mt-0.5">
+                              Check to generate an official installment schedule & auto-link to Accounts & Finance Hub
+                            </p>
+                          </div>
                         </label>
+
+                        {formData.isInstallmentSale && (
+                          <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold whitespace-nowrap self-start sm:self-center">
+                            ⚡ Auto Ledger & Financing Sync
+                          </span>
+                        )}
                       </div>
 
                       {formData.isInstallmentSale && (
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-white/10">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">Number of Installments</label>
-                            <input
-                              type="number"
-                              min="1"
-                              max="60"
-                              placeholder="e.g. 12"
-                              value={formData.totalInstallments || 12}
-                              onChange={(e) => handleInputChange('totalInstallments', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500 font-mono"
-                            />
-                          </div>
+                        <div className="space-y-4 pt-1">
+                          {/* Financial Breakdown Summary Cards */}
+                          {(() => {
+                            const tot = parsePakistaniPrice(formData.totalPrice || 0);
+                            const adv = parsePakistaniPrice(formData.advanceAmount || 0);
+                            const rem = Math.max(0, tot - adv);
+                            const numInst = parseInt(formData.totalInstallments || 12, 10) || 12;
+                            const perInst = formData.installmentAmount 
+                              ? parsePakistaniPrice(formData.installmentAmount) 
+                              : Math.round(rem / numInst);
 
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">Installment Frequency</label>
-                            <select
-                              value={formData.installmentFrequency || 'MONTHLY'}
-                              onChange={(e) => handleInputChange('installmentFrequency', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500 font-mono"
-                            >
-                              <option value="MONTHLY">Monthly (ماہانہ)</option>
-                              <option value="QUARTERLY">Quarterly (سہ ماہی)</option>
-                            </select>
-                          </div>
+                            return (
+                              <>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-950/80 p-3.5 rounded-lg border border-emerald-500/30 text-xs">
+                                  <div className="p-2 bg-slate-900/60 rounded border border-white/5">
+                                    <span className="text-[10px] text-slate-400 font-medium">Total Price (کل قیمت):</span>
+                                    <div className="font-mono font-bold text-white text-sm mt-0.5">PKR {tot.toLocaleString()}</div>
+                                  </div>
+                                  <div className="p-2 bg-emerald-500/10 rounded border border-emerald-500/30">
+                                    <span className="text-[10px] text-emerald-300 font-bold">Advance Paid (پیشگی بیعانہ):</span>
+                                    <div className="font-mono font-bold text-emerald-400 text-sm mt-0.5">PKR {adv.toLocaleString()}</div>
+                                    <div className="text-[9px] text-emerald-300/70 mt-0.5">Deposits into Cash/Bank now</div>
+                                  </div>
+                                  <div className="p-2 bg-rose-500/10 rounded border border-rose-500/30">
+                                    <span className="text-[10px] text-rose-300 font-bold">Installment Balance (بقایا قسطیں):</span>
+                                    <div className="font-mono font-bold text-rose-400 text-sm mt-0.5">PKR {rem.toLocaleString()}</div>
+                                    <div className="text-[9px] text-rose-300/70 mt-0.5">Debits Buyer's Ledger</div>
+                                  </div>
+                                  <div className="p-2 bg-cyan-500/10 rounded border border-cyan-500/30">
+                                    <span className="text-[10px] text-cyan-300 font-bold">Monthly Dues (ماہانہ قسط):</span>
+                                    <div className="font-mono font-bold text-cyan-400 text-sm mt-0.5">PKR {perInst.toLocaleString()}</div>
+                                    <div className="text-[9px] text-cyan-300/70 mt-0.5">For {numInst} {formData.installmentFrequency || 'MONTHLY'} cycles</div>
+                                  </div>
+                                </div>
 
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">Installment Start Date</label>
-                            <input
-                              type="date"
-                              value={formData.installmentStartDate || new Date().toISOString().slice(0, 10)}
-                              onChange={(e) => handleInputChange('installmentStartDate', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500 font-mono"
-                            />
-                          </div>
+                                {/* Form Parameters */}
+                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                                  <div>
+                                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                      Number of Installments <span className="text-rose-400">*</span>
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      max="84"
+                                      placeholder="e.g. 6, 12, 24"
+                                      value={formData.totalInstallments || 12}
+                                      onChange={(e) => {
+                                        const count = parseInt(e.target.value, 10) || 1;
+                                        handleInputChange('totalInstallments', count);
+                                        if (rem > 0) {
+                                          handleInputChange('installmentAmount', String(Math.round(rem / count)));
+                                        }
+                                      }}
+                                      className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-emerald-500/40 text-white text-xs font-bold focus:border-emerald-400 font-mono"
+                                      required
+                                    />
+                                    {/* Quick Presets */}
+                                    <div className="flex gap-1 mt-1.5 flex-wrap">
+                                      {[6, 12, 18, 24, 36].map(n => (
+                                        <button
+                                          key={n}
+                                          type="button"
+                                          onClick={() => {
+                                            handleInputChange('totalInstallments', n);
+                                            if (rem > 0) {
+                                              handleInputChange('installmentAmount', String(Math.round(rem / n)));
+                                            }
+                                          }}
+                                          className={`px-1.5 py-0.5 text-[10px] font-mono rounded border transition-all ${
+                                            (formData.totalInstallments || 12) === n 
+                                              ? 'bg-emerald-500 text-slate-950 font-bold border-emerald-400' 
+                                              : 'bg-slate-900 text-slate-300 border-white/10 hover:border-emerald-500/40'
+                                          }`}
+                                        >
+                                          {n}M
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                      Monthly Installment (PKR) <span className="text-rose-400">*</span>
+                                    </label>
+                                    <input
+                                      type="text"
+                                      placeholder="e.g. 5 lac, 500000"
+                                      value={formData.installmentAmount !== undefined && formData.installmentAmount !== '' ? formData.installmentAmount : (rem > 0 && numInst > 0 ? String(Math.round(rem / numInst)) : '')}
+                                      onChange={(e) => handleInputChange('installmentAmount', e.target.value)}
+                                      className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-emerald-500/40 text-emerald-300 text-xs font-bold focus:border-emerald-400 font-mono"
+                                      required
+                                    />
+                                    {Boolean(formData.installmentAmount) && Boolean(getPriceHint(formData.installmentAmount)) && (
+                                      <div className="mt-1 px-2 py-0.5 bg-emerald-950/70 border border-emerald-500/30 rounded text-[10px] font-mono text-emerald-300">
+                                        <span>{getPriceHint(formData.installmentAmount)}</span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                      Frequency (تعدد اقساط)
+                                    </label>
+                                    <select
+                                      value={formData.installmentFrequency || 'MONTHLY'}
+                                      onChange={(e) => handleInputChange('installmentFrequency', e.target.value)}
+                                      className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-emerald-500/40 text-white text-xs font-bold focus:border-emerald-400 font-mono"
+                                    >
+                                      <option value="MONTHLY">Monthly (ماہانہ قسط)</option>
+                                      <option value="QUARTERLY">Quarterly (سہ ماہی قسط)</option>
+                                    </select>
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                      First Due Date (پہلی تاریخ ادائیگی)
+                                    </label>
+                                    <input
+                                      type="date"
+                                      value={formData.installmentStartDate || new Date().toISOString().slice(0, 10)}
+                                      onChange={(e) => handleInputChange('installmentStartDate', e.target.value)}
+                                      className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-emerald-500/40 text-white text-xs focus:border-emerald-400 font-mono cursor-pointer"
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Live Generated Schedule Preview Table */}
+                                <div className="space-y-2 pt-2">
+                                  <div className="flex items-center justify-between">
+                                    <h6 className="text-[11px] font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+                                      <span>📋</span> Generated Installment Schedule Preview ({numInst} Installments)
+                                    </h6>
+                                    <span className="text-[10px] font-mono text-slate-400">Total: PKR {rem.toLocaleString()}</span>
+                                  </div>
+
+                                  <div className="max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-slate-950/90">
+                                    <table className="w-full text-left text-[11px] font-mono">
+                                      <thead className="bg-slate-900/90 text-slate-400 border-b border-white/10 sticky top-0">
+                                        <tr>
+                                          <th className="py-2 px-3">#</th>
+                                          <th className="py-2 px-3">Due Date (تاریخ)</th>
+                                          <th className="py-2 px-3 text-right">Installment (رقم)</th>
+                                          <th className="py-2 px-3 text-right">Remaining Balance</th>
+                                          <th className="py-2 px-3 text-center">Status</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-white/5">
+                                        {Array.from({ length: numInst }).map((_, idx) => {
+                                          const instNum = idx + 1;
+                                          const startD = formData.installmentStartDate ? new Date(formData.installmentStartDate) : new Date();
+                                          const d = new Date(startD);
+                                          if ((formData.installmentFrequency || 'MONTHLY') === 'MONTHLY') {
+                                            d.setMonth(d.getMonth() + instNum);
+                                          } else {
+                                            d.setMonth(d.getMonth() + (instNum * 3));
+                                          }
+                                          const isLast = instNum === numInst;
+                                          const priorAmt = perInst * (numInst - 1);
+                                          const itemAmount = isLast ? Math.max(0, rem - priorAmt) : perInst;
+                                          const runRemaining = Math.max(0, rem - (perInst * instNum));
+
+                                          return (
+                                            <tr key={instNum} className="hover:bg-white/5">
+                                              <td className="py-1.5 px-3 font-bold text-cyan-400">#{instNum}</td>
+                                              <td className="py-1.5 px-3 text-slate-300">{d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                                              <td className="py-1.5 px-3 text-right font-bold text-emerald-400">PKR {itemAmount.toLocaleString()}</td>
+                                              <td className="py-1.5 px-3 text-right text-slate-400">PKR {runRemaining.toLocaleString()}</td>
+                                              <td className="py-1.5 px-3 text-center">
+                                                <span className="px-2 py-0.5 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded text-[9px] font-bold">
+                                                  Scheduled
+                                                </span>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+
+                                {/* Information & Accounting Note */}
+                                <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-xs space-y-1">
+                                  <div className="font-bold text-emerald-300 flex items-center gap-1.5">
+                                    <span>💡</span>
+                                    <span>اکاؤنٹس اور لیجر کی باضابطہ تصدیق:</span>
+                                  </div>
+                                  <p className="text-slate-300 text-[11px] leading-relaxed">
+                                    سیل رسید محفوظ کرنے پر خریدار کے لیے <strong>اکاؤنٹس و فنانس ہب</strong> کے انسٹالمنٹ سیکشن میں خودکار پلان بن جائے گا۔ پیشگی رقم (<strong>PKR {adv.toLocaleString()}</strong>) سیف کیش / بینک میں جمع ہوگی، جبکہ بقایا رقم (<strong>PKR {rem.toLocaleString()}</strong>) خریدار کے کھاتے (Customer Ledger) میں ڈیبٹ ہو جائے گی۔
+                                  </p>
+                                </div>
+                              </>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>
