@@ -72,15 +72,44 @@ const getAccountsStock = async (req, res) => {
   }
 };
 
+// Helper to generate transaction number
+const generateTxnNumber = async (prefix = 'TXN') => {
+  const today = new Date();
+  const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+  const count = await prisma.transaction.count();
+  const sequence = String(count + 1).padStart(4, '0');
+  return `${prefix}-${dateStr}-${sequence}`;
+};
+
 // 2. Create Accounts Stock Item
 const createAccountsStockItem = async (req, res) => {
   if (!checkAccountsAccess(req, res)) return;
 
   try {
-    const { vehicle, model, year, color, mileage, askingPrice, purchasePrice, status, location, notes, careOf, regNumber, chassisNumber } = req.body;
+    const { 
+      vehicle, 
+      model, 
+      year, 
+      color, 
+      mileage, 
+      askingPrice, 
+      purchasePrice, 
+      status, 
+      location, 
+      notes, 
+      careOf, 
+      regNumber, 
+      chassisNumber,
+      ledgerAccountId 
+    } = req.body;
 
     const parsedAskingPrice = askingPrice !== undefined && askingPrice !== null && String(askingPrice).trim() !== '' ? parsePakistaniPrice(askingPrice) : null;
     const parsedPurchasePrice = purchasePrice !== undefined && purchasePrice !== null && String(purchasePrice).trim() !== '' ? parsePakistaniPrice(purchasePrice) : null;
+
+    let linkedAccount = null;
+    if (ledgerAccountId) {
+      linkedAccount = await prisma.account.findUnique({ where: { id: ledgerAccountId } });
+    }
 
     const newStock = await prisma.accountsStock.create({
       data: {
@@ -94,17 +123,87 @@ const createAccountsStockItem = async (req, res) => {
         status: status || 'AVAILABLE',
         location: location || 'Main Showroom',
         notes: notes || null,
-        careOf: careOf || 'AL Asr',
+        careOf: careOf || (linkedAccount ? linkedAccount.name : 'AL Asr'),
         regNumber: regNumber || null,
-        chassisNumber: chassisNumber || null
+        chassisNumber: chassisNumber || null,
+        ledgerAccountId: linkedAccount ? linkedAccount.id : null,
+        ledgerAccountName: linkedAccount ? linkedAccount.name : null
       }
     });
+
+    // If purchased from a party ledger and purchase price > 0, post transaction to their ledger
+    if (linkedAccount && parsedPurchasePrice && parsedPurchasePrice > 0) {
+      const txnNumber = await generateTxnNumber('STK-PUR');
+      const vehicleDesc = `${year || ''} ${vehicle || 'Vehicle'} ${model || 'Car'} (Reg: ${regNumber || 'Unregistered'}, Chassis: ${chassisNumber || 'N/A'})`.trim();
+      
+      // Check/create vehicle inventory asset account (code 1100)
+      let inventoryAccount = await prisma.account.findFirst({ where: { code: '1100' } })
+        || await prisma.account.findFirst({ where: { subType: 'INVENTORY' } });
+      if (!inventoryAccount) {
+        inventoryAccount = await prisma.account.create({
+          data: {
+            code: '1100',
+            name: 'Showroom Vehicle Stock Inventory',
+            type: 'ASSET',
+            subType: 'INVENTORY',
+            currentBalance: 0,
+            description: 'Asset account representing showroom floor vehicle inventory value'
+          }
+        });
+      }
+
+      // 1. Transaction: Credit party ledger (amount payable to them), Debit vehicle inventory
+      await prisma.transaction.create({
+        data: {
+          transactionNumber: txnNumber,
+          date: new Date(),
+          type: 'JOURNAL',
+          amount: parsedPurchasePrice,
+          description: `Vehicle Stock Purchase: ${vehicleDesc} from [${linkedAccount.name}]`,
+          referenceType: 'STOCK',
+          referenceId: newStock.id,
+          referenceNumber: regNumber || chassisNumber || txnNumber,
+          chassisNumber: chassisNumber || null,
+          createdById: req.user.id,
+          entries: {
+            create: [
+              {
+                accountId: linkedAccount.id,
+                type: 'CREDIT', // Credit party ledger -> Amount payable to them
+                amount: parsedPurchasePrice,
+                description: `Vehicle Purchase Payable for ${vehicleDesc}`
+              },
+              {
+                accountId: inventoryAccount.id,
+                type: 'DEBIT', // Debit inventory asset
+                amount: parsedPurchasePrice,
+                description: `Inventory Asset Acquisition for ${vehicleDesc}`
+              }
+            ]
+          }
+        }
+      });
+
+      // 2. Update linked party account's current balance (Credit increases payable liability / balance)
+      const isLinkedDebit = ['ASSET', 'EXPENSE'].includes(linkedAccount.type);
+      const delta = isLinkedDebit ? -parsedPurchasePrice : parsedPurchasePrice;
+      await prisma.account.update({
+        where: { id: linkedAccount.id },
+        data: { currentBalance: { increment: delta } }
+      });
+
+      // 3. Update inventory asset account balance
+      await prisma.account.update({
+        where: { id: inventoryAccount.id },
+        data: { currentBalance: { increment: parsedPurchasePrice } }
+      });
+    }
 
     await prisma.activityLog.create({
       data: {
         userId: req.user.id,
         action: 'CREATE_ACCOUNTS_STOCK',
-        details: `Added Accounts Stock: ${year} ${vehicle || 'Vehicle'} ${model || 'Car'} (Cost: Rs. ${parsedPurchasePrice ? parsedPurchasePrice.toLocaleString() : 0} | Asking: Rs. ${parsedAskingPrice ? parsedAskingPrice.toLocaleString() : 0})`
+        details: `Added Accounts Stock: ${year} ${vehicle || 'Vehicle'} ${model || 'Car'} (Cost: Rs. ${parsedPurchasePrice ? parsedPurchasePrice.toLocaleString() : 0} | Asking: Rs. ${parsedAskingPrice ? parsedAskingPrice.toLocaleString() : 0}${linkedAccount ? ` | Purchased from: ${linkedAccount.name}` : ''})`
       }
     });
 

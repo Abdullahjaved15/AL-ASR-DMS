@@ -102,11 +102,13 @@ const getBankAndCashAccounts = async (req, res) => {
 };
 
 // 3. Create a new Account
+// 3. Create a new Account (3 Classification Types: BANK_ACCOUNT, CASH_ACCOUNT, OTHER)
 const createAccount = async (req, res) => {
   try {
     const {
       code,
       name,
+      classificationType, // 'BANK_ACCOUNT', 'CASH_ACCOUNT', 'OTHER'
       type,
       subType,
       bankName,
@@ -116,15 +118,33 @@ const createAccount = async (req, res) => {
       description
     } = req.body;
 
-    if (!name || !type) {
-      return res.status(400).json({ message: 'Account name and type are required' });
+    if (!name || String(name).trim() === '') {
+      return res.status(400).json({ message: 'Account name / title is required.' });
+    }
+
+    // Determine normalized classification type
+    let finalType = type || 'LIABILITY';
+    let finalSubType = subType || 'OTHER';
+
+    if (classificationType === 'BANK_ACCOUNT' || subType === 'BANK' || type === 'BANK') {
+      finalType = 'ASSET';
+      finalSubType = 'BANK';
+    } else if (classificationType === 'CASH_ACCOUNT' || subType === 'CASH' || type === 'CASH') {
+      finalType = 'ASSET';
+      finalSubType = 'CASH';
+    } else {
+      // Classification is OTHER (Vendors, Parties, Sellers, Salaries, Expenses, Customers, etc.)
+      finalType = type && ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'].includes(type) ? type : 'LIABILITY';
+      finalSubType = 'OTHER';
     }
 
     // Auto-generate code if not provided
     let finalCode = code ? String(code).trim() : '';
     if (!finalCode) {
-      const typePrefixMap = { ASSET: '1', LIABILITY: '2', EQUITY: '3', REVENUE: '4', EXPENSE: '5' };
-      const prefix = typePrefixMap[type] || '9';
+      let prefix = '3';
+      if (finalSubType === 'CASH') prefix = '1';
+      else if (finalSubType === 'BANK') prefix = '2';
+      else prefix = '3';
       
       const existingAccounts = await prisma.account.findMany({
         select: { code: true }
@@ -132,16 +152,6 @@ const createAccount = async (req, res) => {
       const codeSet = new Set(existingAccounts.map(a => String(a.code || '').trim()));
       
       let candidate = parseInt(`${prefix}001`, 10);
-      if (type === 'ASSET') {
-        if (subType === 'CASH') candidate = 1001;
-        else if (subType === 'BANK') candidate = 1010;
-        else if (subType === 'CUSTOMER') candidate = 1050;
-        else if (subType === 'INVENTORY') candidate = 1100;
-      } else if (type === 'LIABILITY') {
-        if (subType === 'VENDOR') candidate = 2001;
-        else if (subType === 'LOAN') candidate = 2050;
-      }
-      
       while (codeSet.has(String(candidate))) {
         candidate++;
       }
@@ -159,11 +169,11 @@ const createAccount = async (req, res) => {
       data: {
         code: finalCode,
         name: name.trim(),
-        type,
-        subType: subType || 'OTHER',
-        bankName: bankName || null,
-        accountNumber: accountNumber || null,
-        branch: branch || null,
+        type: finalType,
+        subType: finalSubType,
+        bankName: finalSubType === 'BANK' ? (bankName || null) : null,
+        accountNumber: finalSubType === 'BANK' ? (accountNumber || null) : null,
+        branch: finalSubType === 'BANK' ? (branch || null) : null,
         openingBalance: numOpening,
         currentBalance: numOpening,
         description: description || null,
@@ -189,7 +199,7 @@ const createAccount = async (req, res) => {
             create: [
               {
                 accountId: newAccount.id,
-                type: ['ASSET', 'EXPENSE'].includes(type) ? 'DEBIT' : 'CREDIT',
+                type: 'DEBIT',
                 amount: Math.abs(numOpening),
                 description: `Opening Balance for ${newAccount.name}`
               }
@@ -344,9 +354,9 @@ const getAccountLedger = async (req, res) => {
       periodOpeningBalance = hasPriorOB ? 0 : (account.openingBalance || 0);
       for (const pe of priorEntries) {
         if (pe.type === 'DEBIT') {
-          periodOpeningBalance += isNormalDebit ? pe.amount : -pe.amount;
+          periodOpeningBalance += pe.amount;
         } else {
-          periodOpeningBalance += isNormalDebit ? -pe.amount : pe.amount;
+          periodOpeningBalance -= pe.amount;
         }
       }
     } else {
@@ -401,10 +411,10 @@ const getAccountLedger = async (req, res) => {
       const amt = entry.amount;
       if (entry.type === 'DEBIT') {
         totalDebit += amt;
-        running += isNormalDebit ? amt : -amt;
+        running += amt; // Debit (Receive / Inflow)
       } else {
         totalCredit += amt;
-        running += isNormalDebit ? -amt : amt;
+        running -= amt; // Credit (Pay / Outflow)
       }
 
       return {

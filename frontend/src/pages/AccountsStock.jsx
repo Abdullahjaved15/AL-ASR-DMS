@@ -34,6 +34,7 @@ import { formatPKR, parsePakistaniPrice, getPriceHint, normalizePriceInput, form
 export default function AccountsStock({ onNavigate }) {
   const { user, isAdmin, isSuperAdmin, isAccountsHead, canManageAccounts } = useAuth();
   const [stockList, setStockList] = useState([]);
+  const [coaAccounts, setCoaAccounts] = useState([]);
   const [stats, setStats] = useState({ 
     totalUnits: 0, 
     totalValuation: 0, 
@@ -69,12 +70,24 @@ export default function AccountsStock({ onNavigate }) {
     location: 'Main Showroom',
     notes: '',
     careOf: 'AL Asr',
-    regNumber: ''
+    regNumber: '',
+    chassisNumber: '',
+    ledgerAccountId: ''
   });
 
   useEffect(() => {
     fetchStock();
+    fetchCoaAccounts();
   }, [search, statusFilter]);
+
+  const fetchCoaAccounts = async () => {
+    try {
+      const res = await api.getAccounts();
+      setCoaAccounts(res?.accounts || []);
+    } catch (err) {
+      console.error('Failed to fetch COA accounts in AccountsStock:', err);
+    }
+  };
 
   const fetchStock = async () => {
     setLoading(true);
@@ -95,7 +108,8 @@ export default function AccountsStock({ onNavigate }) {
     ...data,
     askingPrice: data.askingPrice !== '' && data.askingPrice !== null && data.askingPrice !== undefined ? normalizePriceInput(data.askingPrice) : '',
     purchasePrice: data.purchasePrice !== '' && data.purchasePrice !== null && data.purchasePrice !== undefined ? normalizePriceInput(data.purchasePrice) : '',
-    mileage: data.mileage ? parseInt(data.mileage, 10) || 0 : 0
+    mileage: data.mileage ? parseInt(data.mileage, 10) || 0 : 0,
+    ledgerAccountId: data.ledgerAccountId || null
   });
 
   const handleCreate = async (e) => {
@@ -106,6 +120,7 @@ export default function AccountsStock({ onNavigate }) {
       setIsAddModalOpen(false);
       resetForm();
       fetchStock();
+      fetchCoaAccounts();
     } catch (err) {
       alert(err.message || 'Failed to add accounts stock');
     } finally {
@@ -123,6 +138,7 @@ export default function AccountsStock({ onNavigate }) {
       setSelectedStock(null);
       resetForm();
       fetchStock();
+      fetchCoaAccounts();
     } catch (err) {
       alert(err.message || 'Failed to update stock entry');
     } finally {
@@ -164,7 +180,9 @@ export default function AccountsStock({ onNavigate }) {
       location: item.location || 'Main Showroom',
       notes: item.notes || '',
       careOf: item.careOf || 'AL Asr',
-      regNumber: item.regNumber || ''
+      regNumber: item.regNumber || '',
+      chassisNumber: item.chassisNumber || '',
+      ledgerAccountId: item.ledgerAccountId || ''
     });
     setIsEditModalOpen(true);
   };
@@ -178,7 +196,7 @@ export default function AccountsStock({ onNavigate }) {
     setFormData({
       vehicle: '',
       model: '',
-      year: new Date().getFullYear(),
+      year: String(new Date().getFullYear()),
       color: 'White',
       mileage: 0,
       askingPrice: '',
@@ -187,7 +205,9 @@ export default function AccountsStock({ onNavigate }) {
       location: 'Main Showroom',
       notes: '',
       careOf: 'AL Asr',
-      regNumber: ''
+      regNumber: '',
+      chassisNumber: '',
+      ledgerAccountId: ''
     });
   };
 
@@ -886,6 +906,42 @@ export default function AccountsStock({ onNavigate }) {
                 </div>
               </div>
 
+              {/* Purchased From Party Ledger (Chart of Accounts) */}
+              <div className="p-3.5 bg-cyan-500/5 rounded-2xl border border-cyan-500/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-mono text-cyan-300 font-bold">
+                    Purchased From (Chart of Accounts Ledger)
+                  </label>
+                  <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30 font-bold">
+                    Auto-posts payable liability to ledger
+                  </span>
+                </div>
+                <select
+                  value={formData.ledgerAccountId || ''}
+                  onChange={(e) => {
+                    const selectedAcc = coaAccounts.find(a => a.id === e.target.value);
+                    setFormData({ 
+                      ...formData, 
+                      ledgerAccountId: e.target.value,
+                      careOf: selectedAcc ? selectedAcc.name : formData.careOf
+                    });
+                  }}
+                  className="w-full bg-slate-900 border border-cyan-500/30 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400 font-mono font-semibold"
+                >
+                  <option value="">-- None / Manual Cash Purchase --</option>
+                  {coaAccounts.map(acc => (
+                    <option key={acc.id} value={acc.id}>
+                      [{acc.code}] {acc.name} ({acc.subType || acc.type}) — Balance: Rs. {acc.currentBalance.toLocaleString()}
+                    </option>
+                  ))}
+                </select>
+                {formData.ledgerAccountId && formData.purchasePrice && (
+                  <p className="text-[11px] text-emerald-400 font-mono">
+                    ✓ Will automatically post <strong>Rs. {formData.purchasePrice}</strong> into this ledger as payable.
+                  </p>
+                )}
+              </div>
+
               {/* Price Fields with hints */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-900/60 p-3.5 rounded-2xl border border-white/5">
                 <div>
@@ -925,7 +981,7 @@ export default function AccountsStock({ onNavigate }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">Reg / Plate #</label>
                   <input
@@ -938,10 +994,21 @@ export default function AccountsStock({ onNavigate }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Care Of / Manager</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Chassis #</label>
                   <input
                     type="text"
-                    placeholder="AL Asr / Sales Manager"
+                    placeholder="Chassis Number"
+                    value={formData.chassisNumber}
+                    onChange={(e) => setFormData({ ...formData, chassisNumber: e.target.value })}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Care Of / Seller</label>
+                  <input
+                    type="text"
+                    placeholder="AL Asr / Seller Name"
                     value={formData.careOf}
                     onChange={(e) => setFormData({ ...formData, careOf: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"

@@ -436,41 +436,28 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
     await handleFilterLedger(null, emptyFilter);
   };
 
-  const generateNextAccountCode = (type, subType, existingAccounts = []) => {
-    const typePrefixMap = { 
-      ASSET: '1', 
-      LIABILITY: '2', 
-      EQUITY: '3', 
-      REVENUE: '4', 
-      EXPENSE: '5' 
-    };
-    const prefix = typePrefixMap[type] || '1';
+  const generateNextAccountCode = (classificationType = 'OTHER', existingAccounts = []) => {
     const existingCodes = new Set(existingAccounts.map(a => String(a.code || '').trim()));
+    let prefix = '3';
+    if (classificationType === 'CASH_ACCOUNT') prefix = '1';
+    else if (classificationType === 'BANK_ACCOUNT') prefix = '2';
+    else prefix = '3';
     
     let candidate = parseInt(`${prefix}001`, 10);
-    if (type === 'ASSET') {
-      if (subType === 'CASH') candidate = 1001;
-      else if (subType === 'BANK') candidate = 1010;
-      else if (subType === 'CUSTOMER') candidate = 1050;
-      else if (subType === 'INVENTORY') candidate = 1100;
-    } else if (type === 'LIABILITY') {
-      if (subType === 'VENDOR') candidate = 2001;
-      else if (subType === 'LOAN') candidate = 2050;
-    }
-    
     while (existingCodes.has(String(candidate))) {
       candidate++;
     }
     return String(candidate);
   };
 
-  const openAddAccountModal = (defaultType = 'EXPENSE', defaultSubType = 'EXPENSE') => {
-    const autoCode = generateNextAccountCode(defaultType, defaultSubType, accounts);
+  const openAddAccountModal = (defaultClassification = 'OTHER') => {
+    const autoCode = generateNextAccountCode(defaultClassification, accounts);
     setAccountFormData({
       code: autoCode,
       name: '',
-      type: defaultType,
-      subType: defaultSubType,
+      classificationType: defaultClassification,
+      type: defaultClassification === 'OTHER' ? 'LIABILITY' : 'ASSET',
+      subType: defaultClassification === 'BANK_ACCOUNT' ? 'BANK' : defaultClassification === 'CASH_ACCOUNT' ? 'CASH' : 'OTHER',
       bankName: '',
       accountNumber: '',
       branch: '',
@@ -480,28 +467,13 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
     setIsAddAccountModalOpen(true);
   };
 
-  const handleAccountTypeChange = (newType) => {
-    let newSubType = newType;
-    if (newType === 'ASSET') newSubType = 'BANK';
-    else if (newType === 'LIABILITY') newSubType = 'VENDOR';
-    else if (newType === 'EXPENSE') newSubType = 'EXPENSE';
-    else if (newType === 'REVENUE') newSubType = 'REVENUE';
-    else if (newType === 'EQUITY') newSubType = 'CAPITAL';
-
-    const newCode = generateNextAccountCode(newType, newSubType, accounts);
+  const handleClassificationTypeChange = (newClassification) => {
+    const newCode = generateNextAccountCode(newClassification, accounts);
     setAccountFormData(prev => ({
       ...prev,
-      type: newType,
-      subType: newSubType,
-      code: newCode
-    }));
-  };
-
-  const handleAccountSubTypeChange = (newSubType) => {
-    const newCode = generateNextAccountCode(accountFormData.type, newSubType, accounts);
-    setAccountFormData(prev => ({
-      ...prev,
-      subType: newSubType,
+      classificationType: newClassification,
+      type: newClassification === 'OTHER' ? 'LIABILITY' : 'ASSET',
+      subType: newClassification === 'BANK_ACCOUNT' ? 'BANK' : newClassification === 'CASH_ACCOUNT' ? 'CASH' : 'OTHER',
       code: newCode
     }));
   };
@@ -514,8 +486,9 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
       setAccountFormData({
         code: '',
         name: '',
-        type: 'EXPENSE',
-        subType: 'EXPENSE',
+        classificationType: 'OTHER',
+        type: 'LIABILITY',
+        subType: 'OTHER',
         bankName: '',
         accountNumber: '',
         branch: '',
@@ -3028,7 +3001,7 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                     <input
                       type="text"
                       required
-                      placeholder="e.g. 5001"
+                      placeholder="e.g. 1001"
                       value={accountFormData.code}
                       onChange={(e) => setAccountFormData({ ...accountFormData, code: e.target.value })}
                       className="w-full bg-slate-900 border border-cyan-500/30 rounded-xl pl-3 pr-8 py-2 text-sm text-cyan-300 font-bold focus:outline-none focus:border-cyan-400 font-mono shadow-sm"
@@ -3036,7 +3009,7 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                     <button
                       type="button"
                       onClick={() => {
-                        const regenerated = generateNextAccountCode(accountFormData.type, accountFormData.subType, accounts);
+                        const regenerated = generateNextAccountCode(accountFormData.classificationType, accounts);
                         setAccountFormData(prev => ({ ...prev, code: regenerated }));
                       }}
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-cyan-400 p-1 transition-colors"
@@ -3046,94 +3019,57 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                     </button>
                   </div>
                   <p className="text-[10px] text-slate-500 font-mono mt-1">
-                    Auto-sequenced Chart of Accounts code
+                    Auto-sequenced COA ledger code
                   </p>
                 </div>
 
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">Classification Type *</label>
                   <select
-                    value={accountFormData.type}
-                    onChange={(e) => handleAccountTypeChange(e.target.value)}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
+                    value={accountFormData.classificationType}
+                    onChange={(e) => handleClassificationTypeChange(e.target.value)}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono font-bold"
                   >
-                    <option value="ASSET">ASSET (1xxx)</option>
-                    <option value="LIABILITY">LIABILITY (2xxx)</option>
-                    <option value="EQUITY">EQUITY (3xxx)</option>
-                    <option value="REVENUE">REVENUE (4xxx)</option>
-                    <option value="EXPENSE">EXPENSE (5xxx)</option>
+                    <option value="BANK_ACCOUNT">🏦 Bank Account</option>
+                    <option value="CASH_ACCOUNT">💵 Cash Account</option>
+                    <option value="OTHER">📁 Other (Vendors, Salaries, Parties, etc.)</option>
                   </select>
                   <p className="text-[10px] text-slate-500 font-mono mt-1">
-                    Prefix {accountFormData.type === 'ASSET' ? '1' : accountFormData.type === 'LIABILITY' ? '2' : accountFormData.type === 'EQUITY' ? '3' : accountFormData.type === 'REVENUE' ? '4' : '5'}xxx
+                    {accountFormData.classificationType === 'BANK_ACCOUNT' 
+                      ? 'Bank accounts with IBAN/branch tracking' 
+                      : accountFormData.classificationType === 'CASH_ACCOUNT' 
+                      ? 'Cash in hand / Showroom safe ledger' 
+                      : 'Vendors, sellers, expenses, salaries, parties'}
                   </p>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-slate-400 mb-1">Account Title / Name *</label>
+                <label className="block text-xs font-mono text-slate-400 mb-1">Account Title / Ledger Name *</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Meezan Bank Showroom Account or Office Internet Expense"
+                  placeholder={
+                    accountFormData.classificationType === 'BANK_ACCOUNT'
+                      ? 'e.g. Meezan Bank Showroom Account'
+                      : accountFormData.classificationType === 'CASH_ACCOUNT'
+                      ? 'e.g. Main Showroom Cash Safe'
+                      : 'e.g. Haji Ahmad Sab (Seller), Staff Salaries, or Showroom Rent'
+                  }
                   value={accountFormData.name}
                   onChange={(e) => setAccountFormData({ ...accountFormData, name: e.target.value })}
-                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-bold"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-mono text-slate-400 mb-1">Sub-Type Category</label>
-                <select
-                  value={accountFormData.subType}
-                  onChange={(e) => handleAccountSubTypeChange(e.target.value)}
-                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
-                >
-                  {accountFormData.type === 'ASSET' ? (
-                    <>
-                      <option value="BANK">Bank Account (1010+)</option>
-                      <option value="CASH">Cash Account (1001+)</option>
-                      <option value="CUSTOMER">Customer Receivable (1050+)</option>
-                      <option value="INVENTORY">Inventory / Vehicle Stock (1100+)</option>
-                      <option value="OTHER">Other Current / Fixed Asset</option>
-                    </>
-                  ) : accountFormData.type === 'LIABILITY' ? (
-                    <>
-                      <option value="VENDOR">Vendor / Supplier Payable (2001+)</option>
-                      <option value="LOAN">Loans & Borrowings (2050+)</option>
-                      <option value="OTHER">Other Current Liability</option>
-                    </>
-                  ) : accountFormData.type === 'EQUITY' ? (
-                    <>
-                      <option value="CAPITAL">Owner Capital / Equity (3001+)</option>
-                      <option value="DRAWINGS">Owner Drawings</option>
-                      <option value="OTHER">Retained Earnings / Reserves</option>
-                    </>
-                  ) : accountFormData.type === 'REVENUE' ? (
-                    <>
-                      <option value="REVENUE">Vehicle Sales Revenue (4001+)</option>
-                      <option value="COMMISSION">Commission & Brokerage Income</option>
-                      <option value="OTHER">Other Operational Income</option>
-                    </>
-                  ) : (
-                    <>
-                      <option value="EXPENSE">General Operating Expense (5001+)</option>
-                      <option value="SALARY">Salaries & Payroll</option>
-                      <option value="RENT">Showroom Rent & Utilities</option>
-                      <option value="MAINTENANCE">Vehicle Repairs & Fuel</option>
-                      <option value="MARKETING">Marketing & Advertising</option>
-                      <option value="OTHER">Other Administrative Expense</option>
-                    </>
-                  )}
-                </select>
-              </div>
-
-              {accountFormData.subType === 'BANK' && (
-                <div className="grid grid-cols-2 gap-3 p-3 bg-cyan-500/5 rounded-xl border border-cyan-500/20">
+              {accountFormData.classificationType === 'BANK_ACCOUNT' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-cyan-500/5 rounded-2xl border border-cyan-500/20">
                   <div>
-                    <label className="block text-xs font-mono text-slate-400 mb-1">Bank Name</label>
+                    <label className="block text-xs font-mono text-slate-400 mb-1">Bank Name *</label>
                     <input
                       type="text"
-                      placeholder="e.g. Meezan Bank"
+                      required
+                      placeholder="e.g. Meezan Bank, HBL, Bank Alfalah"
                       value={accountFormData.bankName}
                       onChange={(e) => setAccountFormData({ ...accountFormData, bankName: e.target.value })}
                       className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
@@ -3143,10 +3079,20 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                     <label className="block text-xs font-mono text-slate-400 mb-1">Account / IBAN #</label>
                     <input
                       type="text"
-                      placeholder="PK89 MEZN..."
+                      placeholder="e.g. PK89 MEZN 0012 3456 7890"
                       value={accountFormData.accountNumber}
                       onChange={(e) => setAccountFormData({ ...accountFormData, accountNumber: e.target.value })}
                       className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-mono text-slate-400 mb-1">Branch Name / Code</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. High Street Branch, Sahiwal"
+                      value={accountFormData.branch}
+                      onChange={(e) => setAccountFormData({ ...accountFormData, branch: e.target.value })}
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
                     />
                   </div>
                 </div>
@@ -3156,15 +3102,20 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                 <label className="block text-xs font-mono text-slate-400 mb-1">Opening Balance (PKR)</label>
                 <input
                   type="number"
-                  placeholder="0"
+                  placeholder="0 (e.g. 1000000 for 10 Lac)"
                   value={accountFormData.openingBalance}
                   onChange={(e) => setAccountFormData({ ...accountFormData, openingBalance: e.target.value })}
-                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono font-bold"
                 />
+                {accountFormData.openingBalance && (
+                  <p className="text-[11px] text-cyan-400 font-mono mt-1">
+                    In Words: <strong>{numberToWordsPKR(accountFormData.openingBalance)}</strong> ({getPriceHint(accountFormData.openingBalance)})
+                  </p>
+                )}
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-slate-400 mb-1">Description / Notes</label>
+                <label className="block text-xs font-mono text-slate-400 mb-1">Description / Particulars</label>
                 <textarea
                   rows="2"
                   placeholder="Details regarding this ledger..."
