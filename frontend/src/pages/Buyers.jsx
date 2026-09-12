@@ -44,9 +44,9 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
     caseNo: ''
   });
 
-  // UI Pagination State
+  // UI Pagination State (Default: All entries - No limit)
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(10000);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -481,7 +481,7 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                 </div>
 
                 <div class="footer">
-                  AL ASR MOTORS Customer Care & Sales • Sheet ${pageIdx + 1} of ${totalPages} • Showing records ${chunk.length > 0 ? startIdx + 1 : 0} to ${startIdx + chunk.length} of ${displayBuyers.length} (25 entries per sheet)
+                  AL ASR MOTORS Customer Care & Sales • Sheet ${pageIdx + 1} of ${totalPages} • Showing records ${chunk.length > 0 ? startIdx + 1 : 0} to ${startIdx + chunk.length} of ${displayBuyers.length}
                 </div>
               </div>
             `;
@@ -729,11 +729,11 @@ export default function Buyers({ search, isAddModalOpen, setIsAddModalOpen, scop
                   }}
                   className="bg-slate-800 border border-white/10 text-cyan-400 rounded-lg px-2 py-1 focus:outline-none text-xs"
                 >
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
+                  <option value={10000}>All (No Limit)</option>
                   <option value={500}>500</option>
-                  <option value={10000}>All</option>
+                  <option value={100}>100</option>
+                  <option value={50}>50</option>
+                  <option value={25}>25</option>
                 </select>
               </div>
             </div>

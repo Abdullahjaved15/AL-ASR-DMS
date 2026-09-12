@@ -263,7 +263,7 @@ export default function CurrentStock() {
                 </div>
 
                 <div class="footer">
-                  AL ASR MOTORS Dealership Executive System • Sheet ${pageIdx + 1} of ${totalPages} • Showing records ${chunk.length > 0 ? startIdx + 1 : 0} to ${startIdx + chunk.length} of ${stockList.length} (25 entries per sheet)
+                  AL ASR MOTORS Dealership Executive System • Sheet ${pageIdx + 1} of ${totalPages} • Showing records ${chunk.length > 0 ? startIdx + 1 : 0} to ${startIdx + chunk.length} of ${stockList.length}
                 </div>
               </div>
             `;
