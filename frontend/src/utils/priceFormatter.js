@@ -203,3 +203,98 @@ export function formatPKRShort(val) {
   return formatPKR(val, false);
 }
 
+/**
+ * Returns current formatted time in 12-hour AM/PM format (e.g. "03:45 PM")
+ */
+export function getCurrentFormattedTime() {
+  const now = new Date();
+  let hours = now.getHours();
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const strHours = String(hours).padStart(2, '0');
+  return `${strHours}:${minutes} ${ampm}`;
+}
+
+/**
+ * Returns current day of week in English / Urdu context (e.g. "Friday")
+ */
+export function getCurrentDayName() {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return days[new Date().getDay()];
+}
+
+/**
+ * Converts numeric amount to Pakistani Rupee Words
+ * e.g. 5000000 -> "Rupees Fifty Lakh Only"
+ *      12500000 -> "Rupees One Crore Twenty-Five Lakh Only"
+ *      75000 -> "Rupees Seventy-Five Thousand Only"
+ */
+export function numberToWordsPKR(num) {
+  const n = typeof num === 'number' ? num : parsePakistaniPrice(num);
+  if (!n || isNaN(n) || n <= 0) return '';
+
+  const ones = [
+    '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
+    'Seventeen', 'Eighteen', 'Nineteen'
+  ];
+  const tens = [
+    '', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'
+  ];
+
+  function convertTwoDigits(v) {
+    if (v < 20) return ones[v];
+    const rem = v % 10;
+    return tens[Math.floor(v / 10)] + (rem > 0 ? '-' + ones[rem] : '');
+  }
+
+  function convertThreeDigits(v) {
+    const hundred = Math.floor(v / 100);
+    const remainder = v % 100;
+    let res = '';
+    if (hundred > 0) {
+      res += ones[hundred] + ' Hundred';
+      if (remainder > 0) res += ' ';
+    }
+    if (remainder > 0) {
+      res += convertTwoDigits(remainder);
+    }
+    return res;
+  }
+
+  // South Asian Numbering System (Crores, Lakhs, Thousands, Hundreds)
+  let val = Math.round(n);
+  let words = '';
+
+  // Crores (>= 1,00,00,000)
+  const crore = Math.floor(val / 10000000);
+  val %= 10000000;
+  if (crore > 0) {
+    words += (crore >= 100 ? convertThreeDigits(crore) : (crore < 20 ? ones[crore] : convertTwoDigits(crore))) + ' Crore ';
+  }
+
+  // Lakhs (>= 1,00,000)
+  const lakh = Math.floor(val / 100000);
+  val %= 100000;
+  if (lakh > 0) {
+    words += (lakh < 20 ? ones[lakh] : convertTwoDigits(lakh)) + ' Lakh ';
+  }
+
+  // Thousands (>= 1,000)
+  const thousand = Math.floor(val / 1000);
+  val %= 1000;
+  if (thousand > 0) {
+    words += (thousand < 20 ? ones[thousand] : convertTwoDigits(thousand)) + ' Thousand ';
+  }
+
+  // Hundreds & Remaining (< 1,000)
+  if (val > 0) {
+    words += convertThreeDigits(val);
+  }
+
+  words = words.trim();
+  return words ? `Rupees ${words} Only` : '';
+}
+

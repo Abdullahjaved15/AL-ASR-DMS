@@ -322,6 +322,37 @@ const getAccountLedger = async (req, res) => {
       return res.status(404).json({ message: 'Account not found' });
     }
 
+    const isNormalDebit = ['ASSET', 'EXPENSE'].includes(account.type);
+
+    // Calculate prior balance if filtering from a specific startDate
+    let periodOpeningBalance = 0;
+    if (startDate) {
+      const priorEntries = await prisma.transactionEntry.findMany({
+        where: {
+          accountId: id,
+          transaction: {
+            date: { lt: new Date(startDate) }
+          }
+        },
+        include: { transaction: true }
+      });
+
+      const hasPriorOB = priorEntries.some(e => 
+        e.transaction?.transactionNumber?.startsWith('OB-') || 
+        e.transaction?.description?.toLowerCase().includes('opening balance')
+      );
+      periodOpeningBalance = hasPriorOB ? 0 : (account.openingBalance || 0);
+      for (const pe of priorEntries) {
+        if (pe.type === 'DEBIT') {
+          periodOpeningBalance += isNormalDebit ? pe.amount : -pe.amount;
+        } else {
+          periodOpeningBalance += isNormalDebit ? -pe.amount : pe.amount;
+        }
+      }
+    } else {
+      periodOpeningBalance = account.openingBalance || 0;
+    }
+
     const whereTxn = {};
     if (startDate || endDate) {
       whereTxn.date = {};
@@ -331,6 +362,16 @@ const getAccountLedger = async (req, res) => {
         end.setHours(23, 59, 59, 999);
         whereTxn.date.lte = end;
       }
+    }
+
+    if (search && search.trim()) {
+      const q = search.trim();
+      whereTxn.OR = [
+        { transactionNumber: { contains: q, mode: 'insensitive' } },
+        { description: { contains: q, mode: 'insensitive' } },
+        { referenceNumber: { contains: q, mode: 'insensitive' } },
+        { chassisNumber: { contains: q, mode: 'insensitive' } }
+      ];
     }
 
     const entries = await prisma.transactionEntry.findMany({
@@ -348,16 +389,11 @@ const getAccountLedger = async (req, res) => {
       }
     });
 
-    // Calculate running balance
-    // For ASSET and EXPENSE: Debit increases balance, Credit decreases
-    // For LIABILITY, EQUITY, REVENUE: Credit increases balance, Debit decreases
-    const isNormalDebit = ['ASSET', 'EXPENSE'].includes(account.type);
-
-    const hasOpeningBalanceTxn = entries.some(e => 
+    const hasOpeningBalanceTxnInEntries = !startDate && entries.some(e => 
       e.transaction?.transactionNumber?.startsWith('OB-') || 
       e.transaction?.description?.toLowerCase().includes('opening balance')
     );
-    let running = hasOpeningBalanceTxn ? 0 : (account.openingBalance || 0);
+    let running = hasOpeningBalanceTxnInEntries ? 0 : periodOpeningBalance;
     let totalDebit = 0;
     let totalCredit = 0;
 
@@ -389,7 +425,7 @@ const getAccountLedger = async (req, res) => {
 
     return res.json({
       account,
-      openingBalance: account.openingBalance || 0,
+      openingBalance: periodOpeningBalance,
       totalDebit,
       totalCredit,
       closingBalance: running,

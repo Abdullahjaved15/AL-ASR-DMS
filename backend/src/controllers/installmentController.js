@@ -444,7 +444,7 @@ const deleteInstallmentPlan = async (req, res) => {
 
     // Cascade delete schedule items and unlink invoice
     await prisma.$transaction(async (tx) => {
-      await tx.installmentItem.deleteMany({ where: { installmentPlanId: id } });
+      await tx.installmentItem.deleteMany({ where: { planId: id } });
       await tx.invoice.updateMany({ where: { installmentPlanId: id }, data: { installmentPlanId: null, isInstallmentSale: false } });
       await tx.installmentPlan.delete({ where: { id } });
     });

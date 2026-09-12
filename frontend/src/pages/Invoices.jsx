@@ -24,8 +24,16 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { logoBase64 } from '../utils/logoBase64';
-import { formatPKR, parsePakistaniPrice, getPriceHint, normalizePriceInput, formatPKRShort } from '../utils/priceFormatter';
+import { 
+  formatPKR, 
+  parsePakistaniPrice, 
+  getPriceHint, 
+  normalizePriceInput, 
+  formatPKRShort, 
+  numberToWordsPKR, 
+  getCurrentFormattedTime, 
+  getCurrentDayName 
+} from '../utils/priceFormatter';
 
 const CameraCaptureWidget = ({ label, currentPhoto, onPhotoCaptured, onPhotoRemoved }) => {
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -235,8 +243,8 @@ export default function Invoices({ onNavigate }) {
     agreedAmount: '',
     agreedAmountHalf: '',
     agreedAmountWords: '',
-    agreementTime: '',
-    agreementDay: '',
+    agreementTime: getCurrentFormattedTime(),
+    agreementDay: getCurrentDayName(),
     // Voucher Specific Fields
     payeeName: '',
     headOfAccount: '',
@@ -246,7 +254,7 @@ export default function Invoices({ onNavigate }) {
     dueDate: '',
     onAccount: '',
     accountOf: '',
-    time: '',
+    time: getCurrentFormattedTime(),
     // Accounts & Payment Mode Fields
     paymentMethod: 'CASH',
     bankAccountId: '',
@@ -456,24 +464,45 @@ export default function Invoices({ onNavigate }) {
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
       
-      // Auto-calculations for financial amounts
+      // Auto-calculations for financial amounts & words
       if (field === 'totalPrice') {
-        const total = parseFloat(value) || 0;
-        const adv = parseFloat(updated.advanceAmount) || 0;
+        const total = parsePakistaniPrice(value);
+        const adv = parsePakistaniPrice(updated.advanceAmount);
         updated.agreedAmount = value;
-        updated.agreedAmountHalf = total ? (total / 2).toString() : '';
-        updated.remainingAmount = total >= adv ? (total - adv).toString() : '0';
+        if (total > 0) {
+          updated.agreedAmountHalf = Math.round(total / 2).toString();
+          updated.remainingAmount = total >= adv ? (total - adv).toString() : '0';
+          const words = numberToWordsPKR(total);
+          updated.agreedAmountWords = words;
+          updated.inWords = words;
+        } else {
+          updated.agreedAmountHalf = '';
+          updated.remainingAmount = '';
+        }
       } else if (field === 'advanceAmount') {
-        const total = parseFloat(updated.totalPrice) || 0;
-        const adv = parseFloat(value) || 0;
+        const total = parsePakistaniPrice(updated.totalPrice || updated.agreedAmount);
+        const adv = parsePakistaniPrice(value);
         updated.remainingAmount = total >= adv ? (total - adv).toString() : '0';
       } else if (field === 'agreedAmount') {
-        const agreed = parseFloat(value) || 0;
-        updated.agreedAmountHalf = agreed ? (agreed / 2).toString() : '';
-        if (!updated.totalPrice) {
-          updated.totalPrice = value;
-          const adv = parseFloat(updated.advanceAmount) || 0;
-          updated.remainingAmount = agreed >= adv ? (agreed - adv).toString() : '0';
+        const agreed = parsePakistaniPrice(value);
+        if (agreed > 0) {
+          updated.agreedAmountHalf = Math.round(agreed / 2).toString();
+          const words = numberToWordsPKR(agreed);
+          updated.agreedAmountWords = words;
+          updated.inWords = words;
+          if (!updated.totalPrice) {
+            updated.totalPrice = value;
+            const adv = parsePakistaniPrice(updated.advanceAmount);
+            updated.remainingAmount = agreed >= adv ? (agreed - adv).toString() : '0';
+          }
+        } else {
+          updated.agreedAmountHalf = '';
+        }
+      } else if (field === 'saleAmount' || field === 'cashAmount') {
+        const amt = parsePakistaniPrice(value);
+        if (amt > 0) {
+          const words = numberToWordsPKR(amt);
+          updated.inWords = words;
         }
       }
 
@@ -602,8 +631,8 @@ export default function Invoices({ onNavigate }) {
       agreedAmount: '',
       agreedAmountHalf: '',
       agreedAmountWords: '',
-      agreementTime: '',
-      agreementDay: '',
+      agreementTime: getCurrentFormattedTime(),
+      agreementDay: getCurrentDayName(),
       payeeName: '',
       headOfAccount: '',
       inWords: '',
@@ -612,7 +641,7 @@ export default function Invoices({ onNavigate }) {
       dueDate: '',
       onAccount: '',
       accountOf: '',
-      time: '',
+      time: getCurrentFormattedTime(),
       cashAmount: '',
       statusBoxNotes: '',
       isImported: false,
@@ -733,16 +762,18 @@ export default function Invoices({ onNavigate }) {
     const regFatherName = inv.regFatherName || 'N/A';
     const regAddress = inv.regAddress || 'N/A';
 
-    const agreedSum = inv.agreedAmount || inv.totalPrice || inv.saleAmount || 0;
-    const agreedHalf = inv.agreedAmountHalf || (agreedSum / 2);
-    const agreedWords = inv.agreedAmountWords || inv.inWords || '';
-    const agreementTime = inv.agreementTime || 'N/A';
-    const agreementDay = inv.agreementDay || 'N/A';
+    const numericTotal = parsePakistaniPrice(inv.totalPrice || inv.agreedAmount || inv.saleAmount || inv.totalAmount || 0);
+    const numericAdvance = parsePakistaniPrice(inv.advanceAmount || inv.cashAmountReceived || inv.advance || 0);
+    const numericRemaining = inv.remainingAmount !== undefined && inv.remainingAmount !== null && inv.remainingAmount !== ''
+      ? parsePakistaniPrice(inv.remainingAmount)
+      : Math.max(0, numericTotal - numericAdvance);
 
-    const totalPrice = inv.totalPrice || inv.saleAmount || 0;
-    const advanceAmount = inv.advanceAmount || 0;
-    const remainingAmount = inv.remainingAmount !== undefined && inv.remainingAmount !== null ? inv.remainingAmount : (totalPrice - advanceAmount);
-    const paymentDuration = inv.paymentDuration || 'N/A';
+    const numericAgreed = parsePakistaniPrice(inv.agreedAmount || inv.totalPrice || inv.saleAmount || 0) || numericTotal;
+    const numericAgreedHalf = parsePakistaniPrice(inv.agreedAmountHalf) || Math.round(numericAgreed / 2);
+    const agreedWords = inv.agreedAmountWords || inv.inWords || (numericAgreed > 0 ? numberToWordsPKR(numericAgreed) : '');
+    const agreementTime = inv.agreementTime || inv.time || 'N/A';
+    const agreementDay = inv.agreementDay || 'N/A';
+    const paymentDuration = inv.paymentDuration || 'As Agreed';
 
     const renderCNICBoxes = (cnicStr) => {
       const digits = (cnicStr || '').replace(/\D/g, '').padEnd(13, ' ').slice(0, 13);
@@ -1189,10 +1220,10 @@ export default function Invoices({ onNavigate }) {
           <!-- Transaction Agreement (معاہدہ اقرار نامہ) -->
           <div class="agreement-card">
             <div class="agr-urdu">
-              جملہ کاغذات و دیگر حقوق بعوض مبلغ Rs. ${agreedSum > 0 ? agreedSum.toLocaleString() : '0'} (جن کے نصف Rs. ${agreedHalf > 0 ? agreedHalf.toLocaleString() : '0'} بنتے ہیں) بوقت ${agreementTime} بروز ${agreementDay} فریق دوئم (خریدار) پر فروخت کر دی جو کہ مندرجہ ذیل شرائط پر دونوں میں اقرارنامہ ہوا۔
+              جملہ کاغذات و دیگر حقوق بعوض مبلغ Rs. ${numericAgreed > 0 ? numericAgreed.toLocaleString() : '0'} (جن کے نصف Rs. ${numericAgreedHalf > 0 ? numericAgreedHalf.toLocaleString() : '0'} بنتے ہیں) بوقت ${agreementTime} بروز ${agreementDay} فریق دوئم (خریدار) پر فروخت کر دی جو کہ مندرجہ ذیل شرائط پر دونوں میں اقرارنامہ ہوا۔
             </div>
             <div class="agr-en">
-              All vehicle documents & ownership rights sold for PKR ${agreedSum > 0 ? agreedSum.toLocaleString() : '0'} (half sum: PKR ${agreedHalf > 0 ? agreedHalf.toLocaleString() : '0'}), at ${agreementTime} on ${agreementDay}, to the buyer under the following agreed terms. ${agreedWords ? 'Amount in words: ' + agreedWords : ''}
+              All vehicle documents & ownership rights sold for PKR ${numericAgreed > 0 ? numericAgreed.toLocaleString() : '0'} (half sum: PKR ${numericAgreedHalf > 0 ? numericAgreedHalf.toLocaleString() : '0'}), at ${agreementTime} on ${agreementDay}, to the buyer under the following agreed terms. ${agreedWords ? 'Amount in words: ' + agreedWords : ''}
             </div>
           </div>
 
@@ -1208,10 +1239,10 @@ export default function Invoices({ onNavigate }) {
             </thead>
             <tbody>
               <tr>
-                <td style="color: #0f172a;">${totalPrice > 0 ? 'PKR ' + totalPrice.toLocaleString() : 'PKR 0'}</td>
-                <td style="color: #16a34a;">${advanceAmount > 0 ? 'PKR ' + advanceAmount.toLocaleString() : 'PKR 0'}</td>
-                <td style="color: #dc2626;">${remainingAmount > 0 ? 'PKR ' + remainingAmount.toLocaleString() : 'PKR 0'}</td>
-                <td>${paymentDuration}</td>
+                <td style="color: #0f172a; font-family: monospace; font-weight: 800; font-size: 13px;">${numericTotal > 0 ? 'PKR ' + numericTotal.toLocaleString() : 'PKR 0'}</td>
+                <td style="color: #16a34a; font-family: monospace; font-weight: 800; font-size: 13px;">${numericAdvance > 0 ? 'PKR ' + numericAdvance.toLocaleString() : 'PKR 0'}</td>
+                <td style="color: #dc2626; font-family: monospace; font-weight: 800; font-size: 13px;">${numericRemaining > 0 ? 'PKR ' + numericRemaining.toLocaleString() : 'PKR 0'}</td>
+                <td style="font-weight: 700;">${paymentDuration}</td>
               </tr>
             </tbody>
           </table>
@@ -1946,37 +1977,8 @@ export default function Invoices({ onNavigate }) {
                 onClick={() => setIsAddModalOpen(false)}
                 className="text-slate-400 hover:text-white text-lg font-bold px-2 py-1 cursor-pointer"
               >
-                ✕
               </button>
             </div>
-
-            {/* Modal Navigation Tabs - ONLY SHOWN FOR FULL SALES RECEIPT */}
-            {formData.category === 'SALES_RECEIPT' && (
-              <div className="flex overflow-x-auto border-b border-white/10 bg-slate-900/40 p-2 gap-1 text-xs">
-                {[
-                  { id: 'general', label: '📌 1. Basic & Bank/Cash Mode' },
-                  { id: 'seller', label: '👤 2. Seller (فروخت کنندہ)' },
-                  { id: 'buyer', label: '👤 3. Buyer (خریدار)' },
-                  { id: 'vehicle', label: '🚗 4. Vehicle Specs (گاڑی)' },
-                  { id: 'agreement', label: '📜 5. Agreement (معاہدہ)' },
-                  { id: 'financials', label: '💰 6. Financials & Installments' },
-                  { id: 'witnesses', label: '🖋️ 7. Witnesses (گواہان)' }
-                ].map(tab => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`px-3 py-2 rounded-lg font-medium whitespace-nowrap transition-all cursor-pointer ${
-                      activeTab === tab.id
-                        ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                        : 'text-slate-400 hover:text-white hover:bg-white/5'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            )}
 
             {/* Modal Form Content */}
             <form onSubmit={handleSaveInvoice} className="p-6 overflow-y-auto flex-1 space-y-6">
@@ -2830,10 +2832,35 @@ export default function Invoices({ onNavigate }) {
               )}
 
               {/* ------------------------------------------------------------- */}
-              {/* CATEGORY 4: SALES RECEIPT (سیل رسید) - TABBED MULTI-SECTION  */}
+              {/* CATEGORY 4: SALES RECEIPT (سیل رسید) - UNIFIED 1-PAGE SCROLL */}
               {/* ------------------------------------------------------------- */}
               {formData.category === 'SALES_RECEIPT' && (
-                <>
+                <div className="space-y-6 pt-2">
+                  {/* Sticky Quick-Jump Anchor Pills Bar */}
+                  <div className="flex overflow-x-auto bg-slate-900/95 p-2 gap-1.5 text-xs rounded-xl border border-cyan-500/30 sticky top-0 z-20 backdrop-blur-md shadow-xl">
+                    {[
+                      { target: 'sec-sr-meta', label: '📌 1. Basic & Mode' },
+                      { target: 'sec-sr-seller', label: '👤 2. Seller (فروخت کنندہ)' },
+                      { target: 'sec-sr-buyer', label: '👤 3. Buyer (خریدار)' },
+                      { target: 'sec-sr-vehicle', label: '🚗 4. Vehicle Specs' },
+                      { target: 'sec-sr-agreement', label: '📜 5. Agreement' },
+                      { target: 'sec-sr-financials', label: '💰 6. Financials' },
+                      { target: 'sec-sr-witnesses', label: '🖋️ 7. Witnesses' }
+                    ].map(item => (
+                      <button
+                        key={item.target}
+                        type="button"
+                        onClick={() => {
+                          const el = document.getElementById(item.target);
+                          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }}
+                        className="px-3 py-1.5 rounded-lg font-bold text-slate-300 hover:text-white bg-slate-800/90 hover:bg-cyan-500/20 hover:border-cyan-500/40 border border-white/5 whitespace-nowrap transition-all cursor-pointer text-[11px]"
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+
                   {/* ACTIVE LINKED BOOKING RECEIPT NOTIFICATION BANNER */}
                   {formData.linkedBookingNumber ? (
                     <div className="p-3.5 bg-emerald-500/10 border-2 border-emerald-500/40 rounded-xl flex items-center justify-between shadow-lg">
@@ -2894,1086 +2921,995 @@ export default function Invoices({ onNavigate }) {
                     </div>
                   ) : null}
 
-                  {/* TAB 1: GENERAL DETAILS & PAYMENT MODE */}
-                  {activeTab === 'general' && (
-                    <div className="space-y-5">
-                      <div className="space-y-3">
-                        <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Basic Metadata & Salesman</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">
-                              Date (تاریخ) <span className="text-rose-400">*</span>
-                            </label>
-                            <input
-                              type="date"
-                              value={formData.dated}
-                              onChange={(e) => handleInputChange('dated', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                              required
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">
-                              Registration No. (رجسٹریشن نمبر)
-                            </label>
-                            <input
-                              type="text"
-                              placeholder="e.g. LEA-22-4589 or Unregistered"
-                              value={formData.registrationNo}
-                              onChange={(e) => handleInputChange('registrationNo', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">
-                              Time (وقت)
-                            </label>
-                            <input
-                              type="text"
-                              placeholder="e.g. 03:30 PM"
-                              value={formData.time || formData.agreementTime || ''}
-                              onChange={(e) => handleInputChange('time', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">
-                              👤 Salesman Name (سیلز مین کا نام)
-                            </label>
-                            <div className="relative">
-                              <input
-                                type="text"
-                                list="salesmen-list"
-                                placeholder="Select or type salesman name"
-                                value={formData.salesmanName || ''}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  const matchedStaff = staffUsers.find(u => u.name.toLowerCase() === val.toLowerCase());
-                                  setFormData(prev => ({
-                                    ...prev,
-                                    salesmanName: val,
-                                    salesmanId: matchedStaff ? matchedStaff.id : prev.salesmanId
-                                  }));
-                                }}
-                                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-cyan-500/40 text-cyan-300 text-xs font-bold focus:border-cyan-400"
-                              />
-                              <datalist id="salesmen-list">
-                                {staffUsers.map(u => (
-                                  <option key={u.id} value={u.name}>{u.name} ({u.role})</option>
-                                ))}
-                              </datalist>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* CONSIGNMENT / CUSTOMER-OWNED VEHICLE COMMISSION SECTION */}
-                      <div className={`p-4 rounded-xl border-2 transition-all space-y-3 ${
-                        formData.isCustomerVehicle 
-                          ? 'bg-gradient-to-br from-amber-950/40 via-slate-900 to-amber-950/20 border-amber-500/60 shadow-xl' 
-                          : 'bg-slate-900/60 border-white/10'
-                      }`}>
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
-                          <label className="flex items-center space-x-3 cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={Boolean(formData.isCustomerVehicle)}
-                              onChange={(e) => {
-                                const checked = e.target.checked;
-                                handleInputChange('isCustomerVehicle', checked);
-                              }}
-                              className="w-5 h-5 text-amber-500 rounded bg-slate-950 border-amber-400/40 focus:ring-amber-500 cursor-pointer"
-                            />
-                            <div>
-                              <span className="text-xs font-bold text-white flex items-center gap-2">
-                                🚗 Customer-Owned Vehicle Sale (کسٹمر کی گاڑی / کمیشن پر فروخت)
-                              </span>
-                              <p className="text-[11px] text-amber-300/80 font-mono mt-0.5">
-                                Check this if the car belongs to a customer selling through the dealership
-                              </p>
-                            </div>
-                          </label>
-
-                          {formData.isCustomerVehicle && (
-                            <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold whitespace-nowrap self-start sm:self-center">
-                              ⭐ Direct Seller Payout Mode
-                            </span>
-                          )}
-                        </div>
-
-                        {formData.isCustomerVehicle && (
-                          <div className="space-y-3 pt-1">
-                            {/* Commission Input Boxes */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-950/80 p-3.5 rounded-lg border border-amber-500/30">
-                              <div>
-                                <label className="block text-xs font-semibold text-amber-300 mb-1">
-                                  Dealership Commission Amount (شو روم کمیشن رقم) (PKR) <span className="text-rose-400">*</span>
-                                </label>
-                                <input
-                                  type="text"
-                                  placeholder="e.g. 50,000 / 1 lac"
-                                  value={formData.commissionAmount || ''}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    handleInputChange('commissionAmount', val);
-                                    const tot = parsePakistaniPrice(formData.totalPrice);
-                                    const comm = parsePakistaniPrice(val);
-                                    if (tot > 0 && comm > 0) {
-                                      handleInputChange('commissionPercent', ((comm / tot) * 100).toFixed(2));
-                                    }
-                                  }}
-                                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-amber-500/50 text-amber-300 text-xs font-bold font-mono focus:border-amber-400"
-                                  required={Boolean(formData.isCustomerVehicle)}
-                                />
-                                {Boolean(formData.commissionAmount) && Boolean(getPriceHint(formData.commissionAmount)) && (
-                                  <div className="mt-1 px-2 py-0.5 bg-amber-950/70 border border-amber-500/30 rounded text-[10px] font-mono text-amber-300">
-                                    <span>{getPriceHint(formData.commissionAmount)}</span>
-                                  </div>
-                                )}
-                              </div>
-
-                              <div>
-                                <label className="block text-xs font-semibold text-amber-300 mb-1">
-                                  Commission % (کمیشن فیصد)
-                                </label>
-                                <input
-                                  type="text"
-                                  placeholder="e.g. 1% or 1.5%"
-                                  value={formData.commissionPercent || ''}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    handleInputChange('commissionPercent', val);
-                                    const pct = parseFloat(val.replace(/[^0-9.]/g, '')) || 0;
-                                    const tot = parsePakistaniPrice(formData.totalPrice);
-                                    if (tot > 0 && pct > 0) {
-                                      handleInputChange('commissionAmount', String(Math.round((tot * pct) / 100)));
-                                    }
-                                  }}
-                                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-amber-500/50 text-amber-300 text-xs font-bold font-mono focus:border-amber-400"
-                                />
-                              </div>
-                            </div>
-
-                            {/* Informational Guidance Alert */}
-                            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs space-y-1">
-                              <div className="font-bold text-amber-300 flex items-center gap-1.5">
-                                <span>💡</span>
-                                <span>محفوظ اور درست اکاؤنٹس کا طریقہ کار:</span>
-                              </div>
-                              <p className="text-slate-300 text-[11px] leading-relaxed">
-                                گاڑی کی کل قیمت (<strong>PKR {parsePakistaniPrice(formData.totalPrice).toLocaleString()}</strong>) براہ راست گاڑی کے مالک (فروخت کنندہ) کو دی جائے گی اور شو روم سیف/بینک میں داخل نہیں ہوگی۔ شو روم میں <strong>صرف کمیشن کی رقم (PKR {parsePakistaniPrice(formData.commissionAmount || 0).toLocaleString()})</strong> کیش یا بینک کھاتے میں جمع ہوگی۔
-                              </p>
-                              <p className="text-[10px] text-rose-300 font-bold">
-                                🔒 پرنٹ کی گئی سیل رسید پر کمیشن نہیں لکھا جائے گا تاکہ خریدار کے سامنے رازداری برقرار رہے۔
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* PROMINENT MONEY ALLOCATION & BANK ACCOUNT CARD */}
-                      <div className="p-4 bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-cyan-950/30 rounded-xl border-2 border-cyan-500/30 shadow-lg space-y-3">
-                        <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                          <div className="flex items-center space-x-2">
-                            <span className="p-1.5 bg-cyan-500/20 text-cyan-400 rounded-lg text-xs font-bold">💳</span>
-                            <div>
-                              <h4 className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
-                                Money Receiving Mode & Bank Account (رقم وصولی کھاتہ)
-                              </h4>
-                              <p className="text-[10px] text-slate-400 font-mono">Select where the payment from this sales receipt is deposited</p>
-                            </div>
-                          </div>
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">
-                            Live Double Entry
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">
-                              Payment Method <span className="text-rose-400">*</span>
-                            </label>
-                            <select
-                              value={formData.paymentMethod || 'CASH'}
-                              onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
-                              className="w-full px-3 py-2.5 rounded-lg bg-slate-950 border border-cyan-500/40 text-white text-xs font-bold focus:border-cyan-400 font-mono"
-                            >
-                              <option value="CASH">💵 100% Cash in Hand (Showroom Safe)</option>
-                              <option value="BANK">🏦 100% Bank Account Transfer</option>
-                              <option value="SPLIT">🔀 Split Payment (Cash + Bank)</option>
-                            </select>
-                          </div>
-
-                          {(formData.paymentMethod === 'BANK' || formData.paymentMethod === 'SPLIT') && (
-                            <div className="sm:col-span-2">
-                              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                                Receiving Bank Account (وصول کنندہ بینک) <span className="text-rose-400">*</span>
-                              </label>
-                              <select
-                                value={formData.bankAccountId || ''}
-                                onChange={(e) => handleInputChange('bankAccountId', e.target.value)}
-                                className="w-full px-3 py-2.5 rounded-lg bg-slate-950 border border-cyan-500/40 text-cyan-300 text-xs font-bold focus:border-cyan-400 font-mono"
-                              >
-                                <option value="">-- Select Bank Account --</option>
-                                {bankAccounts.filter(a => a.subType === 'BANK' || (a.type === 'ASSET' && (a.bankName || a.accountNumber || a.code === '1002' || a.code === '1003'))).map(bank => (
-                                  <option key={bank.id} value={bank.id}>
-                                    {bank.bankName || bank.name} ({bank.accountNumber || bank.code}) - Balance: Rs. {(bank.currentBalance || 0).toLocaleString()}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Split Amounts Inputs */}
-                        {formData.paymentMethod === 'SPLIT' && (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-cyan-950/40 rounded-lg border border-cyan-500/30">
-                            <div>
-                              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                                Cash Received Portion (PKR) <span className="text-rose-400">*</span>
-                              </label>
-                              <input
-                                type="text"
-                                placeholder="e.g. 10 lac, 1000000"
-                                value={formData.cashAmountReceived || ''}
-                                onChange={(e) => handleInputChange('cashAmountReceived', e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                                Bank Received Portion (PKR) <span className="text-rose-400">*</span>
-                              </label>
-                              <input
-                                type="text"
-                                placeholder="e.g. 20 lac, 2000000"
-                                value={formData.bankAmountReceived || ''}
-                                onChange={(e) => handleInputChange('bankAmountReceived', e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Installment & Delivery Options */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-white/10">
-                          <div className="flex items-center space-x-2 p-2 rounded-lg bg-slate-950/60 border border-white/5">
-                            <input
-                              type="checkbox"
-                              id="isInstallmentSaleQuick"
-                              checked={Boolean(formData.isInstallmentSale)}
-                              onChange={(e) => handleInputChange('isInstallmentSale', e.target.checked)}
-                              className="w-4 h-4 text-emerald-500 rounded bg-slate-900 border-white/20 focus:ring-emerald-500"
-                            />
-                            <label htmlFor="isInstallmentSaleQuick" className="text-xs font-bold text-slate-200 cursor-pointer select-none">
-                              📅 Sale on Installments (قسطوں پر فروخت)
-                            </label>
-                          </div>
-
-                          <div>
-                            <select
-                              value={formData.deliveryStatus || 'DELIVERED'}
-                              onChange={(e) => handleInputChange('deliveryStatus', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-xs font-semibold text-slate-300 font-mono"
-                            >
-                              <option value="DELIVERED">🚗 Vehicle Status: Handed Over / Delivered</option>
-                              <option value="UNDELIVERED">⚠️ Vehicle Status: Undelivered (Showroom Holding)</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
+                  {/* SECTION 1: BASIC METADATA & RECEIVING ACCOUNT */}
+                  <div id="sec-sr-meta" className="space-y-4 bg-slate-900/80 p-5 rounded-2xl border border-white/10 scroll-mt-20 shadow-md">
+                    <div className="flex items-center justify-between border-b border-cyan-500/20 pb-2">
+                      <h3 className="text-sm font-bold text-cyan-400 flex items-center gap-2">
+                        <span>📌 1. Basic Metadata & Receiving Mode</span>
+                      </h3>
+                      <span className="text-[10px] font-mono text-cyan-300 font-bold bg-cyan-500/10 px-2.5 py-0.5 rounded border border-cyan-500/30">Step 1 of 7</span>
                     </div>
-                  )}
 
-                  {/* TAB 2: SELLER DETAILS */}
-                  {activeTab === 'seller' && (
-                    <div className="space-y-4">
-                      <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Seller Details (فروخت کنندہ)</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Seller Name (فروخت کنندہ) <span className="text-rose-400">*</span>
-                          </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Date (تاریخ) <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={formData.dated}
+                          onChange={(e) => handleInputChange('dated', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Registration No. (رجسٹریشن نمبر)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. LEA-22-4589 or Unregistered"
+                          value={formData.registrationNo}
+                          onChange={(e) => handleInputChange('registrationNo', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Time (وقت)
+                        </label>
+                        <div className="flex items-center space-x-1.5">
                           <input
                             type="text"
-                            placeholder="Full name of seller"
-                            value={formData.sellerName}
-                            onChange={(e) => handleInputChange('sellerName', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                            required
+                            placeholder="e.g. 03:30 PM"
+                            value={formData.time || formData.agreementTime || ''}
+                            onChange={(e) => {
+                              handleInputChange('time', e.target.value);
+                              handleInputChange('agreementTime', e.target.value);
+                            }}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
                           />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Son of / Father's Name (ولدیت)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="Father's name"
-                            value={formData.sellerFatherName}
-                            onChange={(e) => handleInputChange('sellerFatherName', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            CNIC No. (شناختی کارڈ نمبر)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="35501-1234567-1"
-                            value={formData.sellerCnic || ''}
-                            onChange={(e) => handleInputChange('sellerCnic', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Phone No. (فون نمبر)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="0300-0000000"
-                            value={formData.sellerPhone}
-                            onChange={(e) => handleInputChange('sellerPhone', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Address (پتہ)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="Complete residential address"
-                            value={formData.sellerAddress}
-                            onChange={(e) => handleInputChange('sellerAddress', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                          />
-                        </div>
-
-                        <div className="sm:col-span-2">
-                          <CameraCaptureWidget
-                            label="Seller Live Photo (تصویر فروخت کنندہ)"
-                            currentPhoto={formData.sellerPhoto}
-                            onPhotoCaptured={(dataUrl) => handleInputChange('sellerPhoto', dataUrl)}
-                            onPhotoRemoved={() => handleInputChange('sellerPhoto', '')}
-                          />
+                          <button
+                            type="button"
+                            title="Set to Current Time"
+                            onClick={() => {
+                              const curTime = getCurrentFormattedTime();
+                              handleInputChange('time', curTime);
+                              handleInputChange('agreementTime', curTime);
+                              handleInputChange('agreementDay', getCurrentDayName());
+                            }}
+                            className="px-2.5 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1"
+                          >
+                            <span>⏰</span>
+                            <span>Now</span>
+                          </button>
                         </div>
                       </div>
-                    </div>
-                  )}
 
-                  {/* TAB 3: BUYER DETAILS */}
-                  {activeTab === 'buyer' && (
-                    <div className="space-y-4">
-                      <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Buyer Details (خریدار)</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Buyer Name (خریدار) <span className="text-rose-400">*</span>
-                          </label>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          👤 Salesman Name (سیلز مین کا نام)
+                        </label>
+                        <div className="relative">
                           <input
                             type="text"
-                            placeholder="Full name of buyer"
-                            value={formData.buyerName}
-                            onChange={(e) => handleInputChange('buyerName', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                            required
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Son of / Father's Name (ولدیت)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="Buyer father's name"
-                            value={formData.buyerFatherName}
-                            onChange={(e) => handleInputChange('buyerFatherName', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            CNIC No. (شناختی کارڈ نمبر)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="35501-1234567-1"
-                            value={formData.buyerCnic || ''}
-                            onChange={(e) => handleInputChange('buyerCnic', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Phone No. (فون نمبر)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="0300-0000000"
-                            value={formData.buyerPhone}
-                            onChange={(e) => handleInputChange('buyerPhone', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Address (پتہ)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="Buyer's address / city"
-                            value={formData.buyerAddress}
-                            onChange={(e) => handleInputChange('buyerAddress', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                          />
-                        </div>
-
-                        <div className="sm:col-span-2">
-                          <CameraCaptureWidget
-                            label="Buyer Live Photo (تصویر خریدار)"
-                            currentPhoto={formData.buyerPhoto}
-                            onPhotoCaptured={(dataUrl) => handleInputChange('buyerPhoto', dataUrl)}
-                            onPhotoRemoved={() => handleInputChange('buyerPhoto', '')}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* TAB 4: VEHICLE DETAILS */}
-                  {activeTab === 'vehicle' && (
-                    <div className="space-y-4">
-                      <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Vehicle Specifications (گاڑی کی تفصیلات)</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Maker (میکر) <span className="text-rose-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Toyota / Honda"
-                            value={formData.vehicleMaker}
-                            onChange={(e) => handleInputChange('vehicleMaker', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                            required
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Model (ماڈل) <span className="text-rose-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Civic Oriel 2022"
-                            value={formData.vehicleModel}
-                            onChange={(e) => handleInputChange('vehicleModel', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                            required
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Power / Engine Capacity (پاور)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. 1800 cc"
-                            value={formData.powerCapacity}
-                            onChange={(e) => handleInputChange('powerCapacity', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Engine No. (انجن نمبر)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="Engine serial number"
-                            value={formData.engineNumber}
-                            onChange={(e) => handleInputChange('engineNumber', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Chassis No. (چیسز نمبر)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="Chassis serial number"
-                            value={formData.chassisNumber}
-                            onChange={(e) => handleInputChange('chassisNumber', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Post Office (ڈاک خانہ)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="Post office location"
-                            value={formData.postOffice}
-                            onChange={(e) => handleInputChange('postOffice', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Last Token (آخری ٹوکن)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Paid up to June 2026"
-                            value={formData.lastToken}
-                            onChange={(e) => handleInputChange('lastToken', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Registration Name (رجسٹریشن نام)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="Name on smartcard / papers"
-                            value={formData.regName}
-                            onChange={(e) => handleInputChange('regName', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Reg Owner Father (ولدیت)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="Registered owner father name"
-                            value={formData.regFatherName}
-                            onChange={(e) => handleInputChange('regFatherName', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* TAB 5: TRANSACTION AGREEMENT */}
-                  {activeTab === 'agreement' && (
-                    <div className="space-y-4">
-                      <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Transaction Agreement (اقرار نامہ و معاہدہ)</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            All docs & rights sum of (جملہ کاغذات و دیگر حقوق بعوض مبلغ) (PKR) <span className="text-rose-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. 40 lac, 1.5 crore, 4500000"
-                            value={formData.agreedAmount}
+                            list="salesmen-list-sr"
+                            placeholder="Select or type salesman name"
+                            value={formData.salesmanName || ''}
                             onChange={(e) => {
                               const val = e.target.value;
-                              handleInputChange('agreedAmount', val);
-                              const parsed = parsePakistaniPrice(val);
-                              if (parsed > 0) {
-                                handleInputChange('agreedAmountHalf', String(Math.round(parsed / 2)));
-                              }
+                              const matchedStaff = staffUsers.find(u => u.name.toLowerCase() === val.toLowerCase());
+                              setFormData(prev => ({
+                                ...prev,
+                                salesmanName: val,
+                                salesmanId: matchedStaff ? matchedStaff.id : prev.salesmanId
+                              }));
                             }}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
-                            required
+                            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-cyan-500/40 text-cyan-300 text-xs font-bold focus:border-cyan-400"
                           />
-                          {Boolean(formData.agreedAmount) && Boolean(getPriceHint(formData.agreedAmount)) && (
-                            <div className="mt-1 px-2 py-0.5 bg-cyan-950/70 border border-cyan-500/30 rounded text-[10px] font-mono text-cyan-300 flex items-center justify-between">
-                              <span>{getPriceHint(formData.agreedAmount)}</span>
-                            </div>
-                          )}
+                          <datalist id="salesmen-list-sr">
+                            {staffUsers.map(u => (
+                              <option key={u.id} value={u.name}>{u.name} ({u.role})</option>
+                            ))}
+                          </datalist>
                         </div>
+                      </div>
+                    </div>
 
+                    {/* CONSIGNMENT / CUSTOMER-OWNED VEHICLE COMMISSION SECTION */}
+                    <div className={`p-4 rounded-xl border-2 transition-all space-y-3 ${
+                      formData.isCustomerVehicle 
+                        ? 'bg-gradient-to-br from-amber-950/40 via-slate-900 to-amber-950/20 border-amber-500/60 shadow-xl' 
+                        : 'bg-slate-950/60 border-white/10'
+                    }`}>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+                        <label className="flex items-center space-x-3 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(formData.isCustomerVehicle)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              handleInputChange('isCustomerVehicle', checked);
+                            }}
+                            className="w-5 h-5 text-amber-500 rounded bg-slate-950 border-amber-400/40 focus:ring-amber-500 cursor-pointer"
+                          />
+                          <div>
+                            <span className="text-xs font-bold text-white flex items-center gap-2">
+                              🚗 Customer-Owned Vehicle Sale (کسٹمر کی گاڑی / کمیشن پر فروخت)
+                            </span>
+                            <p className="text-[11px] text-amber-300/80 font-mono mt-0.5">
+                              Check this if the car belongs to a customer selling through the dealership
+                            </p>
+                          </div>
+                        </label>
+
+                        {formData.isCustomerVehicle && (
+                          <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold whitespace-nowrap self-start sm:self-center">
+                            ⭐ Direct Seller Payout Mode
+                          </span>
+                        )}
+                      </div>
+
+                      {formData.isCustomerVehicle && (
+                        <div className="space-y-3 pt-1">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-950/80 p-3.5 rounded-lg border border-amber-500/30">
+                            <div>
+                              <label className="block text-xs font-semibold text-amber-300 mb-1">
+                                Dealership Commission Amount (شو روم کمیشن رقم) (PKR) <span className="text-rose-400">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. 50,000 / 1 lac"
+                                value={formData.commissionAmount || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  handleInputChange('commissionAmount', val);
+                                  const tot = parsePakistaniPrice(formData.totalPrice);
+                                  const comm = parsePakistaniPrice(val);
+                                  if (tot > 0 && comm > 0) {
+                                    handleInputChange('commissionPercent', ((comm / tot) * 100).toFixed(2));
+                                  }
+                                }}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-amber-500/50 text-amber-300 text-xs font-bold font-mono focus:border-amber-400"
+                                required={Boolean(formData.isCustomerVehicle)}
+                              />
+                              {Boolean(formData.commissionAmount) && Boolean(getPriceHint(formData.commissionAmount)) && (
+                                <div className="mt-1 px-2 py-0.5 bg-amber-950/70 border border-amber-500/30 rounded text-[10px] font-mono text-amber-300">
+                                  <span>{getPriceHint(formData.commissionAmount)}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-semibold text-amber-300 mb-1">
+                                Commission % (کمیشن فیصد)
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. 1% or 1.5%"
+                                value={formData.commissionPercent || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  handleInputChange('commissionPercent', val);
+                                  const pct = parseFloat(val.replace(/[^0-9.]/g, '')) || 0;
+                                  const tot = parsePakistaniPrice(formData.totalPrice);
+                                  if (tot > 0 && pct > 0) {
+                                    handleInputChange('commissionAmount', String(Math.round((tot * pct) / 100)));
+                                  }
+                                }}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-amber-500/50 text-amber-300 text-xs font-bold font-mono focus:border-amber-400"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs space-y-1">
+                            <div className="font-bold text-amber-300 flex items-center gap-1.5">
+                              <span>💡</span>
+                              <span>محفوظ اور درست اکاؤنٹس کا طریقہ کار:</span>
+                            </div>
+                            <p className="text-slate-300 text-[11px] leading-relaxed">
+                              گاڑی کی کل قیمت (<strong>PKR {parsePakistaniPrice(formData.totalPrice).toLocaleString()}</strong>) براہ راست گاڑی کے مالک (فروخت کنندہ) کو دی جائے گی اور شو روم سیف/بینک میں داخل نہیں ہوگی۔ شو روم میں <strong>صرف کمیشن کی رقم (PKR {parsePakistaniPrice(formData.commissionAmount || 0).toLocaleString()})</strong> کیش یا بینک کھاتے میں جمع ہوگی۔
+                            </p>
+                            <p className="text-[10px] text-rose-300 font-bold">
+                              🔒 پرنٹ کی گئی سیل رسید پر کمیشن نہیں لکھا جائے گا تاکہ خریدار کے سامنے رازداری برقرار رہے۔
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* PROMINENT MONEY ALLOCATION & BANK ACCOUNT CARD */}
+                    <div className="p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950/40 rounded-xl border border-cyan-500/40 shadow-lg space-y-3">
+                      <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                        <div className="flex items-center space-x-2">
+                          <span className="p-1.5 bg-cyan-500/20 text-cyan-400 rounded-lg text-xs font-bold">💳</span>
+                          <div>
+                            <h4 className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
+                              Money Receiving Mode & Bank Account (رقم وصولی کھاتہ)
+                            </h4>
+                            <p className="text-[10px] text-slate-400 font-mono">Select where payment from this sales receipt is deposited</p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">
+                          Live Ledger Sync
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
                           <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Rupees, half of which (روپے جن کے نصف) (PKR)
+                            Payment Method <span className="text-rose-400">*</span>
                           </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. 20 lac, 2250000"
-                            value={formData.agreedAmountHalf}
-                            onChange={(e) => handleInputChange('agreedAmountHalf', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
-                          />
-                          {Boolean(formData.agreedAmountHalf) && Boolean(getPriceHint(formData.agreedAmountHalf)) && (
-                            <div className="mt-1 px-2 py-0.5 bg-cyan-950/70 border border-cyan-500/30 rounded text-[10px] font-mono text-cyan-300 flex items-center justify-between">
-                              <span>{getPriceHint(formData.agreedAmountHalf)}</span>
-                            </div>
-                          )}
+                          <select
+                            value={formData.paymentMethod || 'CASH'}
+                            onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
+                            className="w-full px-3 py-2.5 rounded-lg bg-slate-950 border border-cyan-500/40 text-white text-xs font-bold focus:border-cyan-400 font-mono"
+                          >
+                            <option value="CASH">💵 100% Cash in Hand (Showroom Safe)</option>
+                            <option value="BANK">🏦 100% Bank Account Transfer</option>
+                            <option value="SPLIT">🔀 Split Payment (Cash + Bank)</option>
+                          </select>
                         </div>
 
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Rupees amounts to in words (روپے بنتے ہیں)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Forty Five Lakh Rupees Only / پینتالیس لاکھ روپے"
-                            value={formData.agreedAmountWords}
-                            onChange={(e) => handleInputChange('agreedAmountWords', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                          />
-                        </div>
+                        {(formData.paymentMethod === 'BANK' || formData.paymentMethod === 'SPLIT') && (
+                          <div className="sm:col-span-2">
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">
+                              Receiving Bank Account (وصول کنندہ بینک) <span className="text-rose-400">*</span>
+                            </label>
+                            <select
+                              value={formData.bankAccountId || ''}
+                              onChange={(e) => handleInputChange('bankAccountId', e.target.value)}
+                              className="w-full px-3 py-2.5 rounded-lg bg-slate-950 border border-cyan-500/40 text-cyan-300 text-xs font-bold focus:border-cyan-400 font-mono"
+                            >
+                              <option value="">-- Select Bank Account --</option>
+                              {bankAccounts.filter(a => a.subType === 'BANK' || (a.type === 'ASSET' && (a.bankName || a.accountNumber || a.code === '1002' || a.code === '1003'))).map(bank => (
+                                <option key={bank.id} value={bank.id}>
+                                  {bank.bankName || bank.name} ({bank.accountNumber || bank.code}) - Balance: Rs. {(bank.currentBalance || 0).toLocaleString()}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </div>
 
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            At time (بوقت)
-                          </label>
+                      {/* Split Amounts Inputs */}
+                      {formData.paymentMethod === 'SPLIT' && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-cyan-950/40 rounded-lg border border-cyan-500/30">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">
+                              Cash Received Portion (PKR) <span className="text-rose-400">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 10 lac, 1000000"
+                              value={formData.cashAmountReceived || ''}
+                              onChange={(e) => handleInputChange('cashAmountReceived', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">
+                              Bank Received Portion (PKR) <span className="text-rose-400">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 20 lac, 2000000"
+                              value={formData.bankAmountReceived || ''}
+                              onChange={(e) => handleInputChange('bankAmountReceived', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* SECTION 2: SELLER DETAILS */}
+                  <div id="sec-sr-seller" className="space-y-4 bg-slate-900/80 p-5 rounded-2xl border border-white/10 scroll-mt-20 shadow-md">
+                    <div className="flex items-center justify-between border-b border-cyan-500/20 pb-2">
+                      <h3 className="text-sm font-bold text-cyan-400 flex items-center gap-2">
+                        <span>👤 2. Seller Details (فروخت کنندہ کی تفصیلات)</span>
+                      </h3>
+                      <span className="text-[10px] font-mono text-slate-400 font-bold bg-white/5 px-2.5 py-0.5 rounded border border-white/10">Step 2 of 7</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Seller Name (فروخت کنندہ) <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Full name of seller"
+                          value={formData.sellerName}
+                          onChange={(e) => handleInputChange('sellerName', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Son of / Father's Name (ولدیت)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Father's name"
+                          value={formData.sellerFatherName}
+                          onChange={(e) => handleInputChange('sellerFatherName', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          CNIC No. (شناختی کارڈ نمبر)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="35501-1234567-1"
+                          value={formData.sellerCnic || ''}
+                          onChange={(e) => handleInputChange('sellerCnic', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Phone No. (فون نمبر)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="0300-0000000"
+                          value={formData.sellerPhone}
+                          onChange={(e) => handleInputChange('sellerPhone', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Address (پتہ)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Complete residential address"
+                          value={formData.sellerAddress}
+                          onChange={(e) => handleInputChange('sellerAddress', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <CameraCaptureWidget
+                          label="Seller Live Photo (تصویر فروخت کنندہ)"
+                          currentPhoto={formData.sellerPhoto}
+                          onPhotoCaptured={(dataUrl) => handleInputChange('sellerPhoto', dataUrl)}
+                          onPhotoRemoved={() => handleInputChange('sellerPhoto', '')}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SECTION 3: BUYER DETAILS */}
+                  <div id="sec-sr-buyer" className="space-y-4 bg-slate-900/80 p-5 rounded-2xl border border-white/10 scroll-mt-20 shadow-md">
+                    <div className="flex items-center justify-between border-b border-cyan-500/20 pb-2">
+                      <h3 className="text-sm font-bold text-cyan-400 flex items-center gap-2">
+                        <span>👤 3. Buyer Details (خریدار کی تفصیلات)</span>
+                      </h3>
+                      <span className="text-[10px] font-mono text-slate-400 font-bold bg-white/5 px-2.5 py-0.5 rounded border border-white/10">Step 3 of 7</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Buyer Name (خریدار) <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Full name of buyer"
+                          value={formData.buyerName}
+                          onChange={(e) => handleInputChange('buyerName', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Son of / Father's Name (ولدیت)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Buyer father's name"
+                          value={formData.buyerFatherName}
+                          onChange={(e) => handleInputChange('buyerFatherName', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          CNIC No. (شناختی کارڈ نمبر)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="35501-1234567-1"
+                          value={formData.buyerCnic || ''}
+                          onChange={(e) => handleInputChange('buyerCnic', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Phone No. (فون نمبر)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="0300-0000000"
+                          value={formData.buyerPhone}
+                          onChange={(e) => handleInputChange('buyerPhone', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Address (پتہ)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Buyer's address / city"
+                          value={formData.buyerAddress}
+                          onChange={(e) => handleInputChange('buyerAddress', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <CameraCaptureWidget
+                          label="Buyer Live Photo (تصویر خریدار)"
+                          currentPhoto={formData.buyerPhoto}
+                          onPhotoCaptured={(dataUrl) => handleInputChange('buyerPhoto', dataUrl)}
+                          onPhotoRemoved={() => handleInputChange('buyerPhoto', '')}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SECTION 4: VEHICLE SPECIFICATIONS */}
+                  <div id="sec-sr-vehicle" className="space-y-4 bg-slate-900/80 p-5 rounded-2xl border border-white/10 scroll-mt-20 shadow-md">
+                    <div className="flex items-center justify-between border-b border-cyan-500/20 pb-2">
+                      <h3 className="text-sm font-bold text-cyan-400 flex items-center gap-2">
+                        <span>🚗 4. Vehicle Specifications (گاڑی کی تفصیلات)</span>
+                      </h3>
+                      <span className="text-[10px] font-mono text-slate-400 font-bold bg-white/5 px-2.5 py-0.5 rounded border border-white/10">Step 4 of 7</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Maker (میکر) <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Toyota / Honda"
+                          value={formData.vehicleMaker}
+                          onChange={(e) => handleInputChange('vehicleMaker', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Model (ماڈل) <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Civic Oriel 2022"
+                          value={formData.vehicleModel}
+                          onChange={(e) => handleInputChange('vehicleModel', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Power / Engine Capacity (پاور)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 1800 cc"
+                          value={formData.powerCapacity}
+                          onChange={(e) => handleInputChange('powerCapacity', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Engine No. (انجن نمبر)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Engine serial number"
+                          value={formData.engineNumber}
+                          onChange={(e) => handleInputChange('engineNumber', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Chassis No. (چیسز نمبر)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Chassis serial number"
+                          value={formData.chassisNumber}
+                          onChange={(e) => handleInputChange('chassisNumber', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Post Office (ڈاک خانہ)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Post office location"
+                          value={formData.postOffice}
+                          onChange={(e) => handleInputChange('postOffice', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Last Token (آخری ٹوکن)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Paid up to June 2026"
+                          value={formData.lastToken}
+                          onChange={(e) => handleInputChange('lastToken', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Registration Name (رجسٹریشن نام)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Name on smartcard / papers"
+                          value={formData.regName}
+                          onChange={(e) => handleInputChange('regName', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Reg Owner Father (ولدیت)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Registered owner father name"
+                          value={formData.regFatherName}
+                          onChange={(e) => handleInputChange('regFatherName', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SECTION 5: TRANSACTION AGREEMENT */}
+                  <div id="sec-sr-agreement" className="space-y-4 bg-slate-900/80 p-5 rounded-2xl border border-white/10 scroll-mt-20 shadow-md">
+                    <div className="flex items-center justify-between border-b border-cyan-500/20 pb-2">
+                      <h3 className="text-sm font-bold text-cyan-400 flex items-center gap-2">
+                        <span>📜 5. Transaction Agreement (اقرار نامہ و معاہدہ)</span>
+                      </h3>
+                      <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/30">Auto-Calculated Words</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          All docs & rights sum of (جملہ کاغذات و دیگر حقوق بعوض مبلغ) (PKR) <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 40 lac, 1.5 crore, 4500000"
+                          value={formData.agreedAmount}
+                          onChange={(e) => handleInputChange('agreedAmount', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                          required
+                        />
+                        {Boolean(formData.agreedAmount) && Boolean(getPriceHint(formData.agreedAmount)) && (
+                          <div className="mt-1 px-2 py-0.5 bg-cyan-950/70 border border-cyan-500/30 rounded text-[10px] font-mono text-cyan-300 flex items-center justify-between">
+                            <span>{getPriceHint(formData.agreedAmount)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Rupees, half of which (روپے جن کے نصف) (PKR)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 20 lac, 2250000"
+                          value={formData.agreedAmountHalf}
+                          onChange={(e) => handleInputChange('agreedAmountHalf', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                        />
+                        {Boolean(formData.agreedAmountHalf) && Boolean(getPriceHint(formData.agreedAmountHalf)) && (
+                          <div className="mt-1 px-2 py-0.5 bg-cyan-950/70 border border-cyan-500/30 rounded text-[10px] font-mono text-cyan-300 flex items-center justify-between">
+                            <span>{getPriceHint(formData.agreedAmountHalf)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Rupees amounts to in words (روپے بنتے ہیں) (Auto-Calculated)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Rupees Forty-Five Lakh Only"
+                          value={formData.agreedAmountWords}
+                          onChange={(e) => handleInputChange('agreedAmountWords', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-cyan-300 text-xs font-medium focus:border-cyan-500 italic"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          At time (بوقت)
+                        </label>
+                        <div className="flex items-center space-x-1.5">
                           <input
                             type="text"
                             placeholder="e.g. 03:30 PM"
                             value={formData.agreementTime}
                             onChange={(e) => handleInputChange('agreementTime', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
                           />
+                          <button
+                            type="button"
+                            title="Set to Current Time"
+                            onClick={() => {
+                              const curTime = getCurrentFormattedTime();
+                              handleInputChange('agreementTime', curTime);
+                              handleInputChange('time', curTime);
+                              handleInputChange('agreementDay', getCurrentDayName());
+                            }}
+                            className="px-2.5 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1"
+                          >
+                            <span>⏰</span>
+                            <span>Now</span>
+                          </button>
                         </div>
+                      </div>
 
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            On day (بروز)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Saturday / ہفتہ"
-                            value={formData.agreementDay}
-                            onChange={(e) => handleInputChange('agreementDay', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                          />
-                        </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          On day (بروز)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Saturday / ہفتہ"
+                          value={formData.agreementDay}
+                          onChange={(e) => handleInputChange('agreementDay', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500"
+                        />
                       </div>
                     </div>
-                  )}
+                  </div>
 
-                  {/* TAB 6: FINANCIALS & PAYMENT ALLOCATION */}
-                  {activeTab === 'financials' && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between border-b border-cyan-500/20 pb-2">
-                        <h3 className="text-sm font-bold text-cyan-400">Financial Balances & Payment Mode</h3>
-                        <span className="text-[10px] font-mono text-emerald-400 font-bold">Auto Remaining Balance Calculation</span>
+                  {/* SECTION 6: FINANCIAL BALANCES & INSTALLMENT SCHEDULE */}
+                  <div id="sec-sr-financials" className="space-y-4 bg-slate-900/80 p-5 rounded-2xl border border-white/10 scroll-mt-20 shadow-md">
+                    <div className="flex items-center justify-between border-b border-cyan-500/20 pb-2">
+                      <h3 className="text-sm font-bold text-cyan-400 flex items-center gap-2">
+                        <span>💰 6. Financial Balances & Installments</span>
+                      </h3>
+                      <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/30">Auto Remaining Balance</span>
+                    </div>
+
+                    {/* PROMINENT INFLOW BREAKDOWN CARD */}
+                    <div className="p-4 bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-950/40 rounded-xl border border-cyan-500/30 space-y-2.5 shadow-md">
+                      <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                        <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                          <span>📊</span> {formData.isCustomerVehicle ? 'Customer-Owned Consignment Flow' : 'Safe / Bank Cash Inflow Calculation'}
+                        </span>
+                        <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
+                          formData.isCustomerVehicle ? 'text-amber-300 bg-amber-500/10 border-amber-500/30' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                        }`}>
+                          {formData.isCustomerVehicle ? 'Commission Only Inflow' : 'No Double Counting'}
+                        </span>
                       </div>
 
-                      {/* PROMINENT INFLOW BREAKDOWN CARD */}
-                      <div className="p-4 bg-gradient-to-r from-slate-900/95 via-slate-900/80 to-cyan-950/40 rounded-xl border border-cyan-500/30 space-y-2.5 shadow-md">
-                        <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                          <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
-                            <span>📊</span> {formData.isCustomerVehicle ? 'Customer-Owned Consignment Flow' : 'Safe / Bank Cash Inflow Calculation'}
-                          </span>
-                          <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
-                            formData.isCustomerVehicle ? 'text-amber-300 bg-amber-500/10 border-amber-500/30' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                          }`}>
-                            {formData.isCustomerVehicle ? 'Commission Only Inflow' : 'No Double Counting'}
-                          </span>
-                        </div>
-
-                        {formData.isCustomerVehicle ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                            <div className="p-2.5 bg-slate-950/60 rounded-lg border border-white/5">
-                              <div className="text-[10px] text-slate-400 font-medium">Total Vehicle Deal (کل قیمت)</div>
-                              <div className="font-mono font-bold text-white text-sm mt-0.5">
-                                PKR {parsePakistaniPrice(formData.totalPrice || 0).toLocaleString()}
-                              </div>
-                            </div>
-                            <div className="p-2.5 bg-slate-950/60 rounded-lg border border-white/5">
-                              <div className="text-[10px] text-slate-400 font-medium">Paid Directly to Seller (مالک کو ادائیگی)</div>
-                              <div className="font-mono font-bold text-amber-300 text-sm mt-0.5">
-                                PKR {Math.max(0, parsePakistaniPrice(formData.totalPrice || 0) - parsePakistaniPrice(formData.commissionAmount || 0)).toLocaleString()}
-                              </div>
-                              <div className="text-[9px] text-slate-400 mt-0.5">Does NOT enter showroom safe/bank</div>
-                            </div>
-                            <div className="p-2.5 bg-emerald-500/10 rounded-lg border border-emerald-500/40">
-                              <div className="text-[10px] text-emerald-300 font-bold">Commission Deposited in Safe/Bank</div>
-                              <div className="font-mono font-bold text-emerald-400 text-sm mt-0.5">
-                                PKR {parsePakistaniPrice(formData.commissionAmount || 0).toLocaleString()}
-                              </div>
-                              <div className="text-[9px] text-emerald-300/80 mt-0.5">Showroom Commission Revenue</div>
+                      {formData.isCustomerVehicle ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                          <div className="p-2.5 bg-slate-950/60 rounded-lg border border-white/5">
+                            <div className="text-[10px] text-slate-400 font-medium">Total Vehicle Deal (کل قیمت)</div>
+                            <div className="font-mono font-bold text-white text-sm mt-0.5">
+                              PKR {parsePakistaniPrice(formData.totalPrice || 0).toLocaleString()}
                             </div>
                           </div>
-                        ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                            <div className="p-2.5 bg-slate-950/60 rounded-lg border border-white/5">
-                              <div className="text-[10px] text-slate-400 font-medium">Total Vehicle Deal (کل قیمت)</div>
-                              <div className="font-mono font-bold text-white text-sm mt-0.5">
-                                PKR {parsePakistaniPrice(formData.totalPrice || 0).toLocaleString()}
-                              </div>
+                          <div className="p-2.5 bg-slate-950/60 rounded-lg border border-white/5">
+                            <div className="text-[10px] text-slate-400 font-medium">Paid Directly to Seller (مالک کو ادائیگی)</div>
+                            <div className="font-mono font-bold text-amber-300 text-sm mt-0.5">
+                              PKR {Math.max(0, parsePakistaniPrice(formData.totalPrice || 0) - parsePakistaniPrice(formData.commissionAmount || 0)).toLocaleString()}
                             </div>
-                            <div className="p-2.5 bg-slate-950/60 rounded-lg border border-white/5">
-                              <div className="text-[10px] text-slate-400 font-medium">
-                                Less Advance (Already In Hand/Bank) {formData.linkedBookingNumber ? `(#${formData.linkedBookingNumber})` : ''}
-                              </div>
-                              <div className="font-mono font-bold text-rose-400 text-sm mt-0.5">
-                                - PKR {parsePakistaniPrice(formData.advanceAmount || 0).toLocaleString()}
-                              </div>
+                            <div className="text-[9px] text-slate-400 mt-0.5">Does NOT enter showroom safe/bank</div>
+                          </div>
+                          <div className="p-2.5 bg-emerald-500/10 rounded-lg border border-emerald-500/40">
+                            <div className="text-[10px] text-emerald-300 font-bold">Commission Deposited in Safe/Bank</div>
+                            <div className="font-mono font-bold text-emerald-400 text-sm mt-0.5">
+                              PKR {parsePakistaniPrice(formData.commissionAmount || 0).toLocaleString()}
                             </div>
-                            <div className="p-2.5 bg-cyan-500/10 rounded-lg border border-cyan-500/40">
-                              <div className="text-[10px] text-cyan-300 font-bold">Net Inflow Entering Safe/Bank Now</div>
-                              <div className="font-mono font-bold text-emerald-400 text-sm mt-0.5">
-                                PKR {parsePakistaniPrice(formData.remainingAmount !== undefined && formData.remainingAmount !== null && formData.remainingAmount !== '' ? formData.remainingAmount : (parsePakistaniPrice(formData.totalPrice || 0) - parsePakistaniPrice(formData.advanceAmount || 0))).toLocaleString()}
-                              </div>
+                            <div className="text-[9px] text-emerald-300/80 mt-0.5">Showroom Commission Revenue</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                          <div className="p-2.5 bg-slate-950/60 rounded-lg border border-white/5">
+                            <div className="text-[10px] text-slate-400 font-medium">Total Vehicle Deal (کل قیمت)</div>
+                            <div className="font-mono font-bold text-white text-sm mt-0.5">
+                              PKR {parsePakistaniPrice(formData.totalPrice || 0).toLocaleString()}
                             </div>
+                          </div>
+                          <div className="p-2.5 bg-slate-950/60 rounded-lg border border-white/5">
+                            <div className="text-[10px] text-slate-400 font-medium">
+                              Less Advance (Already In Hand/Bank) {formData.linkedBookingNumber ? `(#${formData.linkedBookingNumber})` : ''}
+                            </div>
+                            <div className="font-mono font-bold text-rose-400 text-sm mt-0.5">
+                              - PKR {parsePakistaniPrice(formData.advanceAmount || 0).toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="p-2.5 bg-cyan-500/10 rounded-lg border border-cyan-500/40">
+                            <div className="text-[10px] text-cyan-300 font-bold">Net Inflow Entering Safe/Bank Now</div>
+                            <div className="font-mono font-bold text-emerald-400 text-sm mt-0.5">
+                              PKR {parsePakistaniPrice(formData.remainingAmount !== undefined && formData.remainingAmount !== null && formData.remainingAmount !== '' ? formData.remainingAmount : (parsePakistaniPrice(formData.totalPrice || 0) - parsePakistaniPrice(formData.advanceAmount || 0))).toLocaleString()}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Total Price of Vehicle (کل قیمت گاڑی) (PKR) <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 40 lac, 1.5 crore, 4500000"
+                          value={formData.totalPrice}
+                          onChange={(e) => handleInputChange('totalPrice', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                          required
+                        />
+                        {Boolean(formData.totalPrice) && Boolean(getPriceHint(formData.totalPrice)) && (
+                          <div className="mt-1 px-2 py-0.5 bg-cyan-950/70 border border-cyan-500/30 rounded text-[10px] font-mono text-cyan-300 flex items-center justify-between">
+                            <span>{getPriceHint(formData.totalPrice)}</span>
                           </div>
                         )}
                       </div>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Total Price of Vehicle (کل قیمت گاڑی) (PKR) <span className="text-rose-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. 40 lac, 1.5 crore, 4500000"
-                            value={formData.totalPrice}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              const tot = parsePakistaniPrice(val);
-                              const adv = parsePakistaniPrice(formData.advanceAmount);
-                              handleInputChange('totalPrice', val);
-                              handleInputChange('remainingAmount', Math.max(0, tot - adv));
-                            }}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
-                            required
-                          />
-                          {Boolean(formData.totalPrice) && Boolean(getPriceHint(formData.totalPrice)) && (
-                            <div className="mt-1 px-2 py-0.5 bg-cyan-950/70 border border-cyan-500/30 rounded text-[10px] font-mono text-cyan-300 flex items-center justify-between">
-                              <span>{getPriceHint(formData.totalPrice)}</span>
-                            </div>
-                          )}
-                        </div>
 
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Advance / Received Amount (بیعانہ / موصولہ رقم) (PKR)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. 5 lac, 500000"
-                            value={formData.advanceAmount}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              const adv = parsePakistaniPrice(val);
-                              const tot = parsePakistaniPrice(formData.totalPrice);
-                              handleInputChange('advanceAmount', val);
-                              handleInputChange('remainingAmount', Math.max(0, tot - adv));
-                            }}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
-                          />
-                          {Boolean(formData.advanceAmount) && Boolean(getPriceHint(formData.advanceAmount)) && (
-                            <div className="mt-1 px-2 py-0.5 bg-cyan-950/70 border border-cyan-500/30 rounded text-[10px] font-mono text-cyan-300 flex items-center justify-between">
-                              <span>{getPriceHint(formData.advanceAmount)}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Remaining Balance (بقایا رقم) (PKR)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. 35 lac, 4000000"
-                            value={formData.remainingAmount}
-                            onChange={(e) => handleInputChange('remainingAmount', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
-                          />
-                          {Boolean(formData.remainingAmount) && Boolean(getPriceHint(formData.remainingAmount)) && (
-                            <div className="mt-1 px-2 py-0.5 bg-cyan-950/70 border border-cyan-500/30 rounded text-[10px] font-mono text-cyan-300 flex items-center justify-between">
-                              <span>{getPriceHint(formData.remainingAmount)}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Time / Duration (ٹائم)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. 15 Days / 1 Month"
-                            value={formData.paymentDuration}
-                            onChange={(e) => handleInputChange('paymentDuration', e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                          />
-                        </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Advance / Received Amount (بیعانہ / موصولہ رقم) (PKR)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 5 lac, 500000"
+                          value={formData.advanceAmount}
+                          onChange={(e) => handleInputChange('advanceAmount', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                        />
+                        {Boolean(formData.advanceAmount) && Boolean(getPriceHint(formData.advanceAmount)) && (
+                          <div className="mt-1 px-2 py-0.5 bg-cyan-950/70 border border-cyan-500/30 rounded text-[10px] font-mono text-cyan-300 flex items-center justify-between">
+                            <span>{getPriceHint(formData.advanceAmount)}</span>
+                          </div>
+                        )}
                       </div>
 
-                      {/* PAYMENT RECEIVING MODE & BANK ALLOCATION */}
-                      <div className="p-4 bg-slate-900/90 rounded-xl border border-cyan-500/20 space-y-3 mt-4">
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
-                            💳 Money Receiving Mode (Cash / Bank Allocation)
-                          </h4>
-                          <span className="text-[10px] font-mono text-slate-400">Posts automatically to ledger</span>
-                        </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Remaining Balance (بقایا رقم) (PKR) (Auto-Calculated)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 35 lac, 4000000"
+                          value={formData.remainingAmount}
+                          onChange={(e) => handleInputChange('remainingAmount', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-amber-300 text-xs focus:border-cyan-500 font-mono font-bold"
+                        />
+                        {Boolean(formData.remainingAmount) && Boolean(getPriceHint(formData.remainingAmount)) && (
+                          <div className="mt-1 px-2 py-0.5 bg-cyan-950/70 border border-cyan-500/30 rounded text-[10px] font-mono text-cyan-300 flex items-center justify-between">
+                            <span>{getPriceHint(formData.remainingAmount)}</span>
+                          </div>
+                        )}
+                      </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Time / Duration (ٹائم)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 15 Days / 1 Month"
+                          value={formData.paymentDuration}
+                          onChange={(e) => handleInputChange('paymentDuration', e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* INSTALLMENT PLAN OPTION */}
+                    <div className="p-4 bg-slate-950 rounded-xl border border-emerald-500/30 space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="isInstallmentSale"
+                          checked={Boolean(formData.isInstallmentSale)}
+                          onChange={(e) => handleInputChange('isInstallmentSale', e.target.checked)}
+                          className="w-4 h-4 text-emerald-500 rounded bg-slate-900 border-white/20 focus:ring-emerald-500 cursor-pointer"
+                        />
+                        <label htmlFor="isInstallmentSale" className="text-xs font-bold text-white cursor-pointer select-none">
+                          📅 Is this vehicle sale on Installments? (قسطوں پر فروخت)
+                        </label>
+                      </div>
+
+                      {formData.isInstallmentSale && (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-white/10">
                           <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1">Payment Method</label>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">Number of Installments</label>
+                            <input
+                              type="number"
+                              min="1"
+                              max="60"
+                              placeholder="e.g. 12"
+                              value={formData.totalInstallments || 12}
+                              onChange={(e) => handleInputChange('totalInstallments', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500 font-mono"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">Installment Frequency</label>
                             <select
-                              value={formData.paymentMethod || 'CASH'}
-                              onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                              value={formData.installmentFrequency || 'MONTHLY'}
+                              onChange={(e) => handleInputChange('installmentFrequency', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500 font-mono"
                             >
-                              <option value="CASH">💵 100% Cash in Hand (Safe)</option>
-                              <option value="BANK">🏦 100% Bank Account Transfer</option>
-                              <option value="SPLIT">🔀 Split Payment (Cash + Bank)</option>
+                              <option value="MONTHLY">Monthly (ماہانہ)</option>
+                              <option value="QUARTERLY">Quarterly (سہ ماہی)</option>
                             </select>
                           </div>
 
-                          {(formData.paymentMethod === 'BANK' || formData.paymentMethod === 'SPLIT') && (
-                            <div className={formData.paymentMethod === 'SPLIT' ? 'sm:col-span-2' : 'sm:col-span-2'}>
-                              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                                Receiving Bank Account <span className="text-rose-400">*</span>
-                              </label>
-                              <select
-                                value={formData.bankAccountId || ''}
-                                onChange={(e) => handleInputChange('bankAccountId', e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
-                              >
-                                <option value="">-- Select Bank Account --</option>
-                                {bankAccounts.filter(a => a.subType === 'BANK').map(bank => (
-                                  <option key={bank.id} value={bank.id}>
-                                    {bank.bankName || bank.name} (Balance: Rs. {bank.currentBalance?.toLocaleString()})
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Split Amounts Inputs */}
-                        {formData.paymentMethod === 'SPLIT' && (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-cyan-950/30 rounded-lg border border-cyan-500/20">
-                            <div>
-                              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                                Cash Received Amount (PKR) <span className="text-rose-400">*</span>
-                              </label>
-                              <input
-                                type="text"
-                                placeholder="e.g. 1000000"
-                                value={formData.cashAmountReceived || ''}
-                                onChange={(e) => handleInputChange('cashAmountReceived', e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                                Bank Received Amount (PKR) <span className="text-rose-400">*</span>
-                              </label>
-                              <input
-                                type="text"
-                                placeholder="e.g. 2000000"
-                                value={formData.bankAmountReceived || ''}
-                                onChange={(e) => handleInputChange('bankAmountReceived', e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
-                              />
-                            </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">Installment Start Date</label>
+                            <input
+                              type="date"
+                              value={formData.installmentStartDate || new Date().toISOString().slice(0, 10)}
+                              onChange={(e) => handleInputChange('installmentStartDate', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-emerald-500 font-mono"
+                            />
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
+                    </div>
 
-                      {/* INSTALLMENT PLAN OPTION */}
-                      <div className="p-4 bg-slate-900/90 rounded-xl border border-emerald-500/20 space-y-3">
-                        <div className="flex items-center space-x-2">
+                    {/* DELIVERY & SINGLE CHASSIS STATUS */}
+                    <div className="p-4 bg-slate-950 rounded-xl border border-white/10 space-y-2">
+                      <label className="block text-xs font-semibold text-slate-300">
+                        Vehicle Physical Delivery Status (گاڑی کی ترسیل)
+                      </label>
+                      <select
+                        value={formData.deliveryStatus || 'DELIVERED'}
+                        onChange={(e) => handleInputChange('deliveryStatus', e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                      >
+                        <option value="DELIVERED">✅ Handed Over / Delivered to Buyer</option>
+                        <option value="UNDELIVERED">⚠️ Undelivered (Holding / Re-allocation / Double Sale Liability)</option>
+                        <option value="PENDING_SETTLEMENT">⏳ Pending Settlement / Cheque Issued</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* SECTION 7: WITNESSES */}
+                  <div id="sec-sr-witnesses" className="space-y-4 bg-slate-900/80 p-5 rounded-2xl border border-white/10 scroll-mt-20 shadow-md">
+                    <div className="flex items-center justify-between border-b border-cyan-500/20 pb-2">
+                      <h3 className="text-sm font-bold text-cyan-400 flex items-center gap-2">
+                        <span>🖋️ 7. Witness Information (گواہان کی تفصیلات)</span>
+                      </h3>
+                      <span className="text-[10px] font-mono text-slate-400 font-bold bg-white/5 px-2.5 py-0.5 rounded border border-white/10">Step 7 of 7</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="p-4 bg-slate-950 rounded-xl border border-white/10 space-y-3">
+                        <h4 className="text-xs font-bold text-cyan-300">Witness No. 1 (گواہ نمبر 1)</h4>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Name</label>
                           <input
-                            type="checkbox"
-                            id="isInstallmentSale"
-                            checked={Boolean(formData.isInstallmentSale)}
-                            onChange={(e) => handleInputChange('isInstallmentSale', e.target.checked)}
-                            className="w-4 h-4 text-emerald-500 rounded bg-slate-950 border-white/20 focus:ring-emerald-500"
+                            type="text"
+                            placeholder="Witness 1 full name"
+                            value={formData.witness1Name}
+                            onChange={(e) => handleInputChange('witness1Name', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
                           />
-                          <label htmlFor="isInstallmentSale" className="text-xs font-bold text-white cursor-pointer select-none">
-                            📅 Is this vehicle sale on Installments? (قسطوں پر فروخت)
-                          </label>
                         </div>
-
-                        {formData.isInstallmentSale && (
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-white/10">
-                            <div>
-                              <label className="block text-xs font-semibold text-slate-300 mb-1">Number of Installments</label>
-                              <input
-                                type="number"
-                                min="1"
-                                max="60"
-                                placeholder="e.g. 12"
-                                value={formData.totalInstallments || 12}
-                                onChange={(e) => handleInputChange('totalInstallments', e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 font-mono"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-xs font-semibold text-slate-300 mb-1">Installment Frequency</label>
-                              <select
-                                value={formData.installmentFrequency || 'MONTHLY'}
-                                onChange={(e) => handleInputChange('installmentFrequency', e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 font-mono"
-                              >
-                                <option value="MONTHLY">Monthly (ماہانہ)</option>
-                                <option value="QUARTERLY">Quarterly (سہ ماہی)</option>
-                              </select>
-                            </div>
-
-                            <div>
-                              <label className="block text-xs font-semibold text-slate-300 mb-1">Installment Start Date</label>
-                              <input
-                                type="date"
-                                value={formData.installmentStartDate || new Date().toISOString().slice(0, 10)}
-                                onChange={(e) => handleInputChange('installmentStartDate', e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 font-mono"
-                              />
-                            </div>
-                          </div>
-                        )}
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">CNIC / Phone</label>
+                          <input
+                            type="text"
+                            placeholder="CNIC / Phone number"
+                            value={formData.witness1Cnic}
+                            onChange={(e) => handleInputChange('witness1Cnic', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                          />
+                        </div>
                       </div>
 
-                      {/* DELIVERY & SINGLE CHASSIS STATUS */}
-                      <div className="p-4 bg-slate-900/90 rounded-xl border border-white/10 space-y-2">
-                        <label className="block text-xs font-semibold text-slate-300">
-                          Vehicle Physical Delivery Status (گاڑی کی ترسیل)
-                        </label>
-                        <select
-                          value={formData.deliveryStatus || 'DELIVERED'}
-                          onChange={(e) => handleInputChange('deliveryStatus', e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
-                        >
-                          <option value="DELIVERED">✅ Handed Over / Delivered to Buyer</option>
-                          <option value="UNDELIVERED">⚠️ Undelivered (Holding / Re-allocation / Double Sale Liability)</option>
-                          <option value="PENDING_SETTLEMENT">⏳ Pending Settlement / Cheque Issued</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* TAB 7: WITNESSES */}
-                  {activeTab === 'witnesses' && (
-                    <div className="space-y-4">
-                      <h3 className="text-sm font-bold text-cyan-400 border-b border-cyan-500/20 pb-2">Witness Information (گواہان)</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="p-4 bg-slate-900/60 rounded-xl border border-white/5 space-y-3">
-                          <h4 className="text-xs font-bold text-slate-300">Witness No. 1 (گواہ نمبر 1)</h4>
-                          <div>
-                            <label className="block text-[11px] text-slate-400 mb-1">Name</label>
-                            <input
-                              type="text"
-                              placeholder="Witness 1 full name"
-                              value={formData.witness1Name}
-                              onChange={(e) => handleInputChange('witness1Name', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[11px] text-slate-400 mb-1">CNIC / Phone</label>
-                            <input
-                              type="text"
-                              placeholder="CNIC / Phone number"
-                              value={formData.witness1Cnic}
-                              onChange={(e) => handleInputChange('witness1Cnic', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                            />
-                          </div>
+                      <div className="p-4 bg-slate-950 rounded-xl border border-white/10 space-y-3">
+                        <h4 className="text-xs font-bold text-cyan-300">Witness No. 2 (گواہ نمبر 2)</h4>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Name</label>
+                          <input
+                            type="text"
+                            placeholder="Witness 2 full name"
+                            value={formData.witness2Name}
+                            onChange={(e) => handleInputChange('witness2Name', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
+                          />
                         </div>
-
-                        <div className="p-4 bg-slate-900/60 rounded-xl border border-white/5 space-y-3">
-                          <h4 className="text-xs font-bold text-slate-300">Witness No. 2 (گواہ نمبر 2)</h4>
-                          <div>
-                            <label className="block text-[11px] text-slate-400 mb-1">Name</label>
-                            <input
-                              type="text"
-                              placeholder="Witness 2 full name"
-                              value={formData.witness2Name}
-                              onChange={(e) => handleInputChange('witness2Name', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[11px] text-slate-400 mb-1">CNIC / Phone</label>
-                            <input
-                              type="text"
-                              placeholder="CNIC / Phone number"
-                              value={formData.witness2Cnic}
-                              onChange={(e) => handleInputChange('witness2Cnic', e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500"
-                            />
-                          </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">CNIC / Phone</label>
+                          <input
+                            type="text"
+                            placeholder="CNIC / Phone number"
+                            value={formData.witness2Cnic}
+                            onChange={(e) => handleInputChange('witness2Cnic', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                          />
                         </div>
                       </div>
                     </div>
-                  )}
-                </>
+                  </div>
+                </div>
               )}
 
-              {/* Modal Footer Controls */}
-              <div className="pt-4 border-t border-white/10 flex items-center justify-between bg-slate-900/40 p-4 -mx-6 -mb-6">
-                <div className="flex space-x-2">
-                  {formData.category === 'SALES_RECEIPT' && activeTab !== 'general' && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const tabs = ['general', 'seller', 'buyer', 'vehicle', 'agreement', 'financials', 'witnesses'];
-                        const idx = tabs.indexOf(activeTab);
-                        if (idx > 0) setActiveTab(tabs[idx - 1]);
-                      }}
-                      className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer"
-                    >
-                      ← Previous Section
-                    </button>
-                  )}
-                </div>
+              {/* Modal Footer Controls - Direct & Always Visible */}
+              <div className="pt-4 border-t border-white/10 flex items-center justify-between bg-slate-900/80 p-4 -mx-6 -mb-6 sticky bottom-0 z-30 backdrop-blur-md">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer border border-white/10"
+                >
+                  Cancel
+                </button>
 
-                <div className="flex space-x-3">
-                  {activeTab !== 'witnesses' ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const tabs = ['general', 'seller', 'buyer', 'vehicle', 'agreement', 'imported', 'financials', 'witnesses'];
-                        const idx = tabs.indexOf(activeTab);
-                        if (idx < tabs.length - 1) setActiveTab(tabs[idx + 1]);
-                      }}
-                      className="px-4 py-2 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/30 text-xs font-semibold flex items-center space-x-1"
-                    >
-                      <span>Next Section</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  ) : null}
-
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="px-6 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 transition-all disabled:opacity-50"
-                  >
-                    {submitting ? 'Saving Receipt...' : 'Save & Issue Sales Receipt (سیل رسید)'}
-                  </button>
-                </div>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs shadow-lg shadow-cyan-500/20 transition-all disabled:opacity-50 cursor-pointer flex items-center gap-2"
+                >
+                  <span>💾</span>
+                  <span>{submitting ? 'Saving Receipt...' : (selectedInvoice ? 'Update & Save Receipt' : (formData.category === 'SALES_RECEIPT' ? 'Save & Issue Sales Receipt (سیل رسید)' : 'Save & Issue Voucher'))}</span>
+                </button>
               </div>
             </form>
           </div>

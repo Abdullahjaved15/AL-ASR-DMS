@@ -34,11 +34,16 @@ import {
   Receipt,
   Sparkles,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Copy,
+  Check,
+  Info,
+  SlidersHorizontal,
+  Zap
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { formatPKR, parsePakistaniPrice, getPriceHint, normalizePriceInput } from '../utils/priceFormatter';
+import { formatPKR, parsePakistaniPrice, getPriceHint, normalizePriceInput, numberToWordsPKR } from '../utils/priceFormatter';
 import { logoBase64 } from '../utils/logoBase64';
 
 export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
@@ -71,7 +76,7 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
   const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
   const [selectedAccountLedger, setSelectedAccountLedger] = useState(null);
   const [ledgerLoading, setLedgerLoading] = useState(false);
-  const [ledgerDateFilter, setLedgerDateFilter] = useState({ startDate: '', endDate: '' });
+  const [ledgerDateFilter, setLedgerDateFilter] = useState({ startDate: '', endDate: '', search: '' });
 
   // Security Cheques states
   const [cheques, setCheques] = useState([]);
@@ -103,11 +108,39 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
   const [auditAnalytics, setAuditAnalytics] = useState(null);
   const [auditTimeRange, setAuditTimeRange] = useState('TODAY');
   const [auditDateCustom, setAuditDateCustom] = useState({ startDate: '', endDate: '' });
+  const [auditSearchQuery, setAuditSearchQuery] = useState('');
 
   // Chassis Multi-Sale Tracker states
   const [chassisSearchInput, setChassisSearchInput] = useState('');
   const [chassisTrackerData, setChassisTrackerData] = useState(null);
   const [chassisLoading, setChassisLoading] = useState(false);
+
+  // UX Feedback states
+  const [copiedId, setCopiedId] = useState(null);
+
+  const handleCopyToClipboard = (text, id) => {
+    if (!text) return;
+    navigator.clipboard.writeText(String(text));
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleQuickRefreshAll = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        fetchAccountsData(),
+        fetchBankCashAccounts(),
+        activeTab === 'cheques' ? fetchChequesData() : Promise.resolve(),
+        activeTab === 'installments' ? fetchInstallmentsData() : Promise.resolve(),
+        activeTab === 'audit' ? fetchAuditTrailData() : Promise.resolve()
+      ]);
+    } catch (err) {
+      console.error('Quick refresh error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Forms data
   const [accountFormData, setAccountFormData] = useState({
@@ -255,7 +288,7 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
     } else if (activeTab === 'installments') {
       fetchInstallmentsData();
     } else if (activeTab === 'audit') {
-      fetchAuditTrailData();
+      fetchAuditTrailData({ timeRange: auditTimeRange });
     }
   }, [activeTab, selectedChequeStatus, auditTimeRange]);
 
@@ -307,13 +340,17 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
     }
   };
 
-  const fetchAuditTrailData = async () => {
+  const fetchAuditTrailData = async (overrideParams = {}) => {
     setLoading(true);
     try {
-      const params = { timeRange: auditTimeRange, search: searchQuery };
-      if (auditTimeRange === 'CUSTOM' && auditDateCustom.startDate) {
-        params.startDate = auditDateCustom.startDate;
-        params.endDate = auditDateCustom.endDate;
+      const range = overrideParams.timeRange !== undefined ? overrideParams.timeRange : auditTimeRange;
+      const customDates = overrideParams.auditDateCustom !== undefined ? overrideParams.auditDateCustom : auditDateCustom;
+      const search = overrideParams.search !== undefined ? overrideParams.search : (auditSearchQuery || searchQuery || '');
+
+      const params = { timeRange: range, search };
+      if (range === 'CUSTOM' && customDates.startDate) {
+        params.startDate = customDates.startDate;
+        if (customDates.endDate) params.endDate = customDates.endDate;
       }
       const res = await api.getAuditTrail(params);
       setAuditTransactions(res.transactions || []);
@@ -323,6 +360,28 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleApplyAuditCustomDates = (e) => {
+    if (e?.preventDefault) e.preventDefault();
+    if (!auditDateCustom.startDate) {
+      alert('Please select a valid "From Date"');
+      return;
+    }
+    setAuditTimeRange('CUSTOM');
+    fetchAuditTrailData({ timeRange: 'CUSTOM', auditDateCustom, search: auditSearchQuery });
+  };
+
+  const handleAuditSearchSubmit = (e) => {
+    if (e?.preventDefault) e.preventDefault();
+    fetchAuditTrailData({ search: auditSearchQuery });
+  };
+
+  const handleResetAuditFilter = () => {
+    setAuditTimeRange('TODAY');
+    setAuditDateCustom({ startDate: '', endDate: '' });
+    setAuditSearchQuery('');
+    fetchAuditTrailData({ timeRange: 'TODAY', auditDateCustom: { startDate: '', endDate: '' }, search: '' });
   };
 
   const handleSearchChassis = async (e) => {
@@ -343,14 +402,38 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
     setSelectedAccountLedger(account);
     setIsLedgerModalOpen(true);
     setLedgerLoading(true);
+    const initialFilter = { startDate: '', endDate: '', search: '' };
+    setLedgerDateFilter(initialFilter);
     try {
-      const res = await api.getAccountLedger(account.id, ledgerDateFilter);
+      const res = await api.getAccountLedger(account.id, initialFilter);
       setSelectedAccountLedger(res);
     } catch (err) {
       alert(err.message || 'Failed to load ledger statement');
     } finally {
       setLedgerLoading(false);
     }
+  };
+
+  const handleFilterLedger = async (e, customFilters = null) => {
+    if (e?.preventDefault) e.preventDefault();
+    const accountId = selectedAccountLedger?.account?.id || selectedAccountLedger?.id;
+    if (!accountId) return;
+    const filtersToUse = customFilters !== null ? customFilters : ledgerDateFilter;
+    setLedgerLoading(true);
+    try {
+      const res = await api.getAccountLedger(accountId, filtersToUse);
+      setSelectedAccountLedger(res);
+    } catch (err) {
+      alert(err.message || 'Failed to filter ledger statement');
+    } finally {
+      setLedgerLoading(false);
+    }
+  };
+
+  const handleResetLedgerFilter = async () => {
+    const emptyFilter = { startDate: '', endDate: '', search: '' };
+    setLedgerDateFilter(emptyFilter);
+    await handleFilterLedger(null, emptyFilter);
   };
 
   const generateNextAccountCode = (type, subType, existingAccounts = []) => {
@@ -822,6 +905,10 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
     const totalCredit = selectedAccountLedger.totalCredit || 0;
     const closingBalance = selectedAccountLedger.closingBalance !== undefined ? selectedAccountLedger.closingBalance : (selectedAccountLedger.currentBalance || 0);
 
+    const filterSubtitle = (ledgerDateFilter.startDate || ledgerDateFilter.endDate || ledgerDateFilter.search)
+      ? `Filtered Period: ${ledgerDateFilter.startDate || 'Beginning'} to ${ledgerDateFilter.endDate || 'Present'}${ledgerDateFilter.search ? ` • Keyword: "${ledgerDateFilter.search}"` : ''}`
+      : 'Complete Transaction Statement & Balance Register';
+
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -835,7 +922,7 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
             .header-container { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 8px; }
             .logo-title-box { display: flex; align-items: center; gap: 12px; }
             .title { font-size: 15px; font-weight: 800; color: #0f172a; letter-spacing: 0.5px; text-transform: uppercase; }
-            .subtitle { font-size: 9px; color: #475569; font-family: monospace; }
+            .subtitle { font-size: 9px; color: #475569; font-family: monospace; font-weight: bold; }
             
             .acc-banner { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
             .acc-name { font-size: 13px; font-weight: 800; color: #0f172a; }
@@ -876,7 +963,7 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
               <img src="${logoBase64}" alt="AL ASR MOTORS" style="height: 40px; width: auto; object-fit: contain;" />
               <div>
                 <div class="title">AL ASR MOTORS — OFFICIAL GENERAL LEDGER STATEMENT</div>
-                <div class="subtitle">Complete Transaction Statement & Balance Register • Generated: ${todayStr}</div>
+                <div class="subtitle">${filterSubtitle} • Generated: ${todayStr}</div>
               </div>
             </div>
             <div style="text-align: right;">
@@ -1032,7 +1119,10 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `AL_ASR_Ledger_${accCode || 'ACC'}_${new Date().toISOString().slice(0, 10)}.csv`);
+    const filterSuffix = ledgerDateFilter.startDate
+      ? `_${ledgerDateFilter.startDate}_to_${ledgerDateFilter.endDate || 'now'}`
+      : '';
+    link.setAttribute('download', `AL_ASR_Ledger_${accCode || 'ACC'}${filterSuffix}_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1057,6 +1147,8 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
       ? 'This Month' 
       : auditTimeRange === 'THIS_YEAR'
       ? 'This Financial Year'
+      : auditDateCustom.startDate
+      ? `Custom Period (${auditDateCustom.startDate} to ${auditDateCustom.endDate || 'Present'})`
       : 'Custom Period';
 
     const transactions = auditTransactions || [];
@@ -1286,7 +1378,10 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `AL_ASR_DayBook_${auditTimeRange}_${new Date().toISOString().slice(0, 10)}.csv`);
+    const dateRangeSuffix = auditTimeRange === 'CUSTOM' && auditDateCustom.startDate
+      ? `${auditDateCustom.startDate}_to_${auditDateCustom.endDate || 'now'}`
+      : auditTimeRange;
+    link.setAttribute('download', `AL_ASR_DayBook_${dateRangeSuffix}_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1294,71 +1389,175 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
 
   return (
     <div className="p-4 sm:p-8 space-y-6 max-w-7xl mx-auto">
+      {/* EXECUTIVE HEADER & LIVE REFRESH TOOLBAR */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2 border-b border-white/5">
+        <div>
+          <div className="flex items-center space-x-2.5">
+            <div className="p-2 bg-gradient-to-br from-cyan-500/20 to-blue-600/20 rounded-xl border border-cyan-500/30 text-cyan-400">
+              <Landmark className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center space-x-2">
+                <span>Accounts & Finance Hub</span>
+                <span className="text-[10px] font-mono font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 px-2 py-0.5 rounded-full">
+                  LIVE ACCRUAL LEDGERS
+                </span>
+              </h1>
+              <p className="text-xs text-slate-400 font-mono mt-0.5">
+                Double-entry chart of accounts, safe liquidity, security cheques, installment receivables, and financial day book.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2 self-end sm:self-auto">
+          <button
+            onClick={handleQuickRefreshAll}
+            disabled={loading}
+            className="px-3.5 py-1.5 bg-slate-900/90 hover:bg-slate-800 text-cyan-300 border border-cyan-500/30 rounded-xl text-xs font-mono font-bold transition-all flex items-center space-x-1.5 shadow-sm active:scale-95"
+            title="Refresh live account balances and ledgers from database"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
+            <span>{loading ? 'Refreshing...' : 'Live Sync'}</span>
+          </button>
+        </div>
+      </div>
+
       {/* TOP EXECUTIVE METRIC CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Cash in Hand */}
-        <div className="glass-card rounded-2xl p-4 border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-slate-900 to-slate-950 relative overflow-hidden group">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono text-emerald-400 font-semibold tracking-wider uppercase">Cash in Hand Safe</span>
-            <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-              <Wallet className="w-4 h-4" />
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Cash in Hand */}
+          <div 
+            onClick={() => setActiveTab('banks')}
+            className={`glass-card rounded-2xl p-4 border transition-all cursor-pointer group relative overflow-hidden ${
+              activeTab === 'banks' 
+                ? 'border-emerald-500/50 bg-gradient-to-br from-emerald-500/20 via-slate-900 to-slate-950 shadow-lg shadow-emerald-500/10' 
+                : 'border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-slate-900 to-slate-950 hover:border-emerald-500/40 hover:-translate-y-0.5'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-mono text-emerald-400 font-semibold tracking-wider uppercase">Cash in Hand Safe</span>
+              <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 group-hover:scale-110 transition-transform">
+                <Wallet className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-2">
+              <h3 className="text-xl font-bold font-mono text-white tracking-tight">
+                {formatPKR(accountsSummary?.cashInHandBalance || 0)}
+              </h3>
+              <p className="text-[10px] text-slate-400 font-mono mt-1 flex items-center justify-between">
+                <span>Showroom Cash (1001)</span>
+                <span className="text-emerald-400 font-bold group-hover:underline flex items-center">
+                  View Safe <ChevronRight className="w-3 h-3 ml-0.5" />
+                </span>
+              </p>
             </div>
           </div>
-          <div className="mt-2">
-            <h3 className="text-xl font-bold font-mono text-white tracking-tight">
-              {formatPKR(accountsSummary?.cashInHandBalance || 0)}
-            </h3>
-            <p className="text-[10px] text-slate-400 font-mono mt-1">Live physical showroom liquidity</p>
+
+          {/* Bank Balances */}
+          <div 
+            onClick={() => setActiveTab('banks')}
+            className={`glass-card rounded-2xl p-4 border transition-all cursor-pointer group relative overflow-hidden ${
+              activeTab === 'banks' 
+                ? 'border-cyan-500/50 bg-gradient-to-br from-cyan-500/20 via-slate-900 to-slate-950 shadow-lg shadow-cyan-500/10' 
+                : 'border-cyan-500/20 bg-gradient-to-br from-cyan-500/10 via-slate-900 to-slate-950 hover:border-cyan-500/40 hover:-translate-y-0.5'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-mono text-cyan-400 font-semibold tracking-wider uppercase">Total Bank Accounts</span>
+              <div className="p-2 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 group-hover:scale-110 transition-transform">
+                <Building2 className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-2">
+              <h3 className="text-xl font-bold font-mono text-white tracking-tight">
+                {formatPKR(accountsSummary?.totalBankBalance || 0)}
+              </h3>
+              <p className="text-[10px] text-slate-400 font-mono mt-1 flex items-center justify-between">
+                <span>{accounts.filter(a => a.subType === 'BANK').length} Active Corporate Banks</span>
+                <span className="text-cyan-400 font-bold group-hover:underline flex items-center">
+                  View Banks <ChevronRight className="w-3 h-3 ml-0.5" />
+                </span>
+              </p>
+            </div>
+          </div>
+
+          {/* Total Gross Liquidity */}
+          <div className="glass-card rounded-2xl p-4 border border-amber-500/20 bg-gradient-to-br from-amber-500/10 via-slate-900 to-slate-950 relative overflow-hidden group">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-mono text-amber-400 font-semibold tracking-wider uppercase">Total Dealership Liquidity</span>
+              <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                <DollarSign className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-2">
+              <h3 className="text-xl font-bold font-mono text-amber-300 tracking-tight">
+                {formatPKR(accountsSummary?.totalLiquidity || 0)}
+              </h3>
+              <p className="text-[10px] text-slate-400 font-mono mt-1">Cash Safe + Active Bank Reserves</p>
+            </div>
+          </div>
+
+          {/* Net Profit */}
+          <div 
+            onClick={() => setActiveTab('audit')}
+            className={`glass-card rounded-2xl p-4 border transition-all cursor-pointer group relative overflow-hidden ${
+              activeTab === 'audit' 
+                ? 'border-purple-500/50 bg-gradient-to-br from-purple-500/20 via-slate-900 to-slate-950 shadow-lg shadow-purple-500/10' 
+                : 'border-purple-500/20 bg-gradient-to-br from-purple-500/10 via-slate-900 to-slate-950 hover:border-purple-500/40 hover:-translate-y-0.5'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-mono text-purple-400 font-semibold tracking-wider uppercase">Net Operating Position</span>
+              <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400 border border-purple-500/30 group-hover:scale-110 transition-transform">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="mt-2">
+              <h3 className="text-xl font-bold font-mono text-purple-300 tracking-tight">
+                {formatPKR(accountsSummary?.netProfit || 0)}
+              </h3>
+              <p className="text-[10px] text-slate-400 font-mono mt-1 flex items-center justify-between">
+                <span>Revenue vs Operating Expenses</span>
+                <span className="text-purple-300 font-bold group-hover:underline flex items-center">
+                  Day Book <ChevronRight className="w-3 h-3 ml-0.5" />
+                </span>
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Bank Balances */}
-        <div className="glass-card rounded-2xl p-4 border border-cyan-500/20 bg-gradient-to-br from-cyan-500/10 via-slate-900 to-slate-950 relative overflow-hidden group">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono text-cyan-400 font-semibold tracking-wider uppercase">Total Bank Accounts</span>
-            <div className="p-2 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-              <Building2 className="w-4 h-4" />
+        {/* Liquidity Split Progress Bar */}
+        {accountsSummary && accountsSummary.totalLiquidity > 0 && (
+          <div className="glass-card rounded-xl p-2.5 border border-white/5 bg-slate-950/60 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] font-mono">
+            <div className="flex items-center space-x-2 text-slate-400">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Liquidity Allocation:</span>
+            </div>
+            <div className="flex-1 w-full sm:w-auto mx-2 bg-slate-900 rounded-full h-2 overflow-hidden flex border border-white/10">
+              <div 
+                style={{ width: `${Math.min(100, Math.max(0, ((accountsSummary.cashInHandBalance || 0) / accountsSummary.totalLiquidity) * 100))}%` }}
+                className="bg-emerald-500 h-full transition-all"
+                title={`Cash Safe: ${formatPKR(accountsSummary.cashInHandBalance || 0)}`}
+              />
+              <div 
+                style={{ width: `${Math.min(100, Math.max(0, ((accountsSummary.totalBankBalance || 0) / accountsSummary.totalLiquidity) * 100))}%` }}
+                className="bg-cyan-500 h-full transition-all"
+                title={`Bank Funds: ${formatPKR(accountsSummary.totalBankBalance || 0)}`}
+              />
+            </div>
+            <div className="flex items-center space-x-3 text-[10px]">
+              <span className="flex items-center space-x-1 text-emerald-400">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                <span>Cash Safe: {Math.round(((accountsSummary.cashInHandBalance || 0) / accountsSummary.totalLiquidity) * 100)}%</span>
+              </span>
+              <span className="flex items-center space-x-1 text-cyan-400">
+                <span className="w-2 h-2 rounded-full bg-cyan-500 inline-block" />
+                <span>Banks: {Math.round(((accountsSummary.totalBankBalance || 0) / accountsSummary.totalLiquidity) * 100)}%</span>
+              </span>
             </div>
           </div>
-          <div className="mt-2">
-            <h3 className="text-xl font-bold font-mono text-white tracking-tight">
-              {formatPKR(accountsSummary?.totalBankBalance || 0)}
-            </h3>
-            <p className="text-[10px] text-slate-400 font-mono mt-1">Across all corporate bank accounts</p>
-          </div>
-        </div>
-
-        {/* Total Liquidity */}
-        <div className="glass-card rounded-2xl p-4 border border-amber-500/20 bg-gradient-to-br from-amber-500/10 via-slate-900 to-slate-950 relative overflow-hidden group">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono text-amber-400 font-semibold tracking-wider uppercase">Total Gross Liquidity</span>
-            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
-              <DollarSign className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2">
-            <h3 className="text-xl font-bold font-mono text-amber-300 tracking-tight">
-              {formatPKR(accountsSummary?.totalLiquidity || 0)}
-            </h3>
-            <p className="text-[10px] text-slate-400 font-mono mt-1">Cash Safe + Active Bank Funds</p>
-          </div>
-        </div>
-
-        {/* Net Profit */}
-        <div className="glass-card rounded-2xl p-4 border border-purple-500/20 bg-gradient-to-br from-purple-500/10 via-slate-900 to-slate-950 relative overflow-hidden group">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono text-purple-400 font-semibold tracking-wider uppercase">Net Operating Position</span>
-            <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400 border border-purple-500/30">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2">
-            <h3 className="text-xl font-bold font-mono text-purple-300 tracking-tight">
-              {formatPKR(accountsSummary?.netProfit || 0)}
-            </h3>
-            <p className="text-[10px] text-slate-400 font-mono mt-1">Revenue vs Operating Expenses</p>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* ACTION TOOLBAR & TAB SWITCHER */}
@@ -1366,10 +1565,10 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
         {/* Navigation Tabs */}
         <div className="flex items-center space-x-1.5 overflow-x-auto w-full md:w-auto p-1 bg-slate-900/80 rounded-2xl border border-white/10 scrollbar-none">
           {[
-            { id: 'coa', label: 'Chart of Accounts', icon: Layers },
-            { id: 'banks', label: 'Banks & Cash in Hand', icon: Landmark },
-            { id: 'cheques', label: 'Security Cheques', icon: CreditCard },
-            { id: 'installments', label: 'Installments Plans', icon: Calendar },
+            { id: 'coa', label: 'Chart of Accounts', icon: Layers, count: accounts.length },
+            { id: 'banks', label: 'Banks & Cash in Hand', icon: Landmark, count: bankAndCashAccounts.length },
+            { id: 'cheques', label: 'Security Cheques', icon: CreditCard, count: cheques.length },
+            { id: 'installments', label: 'Installments Plans', icon: Calendar, count: installmentPlans.length },
             { id: 'audit', label: 'Audit Trail & Day Book', icon: FileText },
             { id: 'chassis', label: 'Chassis Double-Sale Tracker', icon: Car },
           ].map(t => {
@@ -1387,6 +1586,13 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
               >
                 <Icon className="w-3.5 h-3.5" />
                 <span>{t.label}</span>
+                {t.count !== undefined && (
+                  <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono ${
+                    isActive ? 'bg-black/30 text-black font-extrabold' : 'bg-slate-800 text-slate-400'
+                  }`}>
+                    {t.count}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -1397,7 +1603,7 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
           {/* Quick link to Accounts Current Stock */}
           <button
             onClick={() => onNavigate ? onNavigate('accounts_stock') : (window.location.hash = '#accounts_stock')}
-            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/20 to-blue-600/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-mono font-bold transition-all flex items-center space-x-1.5 cursor-pointer shadow-sm"
+            className="px-3 py-2 rounded-xl bg-gradient-to-r from-cyan-500/15 to-blue-600/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-xs font-mono font-bold transition-all flex items-center space-x-1.5 cursor-pointer shadow-sm"
             title="View Accounts Current Stock, Purchase Costs and Valuation"
           >
             <Layers className="w-3.5 h-3.5 text-cyan-400" />
@@ -1407,47 +1613,47 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
           {/* Quick link to Vouchers & Invoices */}
           <button
             onClick={() => onNavigate ? onNavigate('invoices') : (window.location.hash = '#invoices')}
-            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/20 to-amber-600/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-mono font-bold transition-all flex items-center space-x-1.5 cursor-pointer shadow-sm"
+            className="px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500/15 to-amber-600/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-xs font-mono font-bold transition-all flex items-center space-x-1.5 cursor-pointer shadow-sm"
             title="Create and manage Payment Vouchers, Sales & Booking Receipts"
           >
             <Receipt className="w-3.5 h-3.5 text-amber-400" />
-            <span>Invoices & Payment Vouchers</span>
+            <span>Invoices & Vouchers</span>
           </button>
 
           {/* Receive Amount / Inflow Button */}
           <button
             onClick={() => openReceiveModal()}
-            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black text-xs font-mono font-bold transition-all flex items-center space-x-1.5 shadow-lg shadow-emerald-500/20 cursor-pointer"
+            className="px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black text-xs font-mono font-bold transition-all flex items-center space-x-1.5 shadow-lg shadow-emerald-500/20 cursor-pointer"
             title="Receive money into Cash in Hand or Bank Account"
           >
             <ArrowDownLeft className="w-3.5 h-3.5" />
-            <span>+ Receive (آمد / وصولی)</span>
+            <span>+ Receive (آمد)</span>
           </button>
 
           {/* Pay Amount / Payment Voucher Button */}
           <button
             onClick={() => openPayModal()}
-            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-400 hover:to-red-500 text-white text-xs font-mono font-bold transition-all flex items-center space-x-1.5 shadow-lg shadow-rose-500/20 cursor-pointer"
+            className="px-3 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-400 hover:to-red-500 text-white text-xs font-mono font-bold transition-all flex items-center space-x-1.5 shadow-lg shadow-rose-500/20 cursor-pointer"
             title="Issue a Payment Voucher (PV) from Cash in Hand or Bank Account"
           >
             <ArrowUpRight className="w-3.5 h-3.5" />
-            <span>- Payment Voucher (ادائیگی واؤچر)</span>
+            <span>- Payment Voucher (ادائیگی)</span>
           </button>
 
           {/* Transfer Funds Button */}
           <button
             onClick={() => setIsTransferModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 text-xs font-mono font-bold transition-all flex items-center space-x-1.5 cursor-pointer"
+            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 text-xs font-mono font-bold transition-all flex items-center space-x-1.5 cursor-pointer"
           >
             <ArrowRightLeft className="w-3.5 h-3.5" />
-            <span>Transfer Funds</span>
+            <span>Transfer</span>
           </button>
 
           {/* Add Account Button */}
           {canManageAccounts && activeTab === 'coa' && (
             <button
               onClick={() => openAddAccountModal('EXPENSE', 'EXPENSE')}
-              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black text-xs font-mono font-bold transition-all flex items-center space-x-1.5 shadow-lg shadow-cyan-500/20"
+              className="px-3 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black text-xs font-mono font-bold transition-all flex items-center space-x-1.5 shadow-lg shadow-cyan-500/20"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New Account</span>
@@ -1458,10 +1664,10 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
           {activeTab === 'cheques' && (
             <button
               onClick={() => setIsAddChequeModalOpen(true)}
-              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-black text-xs font-mono font-bold transition-all flex items-center space-x-1.5 shadow-lg shadow-amber-500/20"
+              className="px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-black text-xs font-mono font-bold transition-all flex items-center space-x-1.5 shadow-lg shadow-amber-500/20"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Issue Security Cheque</span>
+              <span>Issue Cheque</span>
             </button>
           )}
 
@@ -1469,10 +1675,10 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
           {activeTab === 'installments' && (
             <button
               onClick={() => setIsAddPlanModalOpen(true)}
-              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black text-xs font-mono font-bold transition-all flex items-center space-x-1.5 shadow-lg shadow-emerald-500/20"
+              className="px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black text-xs font-mono font-bold transition-all flex items-center space-x-1.5 shadow-lg shadow-emerald-500/20"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Create Installment Plan</span>
+              <span>Create Plan</span>
             </button>
           )}
         </div>
@@ -1483,57 +1689,79 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
       {/* ========================================================================= */}
       {activeTab === 'coa' && (
         <div className="space-y-4">
-          {/* Sub-Filters */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="flex items-center space-x-2 w-full sm:w-auto">
-              <div className="relative flex-1 sm:w-72">
+          {/* Sub-Filters & Category Count Pills */}
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+            {/* Search Input with Instant Clear */}
+            <div className="flex items-center space-x-2 w-full lg:w-auto">
+              <div className="relative flex-1 lg:w-80">
                 <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Search code, account name, bank..."
+                  placeholder="Search code, title, subtype, description..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && fetchAccountsData()}
-                  className="w-full bg-slate-900 border border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono shadow-inner"
                 />
+                {searchQuery && (
+                  <button
+                    onClick={() => { setSearchQuery(''); fetchAccountsData(); }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white p-0.5"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
               <button
                 onClick={fetchAccountsData}
-                className="px-3 py-2 bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-mono border border-white/10"
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-mono border border-white/10 transition-all shadow-sm"
               >
                 Search
               </button>
             </div>
 
-            <div className="flex items-center space-x-1.5 overflow-x-auto w-full sm:w-auto">
-              {['ALL', 'ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'].map(type => (
+            {/* Category Filter Pills with Live Counters */}
+            <div className="flex items-center space-x-1.5 overflow-x-auto w-full lg:w-auto p-1 bg-slate-900/60 rounded-xl border border-white/5 scrollbar-none">
+              {[
+                { id: 'ALL', label: 'All Categories', count: accounts.length },
+                { id: 'ASSET', label: 'Assets (1xxx)', count: accounts.filter(a => a.type === 'ASSET').length },
+                { id: 'LIABILITY', label: 'Liabilities (2xxx)', count: accounts.filter(a => a.type === 'LIABILITY').length },
+                { id: 'EQUITY', label: 'Equity (3xxx)', count: accounts.filter(a => a.type === 'EQUITY').length },
+                { id: 'REVENUE', label: 'Revenue (4xxx)', count: accounts.filter(a => a.type === 'REVENUE').length },
+                { id: 'EXPENSE', label: 'Expenses (5xxx)', count: accounts.filter(a => a.type === 'EXPENSE').length },
+              ].map(type => (
                 <button
-                  key={type}
-                  onClick={() => { setSelectedTypeFilter(type); }}
-                  className={`px-3 py-1.5 rounded-lg text-[11px] font-mono transition-all ${
-                    selectedTypeFilter === type
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold'
-                      : 'bg-slate-900/60 text-slate-400 hover:bg-white/5 border border-white/5'
+                  key={type.id}
+                  onClick={() => { setSelectedTypeFilter(type.id); }}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-mono transition-all flex items-center space-x-1.5 whitespace-nowrap ${
+                    selectedTypeFilter === type.id
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold shadow-sm'
+                      : 'bg-transparent text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'
                   }`}
                 >
-                  {type}
+                  <span>{type.label}</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
+                    selectedTypeFilter === type.id ? 'bg-cyan-500/30 text-cyan-200' : 'bg-slate-800 text-slate-500'
+                  }`}>
+                    {type.count}
+                  </span>
                 </button>
               ))}
             </div>
           </div>
 
           {/* Accounts Table */}
-          <div className="glass-card rounded-2xl overflow-hidden border border-white/10">
+          <div className="glass-card rounded-2xl overflow-hidden border border-white/10 shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-900/90 border-b border-white/10 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
+                  <tr className="bg-slate-900/95 border-b border-white/10 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
                     <th className="py-3 px-4">Code</th>
                     <th className="py-3 px-4">Account Title / Ledger</th>
                     <th className="py-3 px-4">Classification</th>
-                    <th className="py-3 px-4">Subtype / Bank Info</th>
+                    <th className="py-3 px-4">Subtype / Bank Details</th>
                     <th className="py-3 px-4 text-right">Current Balance</th>
-                    <th className="py-3 px-4 text-center">Actions</th>
+                    <th className="py-3 px-4 text-center">Quick Ledger Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 text-xs">
@@ -1549,114 +1777,143 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                   ) : accounts.length === 0 ? (
                     <tr>
                       <td colSpan="6" className="py-12 text-center text-slate-500 font-mono">
-                        No accounts found matching your query.
+                        No accounts found matching your filter criteria.
                       </td>
                     </tr>
                   ) : (
-                    accounts.map(acc => {
-                      const isAsset = acc.type === 'ASSET';
-                      const isExpense = acc.type === 'EXPENSE';
-                      const isRevenue = acc.type === 'REVENUE';
-                      const isLiability = acc.type === 'LIABILITY';
+                    accounts
+                      .filter(acc => {
+                        if (!searchQuery.trim()) return true;
+                        const q = searchQuery.toLowerCase();
+                        return (
+                          (acc.code && String(acc.code).toLowerCase().includes(q)) ||
+                          (acc.name && acc.name.toLowerCase().includes(q)) ||
+                          (acc.subType && acc.subType.toLowerCase().includes(q)) ||
+                          (acc.bankName && acc.bankName.toLowerCase().includes(q)) ||
+                          (acc.accountNumber && String(acc.accountNumber).toLowerCase().includes(q)) ||
+                          (acc.description && acc.description.toLowerCase().includes(q))
+                        );
+                      })
+                      .map(acc => {
+                        const isAsset = acc.type === 'ASSET';
+                        const isExpense = acc.type === 'EXPENSE';
+                        const isRevenue = acc.type === 'REVENUE';
+                        const isLiability = acc.type === 'LIABILITY';
 
-                      return (
-                        <tr 
-                          key={acc.id} 
-                          className="hover:bg-white/5 transition-colors cursor-pointer"
-                          onClick={() => handleOpenLedger(acc)}
-                        >
-                          <td className="py-3.5 px-4 font-mono font-bold text-cyan-400">
-                            {acc.code}
-                          </td>
+                        return (
+                          <tr 
+                            key={acc.id} 
+                            className="hover:bg-white/5 transition-colors cursor-pointer group"
+                            onClick={() => handleOpenLedger(acc)}
+                          >
+                            <td className="py-3.5 px-4 font-mono font-bold text-cyan-400 whitespace-nowrap">
+                              <div className="flex items-center space-x-1.5">
+                                <span>{acc.code}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleCopyToClipboard(acc.code, `code-${acc.id}`); }}
+                                  className="text-slate-500 hover:text-cyan-300 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="Copy account code"
+                                >
+                                  {copiedId === `code-${acc.id}` ? (
+                                    <Check className="w-3 h-3 text-emerald-400" />
+                                  ) : (
+                                    <Copy className="w-3 h-3" />
+                                  )}
+                                </button>
+                              </div>
+                            </td>
 
-                          <td className="py-3.5 px-4 font-semibold text-white">
-                            <div className="flex items-center space-x-2">
-                              <span>{acc.name}</span>
-                              {acc.isSystem && (
-                                <span className="px-1.5 py-0.5 bg-slate-800 text-slate-400 rounded text-[9px] font-mono border border-white/5">
-                                  SYSTEM
-                                </span>
+                            <td className="py-3.5 px-4 font-semibold text-white">
+                              <div className="flex items-center space-x-2">
+                                <span className="group-hover:text-cyan-300 transition-colors">{acc.name}</span>
+                                {acc.isSystem && (
+                                  <span className="px-1.5 py-0.5 bg-slate-800 text-slate-400 rounded text-[9px] font-mono border border-white/5">
+                                    SYSTEM
+                                  </span>
+                                )}
+                              </div>
+                              {acc.description && (
+                                <p className="text-[11px] text-slate-400 font-normal truncate max-w-md mt-0.5">{acc.description}</p>
                               )}
-                            </div>
-                            {acc.description && (
-                              <p className="text-[11px] text-slate-400 font-normal truncate max-w-md">{acc.description}</p>
-                            )}
-                          </td>
+                            </td>
 
-                          <td className="py-3.5 px-4 font-mono">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                              isAsset ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
-                              isLiability ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' :
-                              isRevenue ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' :
-                              isExpense ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' :
-                              'bg-purple-500/10 text-purple-400 border-purple-500/30'
-                            }`}>
-                              {acc.type}
-                            </span>
-                          </td>
+                            <td className="py-3.5 px-4 font-mono">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                isAsset ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
+                                isLiability ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' :
+                                isRevenue ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' :
+                                isExpense ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' :
+                                'bg-purple-500/10 text-purple-400 border-purple-500/30'
+                              }`}>
+                                {acc.type}
+                              </span>
+                            </td>
 
-                          <td className="py-3.5 px-4 font-mono text-slate-300">
-                            <p>{acc.subType || 'OTHER'}</p>
-                            {acc.accountNumber && (
-                              <p className="text-[10px] text-slate-500 truncate">{acc.bankName} - {acc.accountNumber}</p>
-                            )}
-                          </td>
-
-                          <td className="py-3.5 px-4 text-right font-mono font-bold text-sm">
-                            <span className={acc.currentBalance >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
-                              {formatPKR(acc.currentBalance)}
-                            </span>
-                          </td>
-
-                          <td className="py-3.5 px-4 text-center">
-                            <div className="flex items-center justify-center space-x-1.5">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); openReceiveModal(acc.id); }}
-                                className="px-2 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 rounded-lg text-[11px] font-mono transition-all flex items-center space-x-1"
-                                title="Receive / Inflow into this Ledger"
-                              >
-                                <ArrowDownLeft className="w-3 h-3" />
-                                <span>Receive</span>
-                              </button>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); openPayModal(acc.id); }}
-                                className="px-2 py-1 bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 rounded-lg text-[11px] font-mono transition-all flex items-center space-x-1"
-                                title="Pay / Outflow from this Ledger"
-                              >
-                                <ArrowUpRight className="w-3 h-3" />
-                                <span>Pay</span>
-                              </button>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleOpenLedger(acc); }}
-                                className="px-2.5 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg text-xs font-mono transition-all flex items-center space-x-1"
-                                title="View Ledger"
-                              >
-                                <FileText className="w-3 h-3" />
-                                <span>Ledger</span>
-                              </button>
-                              {canManageAccounts && (
-                                <>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleOpenEditAccount(acc); }}
-                                    className="p-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg transition-all"
-                                    title="Edit Account"
-                                  >
-                                    <Edit className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleDeleteAccount(acc); }}
-                                    className="p-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg transition-all"
-                                    title="Delete Account"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </>
+                            <td className="py-3.5 px-4 font-mono text-slate-300">
+                              <p className="font-semibold text-slate-200">{acc.subType || 'OTHER'}</p>
+                              {acc.accountNumber && (
+                                <p className="text-[10px] text-slate-400 truncate flex items-center space-x-1 mt-0.5">
+                                  <span>{acc.bankName} - {acc.accountNumber}</span>
+                                </p>
                               )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
+                            </td>
+
+                            <td className="py-3.5 px-4 text-right font-mono font-bold text-sm whitespace-nowrap">
+                              <span className={acc.currentBalance >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                                {formatPKR(acc.currentBalance)}
+                              </span>
+                            </td>
+
+                            <td className="py-3.5 px-4 text-center">
+                              <div className="flex items-center justify-center space-x-1.5 flex-wrap gap-y-1">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openReceiveModal(acc.id); }}
+                                  className="px-2 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 rounded-lg text-[11px] font-mono transition-all flex items-center space-x-1 shadow-sm"
+                                  title="Receive / Inflow into this Ledger (آمد و وصولی واؤچر)"
+                                >
+                                  <ArrowDownLeft className="w-3 h-3 text-emerald-400" />
+                                  <span>+ Receive</span>
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openPayModal(acc.id); }}
+                                  className="px-2 py-1 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 rounded-lg text-[11px] font-mono transition-all flex items-center space-x-1 shadow-sm"
+                                  title="Pay / Outflow from this Ledger (ادائیگی واؤچر)"
+                                >
+                                  <ArrowUpRight className="w-3 h-3 text-rose-400" />
+                                  <span>- Pay</span>
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleOpenLedger(acc); }}
+                                  className="px-2.5 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-lg text-xs font-mono transition-all flex items-center space-x-1 shadow-sm"
+                                  title="View Running Ledger Statement (کھاتہ تفصیل)"
+                                >
+                                  <FileText className="w-3 h-3 text-cyan-400" />
+                                  <span>Ledger</span>
+                                </button>
+                                {canManageAccounts && (
+                                  <>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleOpenEditAccount(acc); }}
+                                      className="p-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg transition-all"
+                                      title="Edit Account Title & Properties"
+                                    >
+                                      <Edit className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteAccount(acc); }}
+                                      className="p-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg transition-all"
+                                      title="Delete Account from Chart of Accounts"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                   )}
                 </tbody>
               </table>
@@ -1673,16 +1930,32 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
           {/* Header Description */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
-              <h3 className="text-base font-bold text-white">Bank Accounts & Showroom Cash Safe</h3>
-              <p className="text-xs text-slate-400 font-mono">Transfer funds seamlessly between Cash in Hand and corporate bank accounts.</p>
+              <h3 className="text-base font-bold text-white flex items-center space-x-2">
+                <span>Bank Accounts & Showroom Cash Safe</span>
+                <span className="text-[10px] font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 px-2 py-0.5 rounded-full">
+                  {bankAndCashAccounts.length} LIQUIDITY ACCOUNTS
+                </span>
+              </h3>
+              <p className="text-xs text-slate-400 font-mono">Transfer funds seamlessly between Cash in Hand safe and corporate bank accounts.</p>
             </div>
-            <button
-              onClick={() => setIsTransferModalOpen(true)}
-              className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-mono font-bold text-xs rounded-xl shadow-lg shadow-cyan-500/20 flex items-center space-x-2"
-            >
-              <ArrowRightLeft className="w-4 h-4" />
-              <span>Transfer Cash to Bank</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              {canManageAccounts && (
+                <button
+                  onClick={() => openAddAccountModal('ASSET', 'BANK')}
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 font-mono font-bold text-xs rounded-xl flex items-center space-x-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>New Bank Account</span>
+                </button>
+              )}
+              <button
+                onClick={() => setIsTransferModalOpen(true)}
+                className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-mono font-bold text-xs rounded-xl shadow-lg shadow-cyan-500/20 flex items-center space-x-2 active:scale-95 transition-all"
+              >
+                <ArrowRightLeft className="w-4 h-4" />
+                <span>Transfer Cash to Bank</span>
+              </button>
+            </div>
           </div>
 
           {/* Cards Grid */}
@@ -1707,158 +1980,206 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
             )}
 
             {/* Cash in Hand Big Card */}
-            {accounts.filter(a => a.subType === 'CASH').map(cash => (
-              <div key={cash.id} className="glass-card rounded-2xl p-5 border border-emerald-500/30 bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-950 relative overflow-hidden">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                      <Wallet className="w-6 h-6" />
+            {accounts.filter(a => a.subType === 'CASH').map(cash => {
+              const totalLiq = accountsSummary?.totalLiquidity || 1;
+              const cashShare = Math.round(((cash.currentBalance || 0) / totalLiq) * 100);
+
+              return (
+                <div key={cash.id} className="glass-card rounded-2xl p-5 border border-emerald-500/30 bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-950 relative overflow-hidden group hover:border-emerald-500/60 transition-all">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 group-hover:scale-110 transition-transform">
+                        <Wallet className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-white group-hover:text-emerald-300 transition-colors">{cash.name}</h4>
+                        <div className="flex items-center space-x-1.5 mt-0.5">
+                          <span className="text-[10px] font-mono text-emerald-400">Code: {cash.code}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyToClipboard(cash.code, `code-${cash.id}`)}
+                            className="text-slate-500 hover:text-emerald-300 transition-colors"
+                            title="Copy code"
+                          >
+                            {copiedId === `code-${cash.id}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white">{cash.name}</h4>
-                      <p className="text-[10px] font-mono text-emerald-400">Account Code: {cash.code}</p>
+                    <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 rounded-full text-[10px] font-mono font-bold border border-emerald-500/30">
+                      CASH SAFE
+                    </span>
+                  </div>
+
+                  <div className="mt-5 border-t border-white/10 pt-4">
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-[10px] font-mono text-slate-400 uppercase">Available Safe Cash</span>
+                      <span className="text-[10px] font-mono text-emerald-400 font-bold">{cashShare}% of Liquidity</span>
+                    </div>
+                    <h3 className="text-2xl font-black font-mono text-emerald-300 mt-1">
+                      {formatPKR(cash.currentBalance)}
+                    </h3>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between pt-3 border-t border-white/5 flex-wrap gap-2">
+                    <button
+                      onClick={() => handleOpenLedger(cash)}
+                      className="text-xs font-mono text-cyan-400 hover:underline flex items-center space-x-1"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Ledger Statement</span>
+                      <ChevronRight className="w-3 h-3" />
+                    </button>
+                    <div className="flex items-center space-x-1.5 flex-wrap gap-1">
+                      <button
+                        onClick={() => openReceiveModal(cash.id)}
+                        className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-[11px] font-mono hover:bg-emerald-500/30 transition-all flex items-center space-x-1"
+                        title="Receive / Inflow Cash into Showroom Safe"
+                      >
+                        <ArrowDownLeft className="w-3 h-3 text-emerald-400" />
+                        <span>+ Receive</span>
+                      </button>
+                      <button
+                        onClick={() => openPayModal(cash.id)}
+                        className="px-2.5 py-1 bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-[11px] font-mono hover:bg-rose-500/30 transition-all flex items-center space-x-1"
+                        title="Pay / Outflow Cash from Showroom Safe"
+                      >
+                        <ArrowUpRight className="w-3 h-3 text-rose-400" />
+                        <span>- Pay</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setTransferFormData({ ...transferFormData, fromAccountId: cash.id });
+                          setIsTransferModalOpen(true);
+                        }}
+                        className="px-2.5 py-1 bg-slate-800 text-slate-300 border border-white/10 rounded-lg text-[11px] font-mono hover:bg-slate-700 transition-all"
+                      >
+                        To Bank
+                      </button>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full text-[10px] font-mono font-bold">
-                    CASH SAFE
-                  </span>
                 </div>
-
-                <div className="mt-6 border-t border-white/10 pt-4">
-                  <span className="text-[10px] font-mono text-slate-400 uppercase">Available Cash Balance</span>
-                  <h3 className="text-2xl font-black font-mono text-emerald-300 mt-1">
-                    {formatPKR(cash.currentBalance)}
-                  </h3>
-                </div>
-
-                <div className="mt-4 flex items-center justify-between pt-3 border-t border-white/5 flex-wrap gap-2">
-                  <button
-                    onClick={() => handleOpenLedger(cash)}
-                    className="text-xs font-mono text-cyan-400 hover:underline flex items-center space-x-1"
-                  >
-                    <span>View Cash Transactions</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                  <div className="flex items-center space-x-1.5 flex-wrap gap-1">
-                    <button
-                      onClick={() => openReceiveModal(cash.id)}
-                      className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-[11px] font-mono hover:bg-emerald-500/30 transition-all flex items-center space-x-1"
-                      title="Receive / Inflow Cash into Showroom Safe"
-                    >
-                      <ArrowDownLeft className="w-3 h-3" />
-                      <span>Receive Cash</span>
-                    </button>
-                    <button
-                      onClick={() => openPayModal(cash.id)}
-                      className="px-2.5 py-1 bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-[11px] font-mono hover:bg-rose-500/30 transition-all flex items-center space-x-1"
-                      title="Pay / Outflow Cash from Showroom Safe"
-                    >
-                      <ArrowUpRight className="w-3 h-3" />
-                      <span>Pay Cash</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setTransferFormData({ ...transferFormData, fromAccountId: cash.id });
-                        setIsTransferModalOpen(true);
-                      }}
-                      className="px-2.5 py-1 bg-slate-800 text-slate-300 border border-white/10 rounded-lg text-[11px] font-mono hover:bg-slate-700 transition-all"
-                    >
-                      To Bank
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
 
             {/* Bank Accounts Cards */}
-            {accounts.filter(a => a.subType === 'BANK').map(bank => (
-              <div key={bank.id} className="glass-card rounded-2xl p-5 border border-cyan-500/20 bg-gradient-to-br from-cyan-950/30 via-slate-900 to-slate-950 relative overflow-hidden">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-                      <Building2 className="w-6 h-6" />
+            {accounts.filter(a => a.subType === 'BANK').map(bank => {
+              const totalLiq = accountsSummary?.totalLiquidity || 1;
+              const bankShare = Math.round(((bank.currentBalance || 0) / totalLiq) * 100);
+
+              return (
+                <div key={bank.id} className="glass-card rounded-2xl p-5 border border-cyan-500/20 bg-gradient-to-br from-cyan-950/30 via-slate-900 to-slate-950 relative overflow-hidden group hover:border-cyan-500/50 transition-all">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 group-hover:scale-110 transition-transform">
+                        <Building2 className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-white group-hover:text-cyan-300 transition-colors">{bank.bankName || bank.name}</h4>
+                        <div className="flex items-center space-x-1.5 mt-0.5">
+                          <span className="text-[10px] font-mono text-cyan-400">Code: {bank.code}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyToClipboard(bank.code, `code-${bank.id}`)}
+                            className="text-slate-500 hover:text-cyan-300 transition-colors"
+                            title="Copy code"
+                          >
+                            {copiedId === `code-${bank.id}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white">{bank.bankName || bank.name}</h4>
-                      <p className="text-[10px] font-mono text-cyan-400">Account #{bank.code}</p>
-                    </div>
+                    <span className="px-2.5 py-0.5 bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 rounded-full text-[10px] font-mono font-bold">
+                      BANK
+                    </span>
                   </div>
-                  <span className="px-2 py-0.5 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded-full text-[10px] font-mono">
-                    BANK ACCOUNT
-                  </span>
-                </div>
 
-                <div className="mt-3 space-y-1">
-                  <p className="text-xs text-slate-300 font-mono truncate">{bank.name}</p>
-                  <p className="text-[11px] font-mono text-slate-400 truncate">
-                    IBAN/Acc: {bank.accountNumber || 'Not specified'}
-                  </p>
-                  {bank.branch && <p className="text-[10px] text-slate-500">Branch: {bank.branch}</p>}
-                </div>
-
-                <div className="mt-4 border-t border-white/10 pt-3">
-                  <span className="text-[10px] font-mono text-slate-400 uppercase">Available Bank Balance</span>
-                  <h3 className="text-2xl font-black font-mono text-cyan-300 mt-1">
-                    {formatPKR(bank.currentBalance)}
-                  </h3>
-                </div>
-
-                <div className="mt-4 flex items-center justify-between pt-3 border-t border-white/5 flex-wrap gap-2">
-                  <button
-                    onClick={() => handleOpenLedger(bank)}
-                    className="text-xs font-mono text-cyan-400 hover:underline flex items-center space-x-1"
-                  >
-                    <span>Account Statement</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                  <div className="flex items-center space-x-1.5 flex-wrap gap-1">
-                    <button
-                      onClick={() => openReceiveModal(bank.id)}
-                      className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-[11px] font-mono hover:bg-emerald-500/30 transition-all flex items-center space-x-1"
-                      title="Deposit / Receive Amount in this Bank Account"
-                    >
-                      <ArrowDownLeft className="w-3 h-3" />
-                      <span>Deposit</span>
-                    </button>
-                    <button
-                      onClick={() => openPayModal(bank.id)}
-                      className="px-2.5 py-1 bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-[11px] font-mono hover:bg-rose-500/30 transition-all flex items-center space-x-1"
-                      title="Pay / Outflow from this Bank Account"
-                    >
-                      <ArrowUpRight className="w-3 h-3" />
-                      <span>Pay</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setTransferFormData({ ...transferFormData, fromAccountId: bank.id });
-                        setIsTransferModalOpen(true);
-                      }}
-                      className="px-2.5 py-1 bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-lg text-[11px] font-mono hover:bg-cyan-500/30 transition-all"
-                    >
-                      Transfer
-                    </button>
-                    {canManageAccounts && (
-                      <>
+                  <div className="mt-3 space-y-1 bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
+                    <p className="text-xs text-slate-300 font-mono truncate">{bank.name}</p>
+                    {bank.accountNumber && (
+                      <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                        <span className="truncate">Acc/IBAN: <strong className="text-slate-200">{bank.accountNumber}</strong></span>
                         <button
-                          onClick={() => handleOpenEditAccount(bank)}
-                          className="p-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg transition-all"
-                          title="Edit Bank Account"
+                          type="button"
+                          onClick={() => handleCopyToClipboard(bank.accountNumber, `accnum-${bank.id}`)}
+                          className="text-slate-500 hover:text-cyan-300 ml-1 p-0.5"
+                          title="Copy account number"
                         >
-                          <Edit className="w-3.5 h-3.5" />
+                          {copiedId === `accnum-${bank.id}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                         </button>
-                        <button
-                          onClick={() => handleDeleteAccount(bank)}
-                          className="p-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg transition-all"
-                          title="Delete Bank Account"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </>
+                      </div>
                     )}
+                    {bank.branch && <p className="text-[10px] text-slate-500 font-mono">Branch: {bank.branch}</p>}
+                  </div>
+
+                  <div className="mt-4 border-t border-white/10 pt-3">
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-[10px] font-mono text-slate-400 uppercase">Available Bank Balance</span>
+                      <span className="text-[10px] font-mono text-cyan-400 font-bold">{bankShare}% of Liquidity</span>
+                    </div>
+                    <h3 className="text-2xl font-black font-mono text-cyan-300 mt-1">
+                      {formatPKR(bank.currentBalance)}
+                    </h3>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between pt-3 border-t border-white/5 flex-wrap gap-2">
+                    <button
+                      onClick={() => handleOpenLedger(bank)}
+                      className="text-xs font-mono text-cyan-400 hover:underline flex items-center space-x-1"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Ledger</span>
+                      <ChevronRight className="w-3 h-3" />
+                    </button>
+                    <div className="flex items-center space-x-1.5 flex-wrap gap-1">
+                      <button
+                        onClick={() => openReceiveModal(bank.id)}
+                        className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-[11px] font-mono hover:bg-emerald-500/30 transition-all flex items-center space-x-1"
+                        title="Deposit / Receive Amount in this Bank Account"
+                      >
+                        <ArrowDownLeft className="w-3 h-3 text-emerald-400" />
+                        <span>Deposit</span>
+                      </button>
+                      <button
+                        onClick={() => openPayModal(bank.id)}
+                        className="px-2.5 py-1 bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-[11px] font-mono hover:bg-rose-500/30 transition-all flex items-center space-x-1"
+                        title="Pay / Outflow from this Bank Account"
+                      >
+                        <ArrowUpRight className="w-3 h-3 text-rose-400" />
+                        <span>Pay</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setTransferFormData({ ...transferFormData, fromAccountId: bank.id });
+                          setIsTransferModalOpen(true);
+                        }}
+                        className="px-2.5 py-1 bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-lg text-[11px] font-mono hover:bg-cyan-500/30 transition-all"
+                      >
+                        Transfer
+                      </button>
+                      {canManageAccounts && (
+                        <>
+                          <button
+                            onClick={() => handleOpenEditAccount(bank)}
+                            className="p-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg transition-all"
+                            title="Edit Bank Account"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteAccount(bank)}
+                            className="p-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg transition-all"
+                            title="Delete Bank Account"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -1879,31 +2200,61 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && fetchChequesData()}
-                  className="w-full bg-slate-900 border border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono"
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono"
                 />
+                {searchQuery && (
+                  <button
+                    onClick={() => { setSearchQuery(''); fetchChequesData(); }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
               <button
                 onClick={fetchChequesData}
-                className="px-3 py-2 bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-mono border border-white/10"
+                className="px-3.5 py-2 bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-mono border border-white/10"
               >
                 Search
               </button>
             </div>
 
-            <div className="flex items-center space-x-1.5 overflow-x-auto w-full sm:w-auto">
-              {['ALL', 'ISSUED', 'PRESENTED', 'CLEARED', 'BOUNCED', 'CANCELLED'].map(st => (
+            <div className="flex items-center space-x-1.5 overflow-x-auto w-full sm:w-auto flex-wrap gap-y-1">
+              {[
+                { id: 'ALL', label: 'ALL', count: cheques.length },
+                { id: 'ISSUED', label: 'ISSUED', count: cheques.filter(c => c.status === 'ISSUED').length },
+                { id: 'PRESENTED', label: 'PRESENTED', count: cheques.filter(c => c.status === 'PRESENTED').length },
+                { id: 'CLEARED', label: 'CLEARED', count: cheques.filter(c => c.status === 'CLEARED').length },
+                { id: 'BOUNCED', label: 'BOUNCED', count: cheques.filter(c => c.status === 'BOUNCED').length },
+                { id: 'CANCELLED', label: 'CANCELLED', count: cheques.filter(c => c.status === 'CANCELLED').length },
+              ].map(st => (
                 <button
-                  key={st}
-                  onClick={() => setSelectedChequeStatus(st)}
-                  className={`px-3 py-1.5 rounded-lg text-[11px] font-mono transition-all ${
-                    selectedChequeStatus === st
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold'
+                  key={st.id}
+                  onClick={() => setSelectedChequeStatus(st.id)}
+                  className={`px-3 py-1.5 rounded-xl text-[11px] font-mono transition-all flex items-center space-x-1.5 ${
+                    selectedChequeStatus === st.id
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold shadow-sm'
                       : 'bg-slate-900/60 text-slate-400 hover:bg-white/5 border border-white/5'
                   }`}
                 >
-                  {st}
+                  <span>{st.label}</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[9px] ${
+                    selectedChequeStatus === st.id ? 'bg-amber-400 text-black font-extrabold' : 'bg-slate-800 text-slate-400'
+                  }`}>
+                    {st.count}
+                  </span>
                 </button>
               ))}
+
+              {canManageAccounts && (
+                <button
+                  onClick={() => setIsAddChequeModalOpen(true)}
+                  className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-black font-mono font-bold text-xs rounded-xl shadow-md shadow-amber-500/20 flex items-center space-x-1.5 ml-2"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Issue Cheque</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -1939,96 +2290,131 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                       </td>
                     </tr>
                   ) : (
-                    cheques.map(chq => {
-                      const isCleared = chq.status === 'CLEARED';
-                      const isIssued = chq.status === 'ISSUED';
-                      const isBounced = chq.status === 'BOUNCED';
+                    cheques
+                      .filter(c => selectedChequeStatus === 'ALL' || c.status === selectedChequeStatus)
+                      .map(chq => {
+                        const isCleared = chq.status === 'CLEARED';
+                        const isIssued = chq.status === 'ISSUED';
+                        const isBounced = chq.status === 'BOUNCED';
+                        const isPresented = chq.status === 'PRESENTED';
 
-                      return (
-                        <tr key={chq.id} className="hover:bg-white/5 transition-colors">
-                          <td className="py-3.5 px-4 font-mono font-bold text-amber-400">
-                            {chq.chequeNumber}
-                            {chq.chassisNumber && (
-                              <p className="text-[10px] text-slate-400 font-normal">Chassis: {chq.chassisNumber}</p>
-                            )}
-                          </td>
+                        const todayDate = new Date().toISOString().slice(0, 10);
+                        const dueDateStr = chq.dueDate ? new Date(chq.dueDate).toISOString().slice(0, 10) : '';
+                        const isOverdue = !isCleared && dueDateStr && dueDateStr < todayDate;
+                        const isDueToday = !isCleared && dueDateStr && dueDateStr === todayDate;
 
-                          <td className="py-3.5 px-4 font-semibold text-white">
-                            <p>{chq.partyName}</p>
-                            {chq.partyPhone && (
-                              <p className="text-[10px] font-mono text-slate-400">{chq.partyPhone}</p>
-                            )}
-                          </td>
-
-                          <td className="py-3.5 px-4 font-mono text-slate-300">
-                            {chq.bankAccount ? chq.bankAccount.name : chq.bankName}
-                          </td>
-
-                          <td className="py-3.5 px-4 font-mono text-slate-300">
-                            {new Date(chq.dueDate).toLocaleDateString()}
-                          </td>
-
-                          <td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-white">
-                            {formatPKR(chq.amount)}
-                          </td>
-
-                          <td className="py-3.5 px-4 text-center">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
-                              isCleared ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
-                              isIssued ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' :
-                              isBounced ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' :
-                              'bg-slate-800 text-slate-400 border-white/10'
-                            }`}>
-                              {chq.status}
-                            </span>
-                          </td>
-
-                          <td className="py-3.5 px-4 text-center">
-                            <div className="flex items-center justify-center space-x-1.5 flex-wrap gap-y-1">
-                              {!isCleared && (
+                        return (
+                          <tr key={chq.id} className="hover:bg-white/5 transition-colors group">
+                            <td className="py-3.5 px-4 font-mono font-bold text-amber-400">
+                              <div className="flex items-center space-x-1.5">
+                                <span>{chq.chequeNumber}</span>
                                 <button
-                                  onClick={() => {
-                                    setSelectedChequeToClear(chq);
-                                    setClearingForm({
-                                      bankAccountId: chq.bankAccountId || '',
-                                      clearingDate: new Date().toISOString().slice(0, 10),
-                                      notes: ''
-                                    });
-                                    setIsClearChequeModalOpen(true);
-                                  }}
-                                  className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-black font-mono font-bold rounded-lg text-xs transition-colors"
+                                  type="button"
+                                  onClick={() => handleCopyToClipboard(chq.chequeNumber, `chq-${chq.id}`)}
+                                  className="text-slate-500 hover:text-amber-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="Copy cheque #"
                                 >
-                                  Clear
+                                  {copiedId === `chq-${chq.id}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                                 </button>
+                              </div>
+                              {chq.chassisNumber && (
+                                <p className="text-[10px] text-cyan-400/80 font-normal mt-0.5">Chassis: {chq.chassisNumber}</p>
                               )}
-                              {isCleared && (
-                                <span className="text-[10px] font-mono text-slate-500">
-                                  Cleared
+                            </td>
+
+                            <td className="py-3.5 px-4 font-semibold text-white">
+                              <p className="group-hover:text-amber-300 transition-colors">{chq.partyName}</p>
+                              {chq.partyPhone && (
+                                <p className="text-[10px] font-mono text-slate-400">{chq.partyPhone}</p>
+                              )}
+                            </td>
+
+                            <td className="py-3.5 px-4 font-mono text-slate-300">
+                              {chq.bankAccount ? chq.bankAccount.name : (chq.bankName || 'Showroom Bank')}
+                            </td>
+
+                            <td className="py-3.5 px-4 font-mono">
+                              <div className="flex items-center space-x-1.5">
+                                <span className={isOverdue ? 'text-rose-400 font-bold' : isDueToday ? 'text-amber-300 font-bold' : 'text-slate-300'}>
+                                  {chq.dueDate ? new Date(chq.dueDate).toLocaleDateString() : '-'}
                                 </span>
-                              )}
-                              {canManageAccounts && (
-                                <>
+                                {isOverdue && (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-extrabold bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse">
+                                    OVERDUE
+                                  </span>
+                                )}
+                                {isDueToday && (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                                    DUE TODAY
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+
+                            <td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-white">
+                              {formatPKR(chq.amount)}
+                            </td>
+
+                            <td className="py-3.5 px-4 text-center">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
+                                isCleared ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
+                                isIssued ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' :
+                                isPresented ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' :
+                                isBounced ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' :
+                                'bg-slate-800 text-slate-400 border-white/10'
+                              }`}>
+                                {chq.status}
+                              </span>
+                            </td>
+
+                            <td className="py-3.5 px-4 text-center">
+                              <div className="flex items-center justify-center space-x-1.5 flex-wrap gap-y-1">
+                                {!isCleared && (
                                   <button
-                                    onClick={() => handleOpenEditCheque(chq)}
-                                    className="p-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg transition-all"
-                                    title="Edit Security Cheque"
+                                    onClick={() => {
+                                      setSelectedChequeToClear(chq);
+                                      setClearingForm({
+                                        bankAccountId: chq.bankAccountId || '',
+                                        clearingDate: new Date().toISOString().slice(0, 10),
+                                        notes: ''
+                                      });
+                                      setIsClearChequeModalOpen(true);
+                                    }}
+                                    className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-black font-mono font-bold rounded-lg text-xs transition-colors flex items-center space-x-1 shadow-sm"
                                   >
-                                    <Edit className="w-3.5 h-3.5" />
+                                    <CheckCircle className="w-3 h-3" />
+                                    <span>Clear Cheque</span>
                                   </button>
-                                  <button
-                                    onClick={() => handleDeleteCheque(chq)}
-                                    className="p-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg transition-all"
-                                    title="Delete Security Cheque"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
+                                )}
+                                {isCleared && (
+                                  <span className="text-[10px] font-mono text-emerald-400 flex items-center space-x-1">
+                                    <CheckCircle className="w-3 h-3" />
+                                    <span>Cleared</span>
+                                  </span>
+                                )}
+                                {canManageAccounts && (
+                                  <>
+                                    <button
+                                      onClick={() => handleOpenEditCheque(chq)}
+                                      className="p-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg transition-all"
+                                      title="Edit Security Cheque"
+                                    >
+                                      <Edit className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteCheque(chq)}
+                                      className="p-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg transition-all"
+                                      title="Delete Security Cheque"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                   )}
                 </tbody>
               </table>
@@ -2045,44 +2431,68 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
           {/* Summary Pills */}
           {installmentStats && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="glass-card p-3 rounded-xl border border-white/10">
-                <span className="text-[10px] font-mono text-slate-400">Total Portfolio</span>
-                <p className="text-base font-bold font-mono text-white mt-0.5">{formatPKR(installmentStats.totalPortfolioValue)}</p>
+              <div className="glass-card p-3.5 rounded-2xl border border-white/10 bg-slate-900/60">
+                <span className="text-[10px] font-mono text-slate-400 uppercase font-semibold">Total Portfolio</span>
+                <p className="text-base sm:text-lg font-bold font-mono text-white mt-0.5">{formatPKR(installmentStats.totalPortfolioValue)}</p>
+                <p className="text-[10px] text-slate-500 font-mono mt-0.5">{installmentPlans.length} Active Accounts</p>
               </div>
-              <div className="glass-card p-3 rounded-xl border border-white/10">
-                <span className="text-[10px] font-mono text-emerald-400">Advance Received</span>
-                <p className="text-base font-bold font-mono text-emerald-300 mt-0.5">{formatPKR(installmentStats.totalAdvanceCollected)}</p>
+              <div className="glass-card p-3.5 rounded-2xl border border-emerald-500/20 bg-emerald-950/20">
+                <span className="text-[10px] font-mono text-emerald-400 uppercase font-semibold">Advance Received</span>
+                <p className="text-base sm:text-lg font-bold font-mono text-emerald-300 mt-0.5">{formatPKR(installmentStats.totalAdvanceCollected)}</p>
+                <p className="text-[10px] text-emerald-500/80 font-mono mt-0.5">Showroom Downpayments</p>
               </div>
-              <div className="glass-card p-3 rounded-xl border border-white/10">
-                <span className="text-[10px] font-mono text-cyan-400">Installments Collected</span>
-                <p className="text-base font-bold font-mono text-cyan-300 mt-0.5">{formatPKR(installmentStats.totalInstallmentsCollected)}</p>
+              <div className="glass-card p-3.5 rounded-2xl border border-cyan-500/20 bg-cyan-950/20">
+                <span className="text-[10px] font-mono text-cyan-400 uppercase font-semibold">Installments Collected</span>
+                <p className="text-base sm:text-lg font-bold font-mono text-cyan-300 mt-0.5">{formatPKR(installmentStats.totalInstallmentsCollected)}</p>
+                <p className="text-[10px] text-cyan-500/80 font-mono mt-0.5">Realized Cash & Bank Inflow</p>
               </div>
-              <div className="glass-card p-3 rounded-xl border border-white/10">
-                <span className="text-[10px] font-mono text-amber-400">Outstanding Balance</span>
-                <p className="text-base font-bold font-mono text-amber-300 mt-0.5">{formatPKR(installmentStats.totalOutstandingRemaining)}</p>
+              <div className="glass-card p-3.5 rounded-2xl border border-amber-500/20 bg-amber-950/20">
+                <span className="text-[10px] font-mono text-amber-400 uppercase font-semibold">Outstanding Balance</span>
+                <p className="text-base sm:text-lg font-bold font-mono text-amber-300 mt-0.5">{formatPKR(installmentStats.totalOutstandingRemaining)}</p>
+                <p className="text-[10px] text-amber-500/80 font-mono mt-0.5">Remaining Future Receivables</p>
               </div>
             </div>
           )}
 
-          {/* Search bar */}
-          <div className="flex items-center space-x-2">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search by customer name, phone, CNIC, chassis, vehicle..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && fetchInstallmentsData()}
-                className="w-full bg-slate-900 border border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
-              />
+          {/* Search bar & Actions */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center space-x-2 w-full sm:w-auto flex-1">
+              <div className="relative flex-1 max-w-md">
+                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search by customer name, phone, CNIC, chassis, vehicle..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && fetchInstallmentsData()}
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => { setSearchQuery(''); fetchInstallmentsData(); }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={fetchInstallmentsData}
+                className="px-4 py-2 bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-mono border border-white/10"
+              >
+                Search
+              </button>
             </div>
-            <button
-              onClick={fetchInstallmentsData}
-              className="px-4 py-2 bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-mono border border-white/10"
-            >
-              Search
-            </button>
+
+            {canManageAccounts && (
+              <button
+                onClick={() => setIsAddPlanModalOpen(true)}
+                className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-mono font-bold text-xs rounded-xl shadow-lg shadow-cyan-500/20 flex items-center space-x-2 active:scale-95 transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Create Installment Plan</span>
+              </button>
+            )}
           </div>
 
           {/* Installment Plans Table */}
@@ -2094,8 +2504,9 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                     <th className="py-3 px-4">Plan #</th>
                     <th className="py-3 px-4">Customer Details</th>
                     <th className="py-3 px-4">Vehicle / Chassis</th>
-                    <th className="py-3 px-4 text-right">Total Price</th>
+                    <th className="py-3 px-4 text-right">Total Agreed</th>
                     <th className="py-3 px-4 text-right">Remaining Due</th>
+                    <th className="py-3 px-4 text-center">Payment Progress</th>
                     <th className="py-3 px-4 text-center">Status</th>
                     <th className="py-3 px-4 text-center">Schedule Action</th>
                   </tr>
@@ -2103,7 +2514,7 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                 <tbody className="divide-y divide-white/5 text-xs">
                   {loading ? (
                     <tr>
-                      <td colSpan="7" className="py-12 text-center text-slate-400 font-mono">
+                      <td colSpan="8" className="py-12 text-center text-slate-400 font-mono">
                         <div className="flex items-center justify-center space-x-2">
                           <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
                           <span>Loading Installment Plans...</span>
@@ -2112,23 +2523,37 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                     </tr>
                   ) : installmentPlans.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="py-12 text-center text-slate-500 font-mono">
+                      <td colSpan="8" className="py-12 text-center text-slate-500 font-mono">
                         No installment plans recorded yet.
                       </td>
                     </tr>
                   ) : (
                     installmentPlans.map(p => {
                       const isCompleted = p.status === 'COMPLETED';
+                      const totalP = Number(p.totalPrice) || 1;
+                      const remainingP = Number(p.remainingAmount) || 0;
+                      const paidP = totalP - remainingP;
+                      const progressPercent = Math.min(100, Math.max(0, Math.round((paidP / totalP) * 100)));
 
                       return (
-                        <tr key={p.id} className="hover:bg-white/5 transition-colors">
+                        <tr key={p.id} className="hover:bg-white/5 transition-colors group">
                           <td className="py-3.5 px-4 font-mono font-bold text-cyan-400">
-                            {p.planNumber}
+                            <div className="flex items-center space-x-1.5">
+                              <span>{p.planNumber}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyToClipboard(p.planNumber, `plan-${p.id}`)}
+                                className="text-slate-500 hover:text-cyan-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Copy plan #"
+                              >
+                                {copiedId === `plan-${p.id}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                              </button>
+                            </div>
                           </td>
 
                           <td className="py-3.5 px-4 font-semibold text-white">
-                            <p>{p.customerName}</p>
-                            <p className="text-[10px] font-mono text-slate-400">{p.customerPhone || 'No Phone'} • {p.customerCnic || ''}</p>
+                            <p className="group-hover:text-cyan-300 transition-colors">{p.customerName}</p>
+                            <p className="text-[10px] font-mono text-slate-400">{p.customerPhone || 'No Phone'} {p.customerCnic ? `• ${p.customerCnic}` : ''}</p>
                           </td>
 
                           <td className="py-3.5 px-4 font-mono text-slate-300">
@@ -2145,7 +2570,24 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                           </td>
 
                           <td className="py-3.5 px-4 text-center">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
+                            <div className="w-28 mx-auto space-y-1">
+                              <div className="flex justify-between text-[9px] font-mono text-slate-400">
+                                <span>{progressPercent}% Paid</span>
+                                <span>{formatPKR(paidP)}</span>
+                              </div>
+                              <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                <div
+                                  style={{ width: `${progressPercent}%` }}
+                                  className={`h-full rounded-full transition-all ${
+                                    progressPercent >= 100 ? 'bg-emerald-500' : progressPercent > 50 ? 'bg-cyan-500' : 'bg-amber-500'
+                                  }`}
+                                />
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="py-3.5 px-4 text-center">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
                               isCompleted ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
                               'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
                             }`}>
@@ -2157,7 +2599,7 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                             <div className="flex items-center justify-center space-x-1.5">
                               <button
                                 onClick={() => setSelectedInstallmentPlan(p)}
-                                className="px-2.5 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg text-xs font-mono transition-all flex items-center space-x-1"
+                                className="px-2.5 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg text-xs font-mono transition-all flex items-center space-x-1 shadow-sm"
                                 title="View Schedule"
                               >
                                 <Calendar className="w-3 h-3" />
@@ -2200,41 +2642,122 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
       {activeTab === 'audit' && (
         <div className="space-y-4">
           {/* Audit Filter Toolbar */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="flex items-center space-x-1.5 overflow-x-auto w-full sm:w-auto">
-              {['TODAY', 'THIS_MONTH', 'THIS_YEAR'].map(period => (
+          <div className="glass-card rounded-2xl p-4 border border-cyan-500/20 bg-slate-900/60 space-y-3">
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+              {/* Quick Period Presets */}
+              <div className="flex items-center space-x-1.5 overflow-x-auto flex-wrap gap-y-1.5">
+                {[
+                  { id: 'TODAY', label: 'Today' },
+                  { id: 'THIS_MONTH', label: 'This Month' },
+                  { id: 'THIS_YEAR', label: 'This Financial Year' },
+                  { id: 'CUSTOM', label: '📅 Custom Date Range' }
+                ].map(period => (
+                  <button
+                    key={period.id}
+                    onClick={() => {
+                      setAuditTimeRange(period.id);
+                      if (period.id !== 'CUSTOM') {
+                        fetchAuditTrailData({ timeRange: period.id, auditDateCustom: { startDate: '', endDate: '' } });
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all ${
+                      auditTimeRange === period.id
+                        ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-black shadow-md shadow-cyan-500/20'
+                        : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-white/5'
+                    }`}
+                  >
+                    {period.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Action Buttons: Export & Print */}
+              <div className="flex items-center space-x-2 flex-shrink-0">
                 <button
-                  key={period}
-                  onClick={() => setAuditTimeRange(period)}
-                  className={`px-3 py-1.5 rounded-lg text-[11px] font-mono transition-all ${
-                    auditTimeRange === period
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold'
-                      : 'bg-slate-900/60 text-slate-400 hover:bg-white/5 border border-white/5'
-                  }`}
+                  onClick={exportDayBookToCSV}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-mono font-bold flex items-center space-x-1.5 transition-all shadow-sm"
+                  title="Download Day Book records as an Excel-compatible CSV spreadsheet"
                 >
-                  {period.replace('_', ' ')}
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>Export CSV</span>
                 </button>
-              ))}
+                <button
+                  onClick={printDayBookReport}
+                  className="px-3.5 py-1.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-mono font-bold rounded-xl text-xs flex items-center space-x-1.5 transition-all shadow-lg shadow-cyan-500/20"
+                  title="Print formatted Excel-style Day Book spreadsheet"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print Day Book</span>
+                </button>
+              </div>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={exportDayBookToCSV}
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-mono font-bold flex items-center space-x-1.5 transition-all shadow-sm"
-                title="Download Day Book records as an Excel-compatible CSV spreadsheet"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5" />
-                <span>Export Excel / CSV</span>
-              </button>
-              <button
-                onClick={printDayBookReport}
-                className="px-3.5 py-1.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-mono font-bold rounded-xl text-xs flex items-center space-x-1.5 transition-all shadow-lg shadow-cyan-500/20"
-                title="Print formatted Excel-style Day Book spreadsheet with rows, columns and signature blocks"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Print Day Book (Excel Sheet)</span>
-              </button>
+            {/* Custom From-To Date Range Form & Search Input */}
+            <div className="pt-2 border-t border-white/5 flex flex-col md:flex-row items-stretch md:items-center gap-3">
+              {/* Date Pickers */}
+              <form onSubmit={handleApplyAuditCustomDates} className="flex flex-wrap items-center gap-2 flex-1">
+                <div className="flex items-center space-x-1.5 bg-slate-950 border border-white/10 rounded-xl px-2.5 py-1.5">
+                  <span className="text-[10px] font-mono text-cyan-400 font-bold uppercase whitespace-nowrap">From:</span>
+                  <input
+                    type="date"
+                    value={auditDateCustom.startDate}
+                    onChange={(e) => setAuditDateCustom({ ...auditDateCustom, startDate: e.target.value })}
+                    className="bg-transparent text-xs text-white focus:outline-none font-mono cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex items-center space-x-1.5 bg-slate-950 border border-white/10 rounded-xl px-2.5 py-1.5">
+                  <span className="text-[10px] font-mono text-cyan-400 font-bold uppercase whitespace-nowrap">To:</span>
+                  <input
+                    type="date"
+                    value={auditDateCustom.endDate}
+                    onChange={(e) => setAuditDateCustom({ ...auditDateCustom, endDate: e.target.value })}
+                    className="bg-transparent text-xs text-white focus:outline-none font-mono cursor-pointer"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="px-3.5 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-mono font-bold flex items-center space-x-1.5 transition-all"
+                  title="Apply custom date range filter to Audit Trail"
+                >
+                  <Filter className="w-3.5 h-3.5" />
+                  <span>Apply Dates</span>
+                </button>
+
+                {(auditTimeRange === 'CUSTOM' || auditDateCustom.startDate || auditDateCustom.endDate || auditSearchQuery) && (
+                  <button
+                    type="button"
+                    onClick={handleResetAuditFilter}
+                    className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-mono flex items-center space-x-1"
+                    title="Reset to Today"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Reset</span>
+                  </button>
+                )}
+              </form>
+
+              {/* Day Book Keyword Search Input */}
+              <form onSubmit={handleAuditSearchSubmit} className="relative w-full md:w-72">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search Day Book (Txn #, desc, chassis)..."
+                  value={auditSearchQuery}
+                  onChange={(e) => setAuditSearchQuery(e.target.value)}
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
+                />
+              </form>
             </div>
+
+            {/* Active Date Filter Notice */}
+            {auditTimeRange === 'CUSTOM' && auditDateCustom.startDate && (
+              <div className="flex items-center space-x-2 text-[11px] font-mono text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-3 py-1.5 rounded-lg">
+                <Calendar className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Showing custom period: <strong>{auditDateCustom.startDate}</strong> to <strong>{auditDateCustom.endDate || 'Present'}</strong> ({auditTransactions.length} records)</span>
+              </div>
+            )}
           </div>
 
           {/* Analytics Summary */}
@@ -2722,31 +3245,59 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Transfer Amount (PKR) *</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="e.g. 500000"
-                    value={transferFormData.amount}
-                    onChange={(e) => setTransferFormData({ ...transferFormData, amount: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
-                  />
-                  {transferFormData.amount && (
-                    <p className="text-[10px] text-cyan-400 font-mono mt-1">{getPriceHint(transferFormData.amount)}</p>
-                  )}
+              <div>
+                <label className="block text-xs font-mono text-slate-400 mb-1">Transfer Amount (PKR) *</label>
+                <input
+                  type="number"
+                  required
+                  placeholder="e.g. 500000"
+                  value={transferFormData.amount}
+                  onChange={(e) => setTransferFormData({ ...transferFormData, amount: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
+                />
+                
+                {/* Quick Increment Chips */}
+                <div className="flex items-center gap-1.5 flex-wrap pt-1.5">
+                  <span className="text-[10px] font-mono text-slate-500">Quick:</span>
+                  {[50000, 100000, 500000, 1000000, 5000000].map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setTransferFormData(prev => ({ ...prev, amount: (Number(prev.amount) || 0) + val }))}
+                      className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-cyan-300 border border-cyan-500/20 active:scale-95 transition-all"
+                    >
+                      +{val >= 100000 ? `${val / 100000} Lakh` : `${val / 1000}k`}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setTransferFormData(prev => ({ ...prev, amount: '' }))}
+                    className="px-2 py-0.5 rounded bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-[10px] font-mono border border-rose-500/20 active:scale-95"
+                  >
+                    Clear
+                  </button>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Transfer Date</label>
-                  <input
-                    type="date"
-                    value={transferFormData.date}
-                    onChange={(e) => setTransferFormData({ ...transferFormData, date: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
-                  />
-                </div>
+                {transferFormData.amount && (
+                  <div className="mt-2 p-2 bg-slate-950/90 rounded-xl border border-cyan-500/20 text-[11px] font-mono text-cyan-300 flex items-start space-x-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <span className="text-slate-400">In Words: </span>
+                      <strong className="text-cyan-200">{numberToWordsPKR(transferFormData.amount)}</strong>
+                      <span className="text-[10px] text-slate-500 block">({getPriceHint(transferFormData.amount)})</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-400 mb-1">Transfer Date</label>
+                <input
+                  type="date"
+                  value={transferFormData.date}
+                  onChange={(e) => setTransferFormData({ ...transferFormData, date: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
+                />
               </div>
 
               <div>
@@ -2850,24 +3401,149 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
               </div>
             </div>
 
+            {/* Custom Date Search & Filter Toolbar */}
+            <div className="py-3 px-1 border-b border-white/10 space-y-2 flex-shrink-0 bg-slate-900/40 rounded-2xl p-3 my-2">
+              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
+                {/* Quick Date Presets */}
+                <div className="flex items-center space-x-1.5 overflow-x-auto flex-wrap">
+                  <span className="text-[10px] font-mono text-slate-400 font-bold uppercase mr-1">Presets:</span>
+                  {[
+                    { label: 'All Time', getDates: () => ({ startDate: '', endDate: '' }) },
+                    { 
+                      label: 'Today', 
+                      getDates: () => {
+                        const today = new Date().toISOString().slice(0, 10);
+                        return { startDate: today, endDate: today };
+                      } 
+                    },
+                    { 
+                      label: 'This Month', 
+                      getDates: () => {
+                        const now = new Date();
+                        const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+                        const today = now.toISOString().slice(0, 10);
+                        return { startDate: start, endDate: today };
+                      } 
+                    },
+                    { 
+                      label: 'Last 30 Days', 
+                      getDates: () => {
+                        const now = new Date();
+                        const thirtyDays = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+                        const today = now.toISOString().slice(0, 10);
+                        return { startDate: thirtyDays, endDate: today };
+                      } 
+                    }
+                  ].map(preset => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => {
+                        const dates = preset.getDates();
+                        const updated = { ...ledgerDateFilter, ...dates };
+                        setLedgerDateFilter(updated);
+                        handleFilterLedger(null, updated);
+                      }}
+                      className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-white/5 rounded-lg text-[11px] font-mono transition-all"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Filter Form */}
+                <form onSubmit={handleFilterLedger} className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center space-x-1 bg-slate-950 border border-white/10 rounded-xl px-2 py-1">
+                    <span className="text-[9px] font-mono text-cyan-400 font-bold uppercase">From:</span>
+                    <input
+                      type="date"
+                      value={ledgerDateFilter.startDate}
+                      onChange={(e) => setLedgerDateFilter({ ...ledgerDateFilter, startDate: e.target.value })}
+                      className="bg-transparent text-xs text-white focus:outline-none font-mono cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="flex items-center space-x-1 bg-slate-950 border border-white/10 rounded-xl px-2 py-1">
+                    <span className="text-[9px] font-mono text-cyan-400 font-bold uppercase">To:</span>
+                    <input
+                      type="date"
+                      value={ledgerDateFilter.endDate}
+                      onChange={(e) => setLedgerDateFilter({ ...ledgerDateFilter, endDate: e.target.value })}
+                      className="bg-transparent text-xs text-white focus:outline-none font-mono cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search entries..."
+                      value={ledgerDateFilter.search}
+                      onChange={(e) => setLedgerDateFilter({ ...ledgerDateFilter, search: e.target.value })}
+                      className="bg-slate-950 border border-white/10 rounded-xl pl-2.5 pr-2 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono w-32 sm:w-36"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={ledgerLoading}
+                    className="px-3 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-mono font-bold flex items-center space-x-1 shadow-sm transition-all"
+                    title="Search and filter ledger entries by date and keywords"
+                  >
+                    <Search className="w-3 h-3" />
+                    <span>Search</span>
+                  </button>
+
+                  {(ledgerDateFilter.startDate || ledgerDateFilter.endDate || ledgerDateFilter.search) && (
+                    <button
+                      type="button"
+                      onClick={handleResetLedgerFilter}
+                      className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-mono flex items-center space-x-1"
+                      title="Clear all ledger filters"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Clear</span>
+                    </button>
+                  )}
+                </form>
+              </div>
+
+              {/* Active Filter Badge */}
+              {(ledgerDateFilter.startDate || ledgerDateFilter.endDate || ledgerDateFilter.search) && (
+                <div className="flex items-center space-x-2 text-[10.5px] font-mono text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-lg">
+                  <Filter className="w-3 h-3 text-cyan-400" />
+                  <span>
+                    Filtered: {ledgerDateFilter.startDate ? `From ${ledgerDateFilter.startDate}` : 'Beginning'} to {ledgerDateFilter.endDate ? ledgerDateFilter.endDate : 'Present'}
+                    {ledgerDateFilter.search ? ` • Keyword: "${ledgerDateFilter.search}"` : ''} 
+                    {' '}({selectedAccountLedger.entries?.length || 0} entries found)
+                  </span>
+                </div>
+              )}
+            </div>
+
             {/* Balances Summary Bar */}
-            <div className="grid grid-cols-3 gap-3 py-3 border-b border-white/10 flex-shrink-0 text-center">
-              <div className="p-2.5 rounded-xl bg-slate-900 border border-white/5">
-                <span className="text-[10px] font-mono text-slate-400">Total Debits</span>
-                <p className="text-sm font-bold font-mono text-emerald-400">
-                  {formatPKR(selectedAccountLedger.totalDebit || 0)}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 py-2.5 border-b border-white/10 flex-shrink-0 text-center">
+              <div className="p-2 rounded-xl bg-slate-900 border border-white/5">
+                <span className="text-[10px] font-mono text-slate-400">Opening Balance</span>
+                <p className="text-xs sm:text-sm font-bold font-mono text-slate-200 mt-0.5">
+                  {formatPKR(selectedAccountLedger.openingBalance || 0)}
                 </p>
               </div>
-              <div className="p-2.5 rounded-xl bg-slate-900 border border-white/5">
-                <span className="text-[10px] font-mono text-slate-400">Total Credits</span>
-                <p className="text-sm font-bold font-mono text-rose-400">
-                  {formatPKR(selectedAccountLedger.totalCredit || 0)}
+              <div className="p-2 rounded-xl bg-slate-900 border border-white/5">
+                <span className="text-[10px] font-mono text-emerald-400">Total Debits (+In)</span>
+                <p className="text-xs sm:text-sm font-bold font-mono text-emerald-400 mt-0.5">
+                  +{formatPKR(selectedAccountLedger.totalDebit || 0)}
                 </p>
               </div>
-              <div className="p-2.5 rounded-xl bg-slate-900 border border-white/5">
+              <div className="p-2 rounded-xl bg-slate-900 border border-white/5">
+                <span className="text-[10px] font-mono text-rose-400">Total Credits (-Out)</span>
+                <p className="text-xs sm:text-sm font-bold font-mono text-rose-400 mt-0.5">
+                  -{formatPKR(selectedAccountLedger.totalCredit || 0)}
+                </p>
+              </div>
+              <div className="p-2 rounded-xl bg-slate-900 border border-cyan-500/20 bg-cyan-950/10">
                 <span className="text-[10px] font-mono text-cyan-400">Closing Balance</span>
-                <p className="text-sm font-bold font-mono text-white">
-                  {formatPKR(selectedAccountLedger.closingBalance || selectedAccountLedger.currentBalance || 0)}
+                <p className="text-xs sm:text-sm font-bold font-mono text-white mt-0.5">
+                  {formatPKR(selectedAccountLedger.closingBalance !== undefined ? selectedAccountLedger.closingBalance : (selectedAccountLedger.currentBalance || 0))}
                 </p>
               </div>
             </div>
@@ -3013,32 +3689,60 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Cheque Amount (PKR) *</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="e.g. 1000000"
-                    value={chequeFormData.amount}
-                    onChange={(e) => setChequeFormData({ ...chequeFormData, amount: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 font-mono"
-                  />
-                  {chequeFormData.amount && (
-                    <p className="text-[10px] text-amber-400 font-mono mt-1">{getPriceHint(chequeFormData.amount)}</p>
-                  )}
+              <div>
+                <label className="block text-xs font-mono text-slate-400 mb-1">Cheque Amount (PKR) *</label>
+                <input
+                  type="number"
+                  required
+                  placeholder="e.g. 1000000"
+                  value={chequeFormData.amount}
+                  onChange={(e) => setChequeFormData({ ...chequeFormData, amount: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 font-mono"
+                />
+
+                {/* Quick Increment Chips */}
+                <div className="flex items-center gap-1.5 flex-wrap pt-1.5">
+                  <span className="text-[10px] font-mono text-slate-500">Quick:</span>
+                  {[50000, 100000, 500000, 1000000, 5000000].map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setChequeFormData(prev => ({ ...prev, amount: (Number(prev.amount) || 0) + val }))}
+                      className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-amber-300 border border-amber-500/20 active:scale-95 transition-all"
+                    >
+                      +{val >= 100000 ? `${val / 100000} Lakh` : `${val / 1000}k`}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setChequeFormData(prev => ({ ...prev, amount: '' }))}
+                    className="px-2 py-0.5 rounded bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-[10px] font-mono border border-rose-500/20 active:scale-95"
+                  >
+                    Clear
+                  </button>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Due / Maturity Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={chequeFormData.dueDate}
-                    onChange={(e) => setChequeFormData({ ...chequeFormData, dueDate: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 font-mono"
-                  />
-                </div>
+                {chequeFormData.amount && (
+                  <div className="mt-2 p-2 bg-slate-950/90 rounded-xl border border-amber-500/20 text-[11px] font-mono text-amber-300 flex items-start space-x-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <span className="text-slate-400">In Words: </span>
+                      <strong className="text-amber-200">{numberToWordsPKR(chequeFormData.amount)}</strong>
+                      <span className="text-[10px] text-slate-500 block">({getPriceHint(chequeFormData.amount)})</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-400 mb-1">Due / Maturity Date *</label>
+                <input
+                  type="date"
+                  required
+                  value={chequeFormData.dueDate}
+                  onChange={(e) => setChequeFormData({ ...chequeFormData, dueDate: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 font-mono"
+                />
               </div>
 
               <div>
@@ -3330,30 +4034,58 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Amount Paid (PKR) *</label>
-                  <input
-                    type="number"
-                    required
-                    value={paymentFormData.paidAmount}
-                    onChange={(e) => setPaymentFormData({ ...paymentFormData, paidAmount: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
-                  />
-                  {paymentFormData.paidAmount && (
-                    <p className="text-[10px] text-emerald-400 font-mono mt-1">{getPriceHint(paymentFormData.paidAmount)}</p>
-                  )}
+              <div>
+                <label className="block text-xs font-mono text-slate-400 mb-1">Amount Paid (PKR) *</label>
+                <input
+                  type="number"
+                  required
+                  value={paymentFormData.paidAmount}
+                  onChange={(e) => setPaymentFormData({ ...paymentFormData, paidAmount: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                />
+
+                {/* Quick Increment Chips */}
+                <div className="flex items-center gap-1.5 flex-wrap pt-1.5">
+                  <span className="text-[10px] font-mono text-slate-500">Quick:</span>
+                  {[10000, 25000, 50000, 100000, 500000].map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setPaymentFormData(prev => ({ ...prev, paidAmount: (Number(prev.paidAmount) || 0) + val }))}
+                      className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-emerald-300 border border-emerald-500/20 active:scale-95 transition-all"
+                    >
+                      +{val >= 100000 ? `${val / 100000} Lakh` : `${val / 1000}k`}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setPaymentFormData(prev => ({ ...prev, paidAmount: '' }))}
+                    className="px-2 py-0.5 rounded bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-[10px] font-mono border border-rose-500/20 active:scale-95"
+                  >
+                    Clear
+                  </button>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Payment Date</label>
-                  <input
-                    type="date"
-                    value={paymentFormData.paidDate}
-                    onChange={(e) => setPaymentFormData({ ...paymentFormData, paidDate: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
-                  />
-                </div>
+                {paymentFormData.paidAmount && (
+                  <div className="mt-2 p-2 bg-slate-950/90 rounded-xl border border-emerald-500/20 text-[11px] font-mono text-emerald-300 flex items-start space-x-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <span className="text-slate-400">In Words: </span>
+                      <strong className="text-emerald-200">{numberToWordsPKR(paymentFormData.paidAmount)}</strong>
+                      <span className="text-[10px] text-slate-500 block">({getPriceHint(paymentFormData.paidAmount)})</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-400 mb-1">Payment Date</label>
+                <input
+                  type="date"
+                  value={paymentFormData.paidDate}
+                  onChange={(e) => setPaymentFormData({ ...paymentFormData, paidDate: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                />
               </div>
 
               <div>
@@ -3471,7 +4203,7 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-3 p-3 bg-emerald-500/5 rounded-2xl border border-emerald-500/20">
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">Total Agreed Price (PKR) *</label>
                   <input
@@ -3482,9 +4214,37 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                     onChange={(e) => setNewPlanFormData({ ...newPlanFormData, totalPrice: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
                   />
+                  
+                  <div className="flex items-center gap-1.5 flex-wrap pt-1.5">
+                    <span className="text-[10px] font-mono text-slate-500">Quick:</span>
+                    {[500000, 1000000, 2000000, 3000000, 5000000].map(val => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setNewPlanFormData(prev => ({ ...prev, totalPrice: (Number(prev.totalPrice) || 0) + val }))}
+                        className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-emerald-300 border border-emerald-500/20 active:scale-95"
+                      >
+                        +{val >= 100000 ? `${val / 100000} Lakh` : `${val / 1000}k`}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setNewPlanFormData(prev => ({ ...prev, totalPrice: '' }))}
+                      className="px-2 py-0.5 rounded bg-rose-950/40 text-rose-300 text-[10px] font-mono border border-rose-500/20"
+                    >
+                      Clear
+                    </button>
+                  </div>
+
+                  {newPlanFormData.totalPrice && (
+                    <div className="mt-1.5 p-1.5 bg-slate-950/90 rounded-lg text-[10.5px] font-mono text-emerald-300">
+                      🗣️ <strong>Agreed:</strong> {numberToWordsPKR(newPlanFormData.totalPrice)}
+                    </div>
+                  )}
                 </div>
+
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">Advance Downpayment</label>
+                  <label className="block text-xs font-mono text-slate-400 mb-1">Advance Downpayment (PKR)</label>
                   <input
                     type="number"
                     placeholder="e.g. 1000000"
@@ -3492,6 +4252,33 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                     onChange={(e) => setNewPlanFormData({ ...newPlanFormData, advanceAmount: e.target.value })}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
                   />
+
+                  <div className="flex items-center gap-1.5 flex-wrap pt-1.5">
+                    <span className="text-[10px] font-mono text-slate-500">Quick Advance:</span>
+                    {[200000, 500000, 1000000, 2000000].map(val => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setNewPlanFormData(prev => ({ ...prev, advanceAmount: (Number(prev.advanceAmount) || 0) + val }))}
+                        className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-cyan-300 border border-cyan-500/20 active:scale-95"
+                      >
+                        +{val >= 100000 ? `${val / 100000} Lakh` : `${val / 1000}k`}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setNewPlanFormData(prev => ({ ...prev, advanceAmount: '' }))}
+                      className="px-2 py-0.5 rounded bg-rose-950/40 text-rose-300 text-[10px] font-mono border border-rose-500/20"
+                    >
+                      Clear
+                    </button>
+                  </div>
+
+                  {newPlanFormData.advanceAmount && (
+                    <div className="mt-1.5 p-1.5 bg-slate-950/90 rounded-lg text-[10.5px] font-mono text-cyan-300">
+                      🗣️ <strong>Advance:</strong> {numberToWordsPKR(newPlanFormData.advanceAmount)}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -4062,38 +4849,64 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-mono text-slate-300 mb-1 font-semibold">
-                    Amount to Receive (PKR) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="e.g. 500000"
-                    value={receiveFormData.amount}
-                    onChange={(e) => setReceiveFormData({ ...receiveFormData, amount: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
-                  />
-                  {receiveFormData.amount && (
-                    <p className="text-[10px] text-emerald-400 font-mono mt-1 font-bold">
-                      {getPriceHint(receiveFormData.amount)}
-                    </p>
-                  )}
+              <div>
+                <label className="block text-xs font-mono text-slate-300 mb-1 font-semibold">
+                  Amount to Receive (PKR) *
+                </label>
+                <input
+                  type="number"
+                  required
+                  placeholder="e.g. 500000"
+                  value={receiveFormData.amount}
+                  onChange={(e) => setReceiveFormData({ ...receiveFormData, amount: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                />
+
+                {/* Quick Increment Chips */}
+                <div className="flex items-center gap-1.5 flex-wrap pt-1.5">
+                  <span className="text-[10px] font-mono text-slate-500">Quick:</span>
+                  {[50000, 100000, 500000, 1000000, 5000000].map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setReceiveFormData(prev => ({ ...prev, amount: (Number(prev.amount) || 0) + val }))}
+                      className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-emerald-300 border border-emerald-500/20 active:scale-95 transition-all"
+                    >
+                      +{val >= 100000 ? `${val / 100000} Lakh` : `${val / 1000}k`}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setReceiveFormData(prev => ({ ...prev, amount: '' }))}
+                    className="px-2 py-0.5 rounded bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-[10px] font-mono border border-rose-500/20 active:scale-95"
+                  >
+                    Clear
+                  </button>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-mono text-slate-300 mb-1 font-semibold">
-                    Received Date *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={receiveFormData.date}
-                    onChange={(e) => setReceiveFormData({ ...receiveFormData, date: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
-                  />
-                </div>
+                {receiveFormData.amount && (
+                  <div className="mt-2 p-2 bg-slate-950/90 rounded-xl border border-emerald-500/20 text-[11px] font-mono text-emerald-300 flex items-start space-x-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <span className="text-slate-400">In Words: </span>
+                      <strong className="text-emerald-200">{numberToWordsPKR(receiveFormData.amount)}</strong>
+                      <span className="text-[10px] text-slate-500 block">({getPriceHint(receiveFormData.amount)})</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-300 mb-1 font-semibold">
+                  Received Date *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={receiveFormData.date}
+                  onChange={(e) => setReceiveFormData({ ...receiveFormData, date: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -4270,38 +5083,64 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-mono text-slate-300 mb-1 font-semibold">
-                    Amount to Pay (PKR) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="e.g. 50000"
-                    value={payFormData.amount}
-                    onChange={(e) => setPayFormData({ ...payFormData, amount: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500 font-mono"
-                  />
-                  {payFormData.amount && (
-                    <p className="text-[10px] text-rose-400 font-mono mt-1 font-bold">
-                      {getPriceHint(payFormData.amount)}
-                    </p>
-                  )}
+              <div>
+                <label className="block text-xs font-mono text-slate-300 mb-1 font-semibold">
+                  Amount to Pay (PKR) *
+                </label>
+                <input
+                  type="number"
+                  required
+                  placeholder="e.g. 50000"
+                  value={payFormData.amount}
+                  onChange={(e) => setPayFormData({ ...payFormData, amount: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500 font-mono"
+                />
+
+                {/* Quick Increment Chips */}
+                <div className="flex items-center gap-1.5 flex-wrap pt-1.5">
+                  <span className="text-[10px] font-mono text-slate-500">Quick:</span>
+                  {[50000, 100000, 500000, 1000000, 5000000].map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setPayFormData(prev => ({ ...prev, amount: (Number(prev.amount) || 0) + val }))}
+                      className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-rose-300 border border-rose-500/20 active:scale-95 transition-all"
+                    >
+                      +{val >= 100000 ? `${val / 100000} Lakh` : `${val / 1000}k`}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setPayFormData(prev => ({ ...prev, amount: '' }))}
+                    className="px-2 py-0.5 rounded bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-[10px] font-mono border border-rose-500/20 active:scale-95"
+                  >
+                    Clear
+                  </button>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-mono text-slate-300 mb-1 font-semibold">
-                    Payment Date *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={payFormData.date}
-                    onChange={(e) => setPayFormData({ ...payFormData, date: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500 font-mono"
-                  />
-                </div>
+                {payFormData.amount && (
+                  <div className="mt-2 p-2 bg-slate-950/90 rounded-xl border border-rose-500/20 text-[11px] font-mono text-rose-300 flex items-start space-x-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-rose-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <span className="text-slate-400">In Words: </span>
+                      <strong className="text-rose-200">{numberToWordsPKR(payFormData.amount)}</strong>
+                      <span className="text-[10px] text-slate-500 block">({getPriceHint(payFormData.amount)})</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-300 mb-1 font-semibold">
+                  Payment Date *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={payFormData.date}
+                  onChange={(e) => setPayFormData({ ...payFormData, date: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500 font-mono"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
