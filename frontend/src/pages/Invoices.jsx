@@ -305,6 +305,18 @@ export default function Invoices({ onNavigate }) {
     remainingAmount: '',
     paymentDuration: '',
     dated: new Date().toISOString().slice(0, 10),
+    // Trade-In / Car Exchange Fields
+    isTradeIn: false,
+    tradeInVehicle: '',
+    tradeInModel: '',
+    tradeInYear: '',
+    tradeInColor: '',
+    tradeInRegNumber: '',
+    tradeInChassisNumber: '',
+    tradeInEngineNumber: '',
+    tradeInValuation: '',
+    tradeInCashAdvance: '',
+    tradeInStockId: '',
     // Witnesses
     witness1Name: '',
     witness1Cnic: '',
@@ -376,7 +388,18 @@ export default function Invoices({ onNavigate }) {
         agreedAmount: String(totalNum),
         agreedAmountHalf: String(Math.round(totalNum / 2)),
         agreedAmountWords: bk.agreedAmountWords || bk.inWords || prev.agreedAmountWords,
-        inWords: bk.inWords || bk.agreedAmountWords || prev.inWords
+        inWords: bk.inWords || bk.agreedAmountWords || prev.inWords,
+        isTradeIn: Boolean(bk.isTradeIn),
+        tradeInVehicle: bk.tradeInVehicle || prev.tradeInVehicle,
+        tradeInModel: bk.tradeInModel || prev.tradeInModel,
+        tradeInYear: bk.tradeInYear || prev.tradeInYear,
+        tradeInColor: bk.tradeInColor || prev.tradeInColor,
+        tradeInRegNumber: bk.tradeInRegNumber || prev.tradeInRegNumber,
+        tradeInChassisNumber: bk.tradeInChassisNumber || prev.tradeInChassisNumber,
+        tradeInEngineNumber: bk.tradeInEngineNumber || prev.tradeInEngineNumber,
+        tradeInValuation: bk.tradeInValuation || prev.tradeInValuation,
+        tradeInCashAdvance: bk.tradeInCashAdvance || prev.tradeInCashAdvance,
+        tradeInStockId: bk.tradeInStockId || prev.tradeInStockId
       };
     });
   };
@@ -517,6 +540,19 @@ export default function Invoices({ onNavigate }) {
         } else {
           updated.agreedAmountHalf = '';
         }
+      } else if (field === 'tradeInValuation' || field === 'tradeInCashAdvance' || (field === 'isTradeIn' && value === true)) {
+        const val = parsePakistaniPrice(field === 'tradeInValuation' ? value : updated.tradeInValuation);
+        const cash = parsePakistaniPrice(field === 'tradeInCashAdvance' ? value : updated.tradeInCashAdvance);
+        const combinedAdv = val + cash;
+        if (combinedAdv > 0 || updated.isTradeIn) {
+          updated.advanceAmount = combinedAdv > 0 ? combinedAdv.toString() : '0';
+          const total = parsePakistaniPrice(updated.totalPrice || updated.agreedAmount);
+          if (total > 0) {
+            updated.remainingAmount = total >= combinedAdv ? (total - combinedAdv).toString() : '0';
+          }
+        }
+      } else if (field === 'isTradeIn' && value === false) {
+        // If turned off, keep existing advance or allow manual editing
       } else if (field === 'saleAmount' || field === 'cashAmount') {
         const amt = parsePakistaniPrice(value);
         if (amt > 0) {
@@ -648,6 +684,18 @@ export default function Invoices({ onNavigate }) {
       linkedBookingId: inv.linkedBookingId || '',
       linkedBookingNumber: inv.linkedBookingNumber || '',
       bookingStatus: inv.bookingStatus || 'ACTIVE',
+      // Trade-In / Car Exchange
+      isTradeIn: Boolean(inv.isTradeIn),
+      tradeInVehicle: inv.tradeInVehicle || '',
+      tradeInModel: inv.tradeInModel || '',
+      tradeInYear: inv.tradeInYear || '',
+      tradeInColor: inv.tradeInColor || '',
+      tradeInRegNumber: inv.tradeInRegNumber || '',
+      tradeInChassisNumber: inv.tradeInChassisNumber || '',
+      tradeInEngineNumber: inv.tradeInEngineNumber || '',
+      tradeInValuation: formatPKRShort(inv.tradeInValuation) || '',
+      tradeInCashAdvance: formatPKRShort(inv.tradeInCashAdvance) || '',
+      tradeInStockId: inv.tradeInStockId || '',
       witness1Name: inv.witness1Name || '',
       witness1Cnic: inv.witness1Cnic || '',
       witness2Name: inv.witness2Name || '',
@@ -736,6 +784,18 @@ export default function Invoices({ onNavigate }) {
       linkedBookingId: '',
       linkedBookingNumber: '',
       bookingStatus: 'ACTIVE',
+      // Trade-In / Car Exchange
+      isTradeIn: false,
+      tradeInVehicle: '',
+      tradeInModel: '',
+      tradeInYear: '',
+      tradeInColor: '',
+      tradeInRegNumber: '',
+      tradeInChassisNumber: '',
+      tradeInEngineNumber: '',
+      tradeInValuation: '',
+      tradeInCashAdvance: '',
+      tradeInStockId: '',
       witness1Name: '',
       witness1Cnic: '',
       witness2Name: '',
@@ -761,7 +821,10 @@ export default function Invoices({ onNavigate }) {
         cashAmount: cleanPrice(formData.cashAmount || effectiveAmount),
         commissionAmount: cleanPrice(formData.commissionAmount),
         isCustomerVehicle: Boolean(formData.isCustomerVehicle),
-        accountsStockId: formData.isCustomerVehicle ? null : (formData.accountsStockId || null)
+        accountsStockId: formData.isCustomerVehicle ? null : (formData.accountsStockId || null),
+        isTradeIn: Boolean(formData.isTradeIn),
+        tradeInValuation: cleanPrice(formData.tradeInValuation),
+        tradeInCashAdvance: cleanPrice(formData.tradeInCashAdvance)
       };
 
       let savedResult;
@@ -1151,6 +1214,25 @@ export default function Invoices({ onNavigate }) {
             </div>
           </div>
 
+          ${inv.isTradeIn ? `
+            <!-- Vehicle Trade-In / Car Exchange Details in Booking Receipt -->
+            <div style="margin-top: 10px; border: 1.5px solid #d97706; border-radius: 4px; overflow: hidden; background: #ffffff;">
+              <div style="background: #d97706; color: #ffffff; padding: 3px 8px; font-size: 9.5px; font-weight: 800; display: flex; justify-content: space-between;">
+                <span>🔄 تبادلہ شدہ پرانی گاڑی کی تفصیلات (VEHICLE TRADE-IN / EXCHANGE DETAILS)</span>
+                <span>بطور بیعانہ وصولی</span>
+              </div>
+              <div style="padding: 5px 8px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; font-size: 9px; background: #fffbeb; border-bottom: 1px solid #fde68a;">
+                <div><strong>گاڑی (Maker/Model):</strong> <span style="font-weight: 700;">${inv.tradeInVehicle || ''} ${inv.tradeInModel || ''} (${inv.tradeInYear || ''})</span></div>
+                <div><strong>رجسٹریشن (Reg No):</strong> <span style="font-family: monospace; font-weight: 700;">${inv.tradeInRegNumber || 'Unregistered'}</span></div>
+                <div><strong>چیسس (Chassis No):</strong> <span style="font-family: monospace; font-weight: 700;">${inv.tradeInChassisNumber || 'N/A'}</span></div>
+              </div>
+              <div style="padding: 4px 8px; display: flex; justify-content: space-between; font-size: 9px; background: #ffffff;">
+                <div><strong>پرانی گاڑی کی طے شدہ قیمت (Trade Valuation):</strong> <span style="font-family: monospace; font-weight: 800; color: #d97706;">Rs. ${parsePakistaniPrice(inv.tradeInValuation || 0).toLocaleString()}</span></div>
+                ${parsePakistaniPrice(inv.tradeInCashAdvance || 0) > 0 ? `<div><strong>اضافی نقد بیعانہ (Extra Cash Paid):</strong> <span style="font-family: monospace; font-weight: 800; color: #16a34a;">Rs. ${parsePakistaniPrice(inv.tradeInCashAdvance).toLocaleString()}</span></div>` : ''}
+              </div>
+            </div>
+          ` : ''}
+
           <!-- Bottom Section: Bank Status & Blank Lined Status Box -->
           <div style="display: flex; gap: 20px; margin-top: 15px; align-items: flex-start;">
             <!-- Left: Bank Status Details -->
@@ -1319,6 +1401,27 @@ export default function Invoices({ onNavigate }) {
               All vehicle documents & ownership rights sold for PKR ${numericAgreed > 0 ? numericAgreed.toLocaleString() : '0'} (half sum: PKR ${numericAgreedHalf > 0 ? numericAgreedHalf.toLocaleString() : '0'}), at ${agreementTime} on ${agreementDay}, to the buyer under the following agreed terms. ${agreedWords ? 'Amount in words: ' + agreedWords : ''}
             </div>
           </div>
+
+          ${inv.isTradeIn ? `
+            <!-- Vehicle Trade-In / Car Exchange Details in Sales Receipt -->
+            <div style="border: 1.5px solid #d97706; border-radius: 5px; margin-bottom: 6px; overflow: hidden; background: #ffffff;">
+              <div style="background: #d97706; color: #ffffff; padding: 3.5px 8px; font-size: 9.5px; font-weight: 800; display: flex; justify-content: space-between; align-items: center;">
+                <span>🔄 گاڑی کا تبادلہ (VEHICLE TRADE-IN / EXCHANGE AS ADVANCE)</span>
+                <span>بطور پیشگی بیعانہ ایڈجسٹمنٹ</span>
+              </div>
+              <div style="padding: 5px 8px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 9px; background: #fffbeb; border-bottom: 1px solid #fde68a;">
+                <div><strong>تبادلہ گاڑی (Maker/Model):</strong> <span style="font-weight: 700;">${inv.tradeInVehicle || ''} ${inv.tradeInModel || ''} (${inv.tradeInYear || ''})</span></div>
+                <div><strong>رجسٹریشن نمبر (Reg No):</strong> <span style="font-family: monospace; font-weight: 700;">${inv.tradeInRegNumber || 'Unregistered'}</span></div>
+                <div><strong>چیسس نمبر (Chassis No):</strong> <span style="font-family: monospace; font-weight: 700;">${inv.tradeInChassisNumber || 'N/A'}</span></div>
+                <div><strong>رنگ (Color):</strong> <span style="font-weight: 700;">${inv.tradeInColor || 'N/A'}</span></div>
+              </div>
+              <div style="padding: 4px 8px; display: flex; justify-content: space-between; font-size: 9px; background: #ffffff;">
+                <div><strong>پرانی گاڑی کی طے شدہ مالیت (Valuation Credit):</strong> <span style="font-family: monospace; font-weight: 800; color: #d97706;">Rs. ${parsePakistaniPrice(inv.tradeInValuation || 0).toLocaleString()}</span></div>
+                ${parsePakistaniPrice(inv.tradeInCashAdvance || 0) > 0 ? `<div><strong>اضافی نقد بیعانہ (Extra Cash Paid):</strong> <span style="font-family: monospace; font-weight: 800; color: #16a34a;">Rs. ${parsePakistaniPrice(inv.tradeInCashAdvance).toLocaleString()}</span></div>` : ''}
+                <div><strong>کل ایڈوانس بیعانہ (Total Advance):</strong> <span style="font-family: monospace; font-weight: 800; color: #0284c7;">Rs. ${numericAdvance.toLocaleString()}</span></div>
+              </div>
+            </div>
+          ` : ''}
 
           <!-- Financial Balances -->
           <table class="fin-tbl">
@@ -2561,7 +2664,9 @@ export default function Invoices({ onNavigate }) {
                             handleInputChange('advanceAmount', e.target.value);
                             handleInputChange('remainingAmount', Math.max(0, tot - adv));
                           }}
-                          className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                          className={`w-full px-3 py-2 rounded-lg border text-xs focus:border-cyan-500 font-mono ${
+                            formData.isTradeIn ? 'bg-slate-950 border-amber-500/40 text-amber-300 font-bold' : 'bg-slate-900 border-white/10 text-white'
+                          }`}
                           required
                         />
                         {Boolean(formData.advanceAmount) && Boolean(getPriceHint(formData.advanceAmount)) && (
@@ -2593,6 +2698,203 @@ export default function Invoices({ onNavigate }) {
                         />
                       </div>
                     </div>
+                  </div>
+
+                  {/* CAR TRADE-IN / VEHICLE EXCHANGE (گاڑی کا تبادلہ) IN BOOKING RECEIPT */}
+                  <div className={`p-4 rounded-xl border-2 transition-all space-y-3 ${
+                    formData.isTradeIn 
+                      ? 'bg-gradient-to-br from-amber-950/40 via-slate-950 to-orange-950/20 border-amber-500/60 shadow-xl' 
+                      : 'bg-slate-950/60 border-white/10'
+                  }`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+                      <label className="flex items-center space-x-3 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(formData.isTradeIn)}
+                          onChange={(e) => handleInputChange('isTradeIn', e.target.checked)}
+                          className="w-5 h-5 text-amber-500 rounded bg-slate-950 border-amber-400/40 focus:ring-amber-500 cursor-pointer"
+                        />
+                        <div>
+                          <span className="text-xs font-bold text-white flex items-center gap-2">
+                            <span>🔄 Vehicle Trade-In / Car Exchange (گاڑی کا تبادلہ - پرانی گاڑی بطور بیعانہ)</span>
+                          </span>
+                          <p className="text-[11px] text-amber-300/80 font-mono mt-0.5">
+                            Customer sells/trades their old car as advance for this booking (auto-adds to Accounts Current Stock)
+                          </p>
+                        </div>
+                      </label>
+
+                      {formData.isTradeIn && (
+                        <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold whitespace-nowrap self-start sm:self-center">
+                          ⚡ Auto Accounts Stock Inflow
+                        </span>
+                      )}
+                    </div>
+
+                    {formData.isTradeIn && (
+                      <div className="space-y-4 pt-1">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-950/80 p-3.5 rounded-lg border border-amber-500/30 text-xs">
+                          <div className="p-2 bg-slate-900/60 rounded border border-white/5">
+                            <span className="text-[10px] text-slate-400 font-medium">New Vehicle Price (نئی گاڑی قیمت):</span>
+                            <div className="font-mono font-bold text-white text-sm mt-0.5">
+                              PKR {parsePakistaniPrice(formData.totalPrice || 0).toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="p-2 bg-amber-500/10 rounded border border-amber-500/30">
+                            <span className="text-[10px] text-amber-300 font-bold">Trade-In Valuation (پرانی گاڑی قیمت):</span>
+                            <div className="font-mono font-bold text-amber-400 text-sm mt-0.5">
+                              PKR {parsePakistaniPrice(formData.tradeInValuation || 0).toLocaleString()}
+                            </div>
+                            <div className="text-[9px] text-amber-300/70 mt-0.5">Auto Stock Value (Non-Cash Asset)</div>
+                          </div>
+                          <div className="p-2 bg-emerald-500/10 rounded border border-emerald-500/30">
+                            <span className="text-[10px] text-emerald-300 font-bold">Extra Cash Advance (اضافی نقد بیعانہ):</span>
+                            <div className="font-mono font-bold text-emerald-400 text-sm mt-0.5">
+                              PKR {parsePakistaniPrice(formData.tradeInCashAdvance || 0).toLocaleString()}
+                            </div>
+                            <div className="text-[9px] text-emerald-300/70 mt-0.5">Deposits into Cash Safe / Bank</div>
+                          </div>
+                        </div>
+
+                        {/* Trade-In Vehicle Inputs */}
+                        <div className="space-y-3 bg-slate-900/90 p-4 rounded-xl border border-amber-500/30">
+                          <h6 className="text-xs font-bold text-amber-400 uppercase tracking-wider border-b border-white/10 pb-1.5 flex items-center justify-between">
+                            <span>Old Vehicle Traded In By Customer (تبادلہ شدہ پرانی گاڑی کی تفصیلات)</span>
+                            <span className="text-[10px] font-mono text-slate-400">Enters Accounts Stock</span>
+                          </h6>
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                Make / Brand (میکر) <span className="text-rose-400">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Honda / Toyota / Suzuki"
+                                value={formData.tradeInVehicle || ''}
+                                onChange={(e) => handleInputChange('tradeInVehicle', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-amber-400"
+                                required={formData.isTradeIn}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                Model (ماڈل) <span className="text-rose-400">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Civic VTi / Cultus"
+                                value={formData.tradeInModel || ''}
+                                onChange={(e) => handleInputChange('tradeInModel', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-amber-400"
+                                required={formData.isTradeIn}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                Year (سال)
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. 2018"
+                                value={formData.tradeInYear || ''}
+                                onChange={(e) => handleInputChange('tradeInYear', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-amber-400 font-mono"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                Registration No. (رجسٹریشن نمبر)
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. LEB-18-5544"
+                                value={formData.tradeInRegNumber || ''}
+                                onChange={(e) => handleInputChange('tradeInRegNumber', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-amber-400 font-mono"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                Chassis No. (چیسس نمبر)
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="Chassis serial"
+                                value={formData.tradeInChassisNumber || ''}
+                                onChange={(e) => handleInputChange('tradeInChassisNumber', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-amber-400 font-mono"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                Engine No. (انجن نمبر)
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="Engine serial"
+                                value={formData.tradeInEngineNumber || ''}
+                                onChange={(e) => handleInputChange('tradeInEngineNumber', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-amber-400 font-mono"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                Color (رنگ)
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Silver / White"
+                                value={formData.tradeInColor || ''}
+                                onChange={(e) => handleInputChange('tradeInColor', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-amber-400"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-amber-300 mb-1">
+                                Agreed Trade Valuation (قیمت) <span className="text-rose-400">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. 27 lac, 2700000"
+                                value={formData.tradeInValuation || ''}
+                                onChange={(e) => handleInputChange('tradeInValuation', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-amber-500/50 text-amber-300 text-xs font-bold focus:border-amber-400 font-mono"
+                                required={formData.isTradeIn}
+                              />
+                              {Boolean(formData.tradeInValuation) && Boolean(getPriceHint(formData.tradeInValuation)) && (
+                                <div className="mt-1 px-2 py-0.5 bg-amber-950/70 border border-amber-500/30 rounded text-[10px] font-mono text-amber-300">
+                                  {getPriceHint(formData.tradeInValuation)}
+                                </div>
+                              )}
+                            </div>
+                            <div className="sm:col-span-2">
+                              <label className="block text-xs font-semibold text-emerald-300 mb-1">
+                                Additional Cash Advance (اضافی نقد بیعانہ اگر دیا ہو)
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. 3 lac, 300000 (optional)"
+                                value={formData.tradeInCashAdvance || ''}
+                                onChange={(e) => handleInputChange('tradeInCashAdvance', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-emerald-500/40 text-emerald-300 text-xs font-bold focus:border-emerald-400 font-mono"
+                              />
+                              {Boolean(formData.tradeInCashAdvance) && Boolean(getPriceHint(formData.tradeInCashAdvance)) && (
+                                <div className="mt-1 px-2 py-0.5 bg-emerald-950/70 border border-emerald-500/30 rounded text-[10px] font-mono text-emerald-300">
+                                  {getPriceHint(formData.tradeInCashAdvance)}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-3 bg-slate-900/60 rounded-lg border border-white/5 text-[11px] text-slate-300 flex items-start gap-2">
+                          <span className="text-amber-400 text-sm">💡</span>
+                          <div>
+                            <strong>Accounting Note:</strong> When saving, the traded vehicle is automatically added into <strong>Accounts Current Stock</strong> as available inventory. The trade-in valuation (PKR {parsePakistaniPrice(formData.tradeInValuation || 0).toLocaleString()}) debits Stock Inventory (1100). Only additional cash (PKR {parsePakistaniPrice(formData.tradeInCashAdvance || 0).toLocaleString()}) is deposited to Cash Safe / Bank.
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* 4. Bank Status & Payment Allocation */}
@@ -3918,7 +4220,9 @@ export default function Invoices({ onNavigate }) {
                           placeholder="e.g. 5 lac, 500000"
                           value={formData.advanceAmount}
                           onChange={(e) => handleInputChange('advanceAmount', e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500 font-mono"
+                          className={`w-full px-3 py-2 rounded-lg border text-xs focus:border-cyan-500 font-mono ${
+                            formData.isTradeIn ? 'bg-slate-950 border-amber-500/40 text-amber-300 font-bold' : 'bg-slate-950 border-white/10 text-white'
+                          }`}
                         />
                         {Boolean(formData.advanceAmount) && Boolean(getPriceHint(formData.advanceAmount)) && (
                           <div className="mt-1 px-2 py-0.5 bg-cyan-950/70 border border-cyan-500/30 rounded text-[10px] font-mono text-cyan-300 flex items-center justify-between">
@@ -3957,6 +4261,203 @@ export default function Invoices({ onNavigate }) {
                           className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-500"
                         />
                       </div>
+                    </div>
+
+                    {/* VEHICLE TRADE-IN / CAR EXCHANGE (گاڑی کا تبادلہ) IN SALES RECEIPT */}
+                    <div className={`p-4 rounded-xl border-2 transition-all space-y-3 ${
+                      formData.isTradeIn 
+                        ? 'bg-gradient-to-br from-amber-950/40 via-slate-950 to-orange-950/20 border-amber-500/60 shadow-xl' 
+                        : 'bg-slate-950/60 border-white/10'
+                    }`}>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+                        <label className="flex items-center space-x-3 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(formData.isTradeIn)}
+                            onChange={(e) => handleInputChange('isTradeIn', e.target.checked)}
+                            className="w-5 h-5 text-amber-500 rounded bg-slate-950 border-amber-400/40 focus:ring-amber-500 cursor-pointer"
+                          />
+                          <div>
+                            <span className="text-xs font-bold text-white flex items-center gap-2">
+                              <span>🔄 Vehicle Trade-In / Car Exchange (گاڑی کا تبادلہ - پرانی گاڑی بطور ایڈوانس)</span>
+                            </span>
+                            <p className="text-[11px] text-amber-300/80 font-mono mt-0.5">
+                              Check if buyer trades in their old vehicle against this sale (auto-adds to Accounts Current Stock)
+                            </p>
+                          </div>
+                        </label>
+
+                        {formData.isTradeIn && (
+                          <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold whitespace-nowrap self-start sm:self-center">
+                            ⚡ Auto Inflow to Accounts Stock
+                          </span>
+                        )}
+                      </div>
+
+                      {formData.isTradeIn && (
+                        <div className="space-y-4 pt-1">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-950/80 p-3.5 rounded-lg border border-amber-500/30 text-xs">
+                            <div className="p-2 bg-slate-900/60 rounded border border-white/5">
+                              <span className="text-[10px] text-slate-400 font-medium">New Car Price (نئی گاڑی قیمت):</span>
+                              <div className="font-mono font-bold text-white text-sm mt-0.5">
+                                PKR {parsePakistaniPrice(formData.totalPrice || 0).toLocaleString()}
+                              </div>
+                            </div>
+                            <div className="p-2 bg-amber-500/10 rounded border border-amber-500/30">
+                              <span className="text-[10px] text-amber-300 font-bold">Trade-In Valuation (پرانی گاڑی قیمت):</span>
+                              <div className="font-mono font-bold text-amber-400 text-sm mt-0.5">
+                                PKR {parsePakistaniPrice(formData.tradeInValuation || 0).toLocaleString()}
+                              </div>
+                              <div className="text-[9px] text-amber-300/70 mt-0.5">Accounts Current Stock Asset</div>
+                            </div>
+                            <div className="p-2 bg-emerald-500/10 rounded border border-emerald-500/30">
+                              <span className="text-[10px] text-emerald-300 font-bold">Extra Cash Advance (اضافی نقد بیعانہ):</span>
+                              <div className="font-mono font-bold text-emerald-400 text-sm mt-0.5">
+                                PKR {parsePakistaniPrice(formData.tradeInCashAdvance || 0).toLocaleString()}
+                              </div>
+                              <div className="text-[9px] text-emerald-300/70 mt-0.5">Deposits into Cash Safe / Bank</div>
+                            </div>
+                          </div>
+
+                          {/* Trade-In Vehicle Inputs */}
+                          <div className="space-y-3 bg-slate-900/90 p-4 rounded-xl border border-amber-500/30">
+                            <h6 className="text-xs font-bold text-amber-400 uppercase tracking-wider border-b border-white/10 pb-1.5 flex items-center justify-between">
+                              <span>Traded-In Old Vehicle Details (تبادلہ شدہ پرانی گاڑی کی تفصیلات)</span>
+                              <span className="text-[10px] font-mono text-slate-400">Enters Accounts Stock</span>
+                            </h6>
+                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                  Make / Brand (میکر) <span className="text-rose-400">*</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. Toyota / Honda"
+                                  value={formData.tradeInVehicle || ''}
+                                  onChange={(e) => handleInputChange('tradeInVehicle', e.target.value)}
+                                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-amber-400"
+                                  required={formData.isTradeIn}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                  Model (ماڈل) <span className="text-rose-400">*</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. Corolla GLi / City"
+                                  value={formData.tradeInModel || ''}
+                                  onChange={(e) => handleInputChange('tradeInModel', e.target.value)}
+                                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-amber-400"
+                                  required={formData.isTradeIn}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                  Year (سال)
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. 2017"
+                                  value={formData.tradeInYear || ''}
+                                  onChange={(e) => handleInputChange('tradeInYear', e.target.value)}
+                                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-amber-400 font-mono"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                  Registration No. (رجسٹریشن نمبر)
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. LEA-17-9921"
+                                  value={formData.tradeInRegNumber || ''}
+                                  onChange={(e) => handleInputChange('tradeInRegNumber', e.target.value)}
+                                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-amber-400 font-mono"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                  Chassis No. (چیسس نمبر)
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="Chassis serial"
+                                  value={formData.tradeInChassisNumber || ''}
+                                  onChange={(e) => handleInputChange('tradeInChassisNumber', e.target.value)}
+                                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-amber-400 font-mono"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                  Engine No. (انجن نمبر)
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="Engine serial"
+                                  value={formData.tradeInEngineNumber || ''}
+                                  onChange={(e) => handleInputChange('tradeInEngineNumber', e.target.value)}
+                                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-amber-400 font-mono"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                  Color (رنگ)
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. White / Grey"
+                                  value={formData.tradeInColor || ''}
+                                  onChange={(e) => handleInputChange('tradeInColor', e.target.value)}
+                                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-amber-400"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-amber-300 mb-1">
+                                  Agreed Trade Valuation (قیمت) <span className="text-rose-400">*</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. 27 lac, 2700000"
+                                  value={formData.tradeInValuation || ''}
+                                  onChange={(e) => handleInputChange('tradeInValuation', e.target.value)}
+                                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-amber-500/50 text-amber-300 text-xs font-bold focus:border-amber-400 font-mono"
+                                  required={formData.isTradeIn}
+                                />
+                                {Boolean(formData.tradeInValuation) && Boolean(getPriceHint(formData.tradeInValuation)) && (
+                                  <div className="mt-1 px-2 py-0.5 bg-amber-950/70 border border-amber-500/30 rounded text-[10px] font-mono text-amber-300">
+                                    {getPriceHint(formData.tradeInValuation)}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="sm:col-span-2">
+                                <label className="block text-xs font-semibold text-emerald-300 mb-1">
+                                  Additional Cash Advance (اضافی نقد بیعانہ اگر دیا ہو)
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. 3 lac, 300000 (optional)"
+                                  value={formData.tradeInCashAdvance || ''}
+                                  onChange={(e) => handleInputChange('tradeInCashAdvance', e.target.value)}
+                                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-emerald-500/40 text-emerald-300 text-xs font-bold focus:border-emerald-400 font-mono"
+                                />
+                                {Boolean(formData.tradeInCashAdvance) && Boolean(getPriceHint(formData.tradeInCashAdvance)) && (
+                                  <div className="mt-1 px-2 py-0.5 bg-emerald-950/70 border border-emerald-500/30 rounded text-[10px] font-mono text-emerald-300">
+                                    {getPriceHint(formData.tradeInCashAdvance)}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-3 bg-slate-900/60 rounded-lg border border-white/5 text-[11px] text-slate-300 flex items-start gap-2">
+                            <span className="text-amber-400 text-sm">💡</span>
+                            <div>
+                              <strong>Double-Entry Accounting Note:</strong> The trade-in vehicle is automatically created in <strong>Accounts Current Stock</strong> with purchase price PKR {parsePakistaniPrice(formData.tradeInValuation || 0).toLocaleString()}, debiting Vehicle Stock Inventory (1100). Only extra cash (PKR {parsePakistaniPrice(formData.tradeInCashAdvance || 0).toLocaleString()}) enters Cash Safe / Bank.
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* INSTALLMENT PLAN OPTION */}

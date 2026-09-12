@@ -280,6 +280,20 @@ model Invoice {
   isCustomerVehicle    Boolean   @default(false)
   salesmanName         String?
   salesmanId           String?
+
+  // Vehicle Trade-In / Car Exchange Fields (گاڑی کا تبادلہ)
+  isTradeIn            Boolean   @default(false)
+  tradeInVehicle       String?
+  tradeInModel         String?
+  tradeInYear          String?
+  tradeInColor         String?
+  tradeInRegNumber     String?
+  tradeInChassisNumber String?
+  tradeInEngineNumber  String?
+  tradeInValuation     String?   @default("")
+  tradeInCashAdvance   String?   @default("")
+  tradeInStockId       String?
+
   // Deletion / Archival Status (for converted bookings or soft-deletes)
   isDeleted            Boolean   @default(false)
   deletedAt            DateTime?
