@@ -819,141 +819,199 @@ export default function Invoices({ onNavigate }) {
     let innerHTMLBody = '';
 
     if (category === 'DELIVERY_LETTER') {
+      const sellerDisplayName = (inv.sellerName && inv.sellerName !== 'N/A') ? inv.sellerName : 'AL-ASR MOTORS SAHIWAL';
+      const sellerDisplayFather = (inv.sellerFatherName && inv.sellerFatherName !== 'N/A') ? inv.sellerFatherName : '—';
+      const sellerDisplayAddress = (inv.sellerAddress && inv.sellerAddress !== 'N/A') ? inv.sellerAddress : '450 - A/B, Lahore Road (By Pass near McDonald\'s), Sahiwal';
+      const sellerDisplayPhone = (inv.sellerPhone && inv.sellerPhone !== 'N/A') ? inv.sellerPhone : '040-4403799, 4403899';
+      const effectiveTime = inv.time || inv.agreementTime || agreementTime || 'N/A';
+      const effectiveDay = inv.agreementDay || agreementDay || '';
+
       innerHTMLBody = `
-        <div class="receipt-card">
-          <div style="text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 12px;">
-            <div style="display: flex; align-items: center; justify-content: center; gap: 14px;">
-              <img src="${logoBase64}" style="height: 52px;" />
+        <div class="receipt-card" style="border: 2px solid #0f172a; padding: 14px 18px; font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; background: #ffffff; box-sizing: border-box;">
+          
+          <!-- Official Dealership Header -->
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <img src="${logoBase64}" style="height: 52px; object-fit: contain;" alt="AL-ASR Logo" />
               <div>
-                <h1 style="font-size: 22px; font-weight: 900; letter-spacing: 1px; color: #0f172a; margin: 0;">AL-ASR MOTORS</h1>
-                <p style="font-size: 10px; color: #475569; margin: 2px 0 0 0;">Lahore by pass near McDonald, Sahiwal. Tel: 040-4400688</p>
+                <h1 style="font-size: 22px; font-weight: 900; margin: 0; color: #0f172a; letter-spacing: 0.5px;">AL-ASR MOTORS</h1>
+                <p style="font-size: 9.5px; color: #334155; margin: 2px 0 0 0; font-weight: 600;">450 - A/B, Lahore Road (By Pass near McDonald's), Sahiwal.</p>
+                <p style="font-size: 9px; color: #475569; margin: 0;">Tel: 040-4403799, 4403899, 040-4400688 | Fax: 040-4462087</p>
               </div>
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding: 0 4px;">
-              <h2 style="font-size: 16px; font-weight: 900; text-decoration: underline; margin: 0; color: #0f172a;">DELIVERY LETTER</h2>
-              <span style="font-size: 13px; font-weight: 800; font-family: monospace; color: #dc2626;">No. ${receiptNo}</span>
-            </div>
-          </div>
-
-          <p style="font-size: 11px; text-align: justify; line-height: 1.6; margin-bottom: 12px; font-weight: 600;">
-            I, the undersigned, here declare that I have thoroughly checked the machine as and whatever it is and the relevant documents of Motor Car, Bearing
-          </p>
-
-          <table class="grid-tbl" style="margin-bottom: 12px;">
-            <tr>
-              <td class="lbl">Make:</td><td class="val">${vehicleMaker}</td>
-              <td class="lbl">Power:</td><td class="val">${powerCapacity}</td>
-            </tr>
-            <tr>
-              <td class="lbl">Chassis No:</td><td class="val">${chassisNo}</td>
-              <td class="lbl">Engine No:</td><td class="val">${engineNo}</td>
-            </tr>
-            <tr>
-              <td class="lbl">Color:</td><td class="val">${inv.color || 'N/A'}</td>
-              <td class="lbl">Model:</td><td class="val">${vehicleModel} ${inv.carYear || ''}</td>
-            </tr>
-            <tr>
-              <td class="lbl">From:</td><td class="val" colspan="3" style="font-weight: 900;">AL-ASR MOTORS SAHIWAL</td>
-            </tr>
-            <tr>
-              <td class="lbl">Date:</td><td class="val">${createdDate}</td>
-              <td class="lbl">Time:</td><td class="val">${inv.time || agreementTime}</td>
-            </tr>
-            <tr>
-              <td class="lbl">Account of:</td><td class="val" colspan="3">${inv.accountOf || 'N/A'}</td>
-            </tr>
-          </table>
-          <div class="receipt-header">
-            <div class="header-left">
-              <img src="${logoBase64}" class="header-logo" />
-              <div>
-                <h1 class="header-brand-title">AL-ASR MOTORS</h1>
-                <p class="header-address">450 - A/B, Lahore Road, Sahiwal.</p>
-                <p class="header-contact">Tel.: 040-4403799, 4403899, Fax: 040-4462087</p>
+            <div style="text-align: right;">
+              <div style="font-size: 14px; font-weight: 900; background: #0f172a; color: white; padding: 3px 14px; border-radius: 4px; display: inline-block; letter-spacing: 0.5px;">
+                DELIVERY LETTER
               </div>
-            </div>
-            <div class="header-right">
-              <div class="receipt-type-badge dl-badge">DELIVERY LETTER</div>
-              <div class="receipt-meta-box">
-                <div>Date: <span>${createdDate}</span></div>
-                <div>Book No: <span>08</span></div>
-                <div>Receipt No: <span style="font-family: monospace; font-weight: 900; color: #0284c7;">${receiptNo}</span></div>
+              <div style="font-size: 12px; font-weight: 900; color: #0284c7; margin-top: 4px; font-family: monospace;">
+                No. ${receiptNo}
+              </div>
+              <div style="font-size: 9.5px; color: #334155; font-weight: bold; margin-top: 1px;">
+                Date: <span style="font-family: monospace; border-bottom: 1px dotted #0f172a; padding: 0 4px;">${createdDate}</span>
               </div>
             </div>
           </div>
 
-          <div class="party-grid">
-            <div class="party-card">
-              <div class="party-title">فریق اوّل (مالک برائے فروخت) / FIRST PARTY (SELLER)</div>
-              <table class="party-table">
-                <tr><td class="lbl">نام (Name):</td><td class="val">${sellerName}</td></tr>
-                <tr><td class="lbl">ولدیت (Father):</td><td class="val">${sellerFather}</td></tr>
-                <tr><td class="lbl">شناختی کارڈ (CNIC):</td><td class="val">${renderCNICBoxes(inv.sellerCnic)}</td></tr>
-                <tr><td class="lbl">پتہ (Address):</td><td class="val">${sellerAddress}</td></tr>
-                <tr><td class="lbl">فون (Phone):</td><td class="val">${sellerPhone}</td></tr>
+          <!-- Bilingual Opening Declaration -->
+          <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 5px; padding: 6px 10px; margin-bottom: 8px;">
+            <div style="font-size: 9.5px; color: #0f172a; font-weight: 600; line-height: 1.35; margin-bottom: 3px;">
+              <strong>Declaration:</strong> I, the undersigned, hereby declare that I have thoroughly inspected and taken physical delivery and handover of the motor vehicle detailed below, along with all relevant documents, keys and accessories, in satisfactory condition.
+            </div>
+            <div style="direction: rtl; text-align: right; font-size: 10px; color: #0f172a; font-weight: 700; font-family: 'Jameel Noori Nastaleeq', 'Urdu Typesetting', Arial, sans-serif; line-height: 1.35;">
+              <strong>اقرار نامہ:</strong> میں مسمی اقرار کرتا ہوں کہ مندرجہ ذیل گاڑی معہ جملہ اصل کاغذات، چابیاں و فائل بغیر کسی جبر و دباؤ کے بحالت تسلی بخش اپنے قبضے و تحویل میں وصول پا لی ہے۔
+            </div>
+          </div>
+
+          <!-- Vehicle Specifications Table -->
+          <div style="border: 1.5px solid #0f172a; border-radius: 5px; overflow: hidden; margin-bottom: 8px;">
+            <div style="background: #0f172a; color: #ffffff; padding: 3px 8px; font-size: 9.5px; font-weight: 800; display: flex; justify-content: space-between; align-items: center;">
+              <span>گاڑی کی تفصیلات (VEHICLE SPECIFICATIONS)</span>
+              <span>AL-ASR MOTORS SAHIWAL</span>
+            </div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 9.5px;">
+              <tr>
+                <td style="padding: 4px 6px; border: 1px solid #cbd5e1; background: #f8fafc; font-weight: 800; width: 16%;">Make (میکر):</td>
+                <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 800; width: 34%;">${vehicleMaker}</td>
+                <td style="padding: 4px 6px; border: 1px solid #cbd5e1; background: #f8fafc; font-weight: 800; width: 16%;">Power / CC (ہارس پاور):</td>
+                <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 800; width: 34%;">${powerCapacity}</td>
+              </tr>
+              <tr>
+                <td style="padding: 4px 6px; border: 1px solid #cbd5e1; background: #f8fafc; font-weight: 800;">Model (ماڈل):</td>
+                <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 800;">${vehicleModel} ${inv.carYear ? `(${inv.carYear})` : ''}</td>
+                <td style="padding: 4px 6px; border: 1px solid #cbd5e1; background: #f8fafc; font-weight: 800;">Reg No (رجسٹریشن نمبر):</td>
+                <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 900; color: #0284c7; font-family: monospace;">${regNo}</td>
+              </tr>
+              <tr>
+                <td style="padding: 4px 6px; border: 1px solid #cbd5e1; background: #f8fafc; font-weight: 800;">Chassis No (چیسس نمبر):</td>
+                <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-family: monospace; font-weight: 800;">${chassisNo}</td>
+                <td style="padding: 4px 6px; border: 1px solid #cbd5e1; background: #f8fafc; font-weight: 800;">Engine No (انجن نمبر):</td>
+                <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-family: monospace; font-weight: 800;">${engineNo}</td>
+              </tr>
+              <tr>
+                <td style="padding: 4px 6px; border: 1px solid #cbd5e1; background: #f8fafc; font-weight: 800;">Color (رنگ):</td>
+                <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 800;">${inv.color || 'N/A'}</td>
+                <td style="padding: 4px 6px; border: 1px solid #cbd5e1; background: #f8fafc; font-weight: 800;">Time (وقت سپردگی):</td>
+                <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 800;">${effectiveTime}</td>
+              </tr>
+              <tr>
+                <td style="padding: 4px 6px; border: 1px solid #cbd5e1; background: #f8fafc; font-weight: 800;">From / A/c (منجانب):</td>
+                <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 900;" colspan="3">AL-ASR MOTORS SAHIWAL ${inv.accountOf ? `<span style="font-weight: 600; color: #475569; margin-left: 10px;">(Account of: <strong>${inv.accountOf}</strong>)</span>` : ''}</td>
+              </tr>
+            </table>
+          </div>
+
+          <!-- Parties Section: First Party (Seller) & Second Party (Buyer) -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+            
+            <!-- First Party / Seller -->
+            <div style="border: 1.5px solid #0f172a; border-radius: 5px; overflow: hidden;">
+              <div style="background: #1e293b; color: #ffffff; padding: 3px 6px; font-size: 9px; font-weight: 800; text-align: center;">
+                فریق اوّل (مالک / شوروم) — FIRST PARTY (SELLER / DELIVERER)
+              </div>
+              <table style="width: 100%; border-collapse: collapse; font-size: 9px;">
+                <tr>
+                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; width: 34%; font-weight: 700; color: #475569;">نام (Name):</td>
+                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 800; color: #0f172a;">${sellerDisplayName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #475569;">ولدیت (Father):</td>
+                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 800; color: #0f172a;">${sellerDisplayFather}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #475569;">شناختی کارڈ (CNIC):</td>
+                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0;">${renderCNICBoxes(inv.sellerCnic)}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #475569;">پتہ (Address):</td>
+                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a;">${sellerDisplayAddress}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 3px 6px; font-weight: 700; color: #475569;">فون (Phone):</td>
+                  <td style="padding: 3px 6px; font-weight: 800; font-family: monospace; color: #0f172a;">${sellerDisplayPhone}</td>
+                </tr>
               </table>
             </div>
 
-            <div class="party-card">
-              <div class="party-title">فریق دوئم (خریدار) / SECOND PARTY (BUYER)</div>
-              <table class="party-table">
-                <tr><td class="lbl">نام (Name):</td><td class="val">${buyerName}</td></tr>
-                <tr><td class="lbl">ولدیت (Father):</td><td class="val">${buyerFather}</td></tr>
-                <tr><td class="lbl">شناختی کارڈ (CNIC):</td><td class="val">${renderCNICBoxes(inv.buyerCnic)}</td></tr>
-                <tr><td class="lbl">پتہ (Address):</td><td class="val">${buyerAddress}</td></tr>
-                <tr><td class="lbl">فون (Phone):</td><td class="val">${buyerPhone}</td></tr>
+            <!-- Second Party / Buyer -->
+            <div style="border: 1.5px solid #0f172a; border-radius: 5px; overflow: hidden;">
+              <div style="background: #1e293b; color: #ffffff; padding: 3px 6px; font-size: 9px; font-weight: 800; text-align: center;">
+                فریق دوئم (خریدار / وصول کنندہ) — SECOND PARTY (BUYER / RECIPIENT)
+              </div>
+              <table style="width: 100%; border-collapse: collapse; font-size: 9px;">
+                <tr>
+                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; width: 34%; font-weight: 700; color: #475569;">نام (Name):</td>
+                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 800; color: #0f172a;">${buyerName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #475569;">ولدیت (Father):</td>
+                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 800; color: #0f172a;">${buyerFather}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #475569;">شناختی کارڈ (CNIC):</td>
+                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0;">${renderCNICBoxes(inv.buyerCnic)}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #475569;">پتہ (Address):</td>
+                  <td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a;">${buyerAddress}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 3px 6px; font-weight: 700; color: #475569;">فون (Phone):</td>
+                  <td style="padding: 3px 6px; font-weight: 800; font-family: monospace; color: #0f172a;">${buyerPhone}</td>
+                </tr>
               </table>
+            </div>
+
+          </div>
+
+          <!-- Urdu Undertaking Statement & Legal Responsibility Clause -->
+          <div style="background: #fffbeb; border: 1.5px solid #f59e0b; border-radius: 5px; padding: 6px 10px; margin-bottom: 8px; line-height: 1.5;">
+            <div style="direction: rtl; text-align: justify; font-size: 10.5px; font-weight: 700; color: #1e1b4b; font-family: 'Jameel Noori Nastaleeq', 'Urdu Typesetting', Arial, sans-serif;">
+              مندرجہ بالا گاڑی معہ جملہ اصل کاغذات و فائل و کسٹمز کٹ (اگر لاگو ہو) فریق دوئم (خریدار) کے قبضہ میں بقائمی ہوش و حواس بلا جبر و اکراہ دے دی گئی ہے۔ آج مورخہ <span style="font-family: monospace; font-weight: 900; color: #0284c7;">${createdDate}</span> بوقت <span style="font-family: monospace; font-weight: 900; color: #0284c7;">${effectiveTime}</span> ${effectiveDay ? `بروز <strong>${effectiveDay}</strong>` : ''} گاڑی فریق دوئم کے قبضہ میں باضابطہ دے دی گئی ہے۔ اب بعد ازاں ہر قسم کے چالان، ایکسیڈنٹ، حادثات، ٹیکس، کسٹمز، قانونی یا پولیس کارروائی کی تمام تر ذمہ داری فریق دوئم (خریدار / وصول کنندہ) پر ہوگی۔ شوروم یا فریق اول کسی بھی قسم کا ذمہ دار نہ ہوگا۔
+            </div>
+            <div style="font-size: 8.5px; color: #64748b; font-weight: 600; margin-top: 2px;">
+              * Note: From the exact handover timestamp, all traffic penalties, accident liabilities, tax/excise duties, police and legal responsibilities rest solely with the Buyer.
             </div>
           </div>
 
-          <table class="veh-tbl">
-            <thead>
-              <tr>
-                <th>گاڑی (Maker)</th>
-                <th>ماڈل (Model)</th>
-                <th>رجسٹریشن نمبر (Reg No)</th>
-                <th>چیسز نمبر (Chassis No)</th>
-                <th>انجن نمبر (Engine No)</th>
-                <th>ہارس پاور (HP/CC)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>${vehicleMaker}</td>
-                <td>${vehicleModel} (${inv.carYear || 'N/A'})</td>
-                <td style="font-weight: 900; color: #0284c7;">${regNo}</td>
-                <td style="font-family: monospace;">${chassisNo}</td>
-                <td style="font-family: monospace;">${engineNo}</td>
-                <td>${powerCapacity}</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div class="urdu-statement">
-            مندرجہ بالا گاڑی معہ جملہ کاغذات و فائل و کسٹمز کٹ (اگر لاگو ہو) فریق دوئم (خریدار) کے قبضہ میں بقائمی ہوش و حواس بلا جبر و اکراہ دی گئی ہے۔ 
-            آج بوقت <strong>${agreementTime}</strong> بروز <strong>${agreementDay}</strong> گاڑی فریق دوئم کے قبضہ میں دے دی گئی ہے۔ اب بعد ازاں ہر قسم کے چالان، ایکسیڈنٹ، قانونی یا پولیس کارروائی کی تمام تر ذمہ داری فریق دوئم (خریدار) پر ہوگی۔ شوروم کسی قسم کا ذمہ دار نہ ہوگا۔
+          <!-- Witnesses Information -->
+          <div style="border: 1px solid #cbd5e1; border-radius: 5px; padding: 5px 8px; margin-bottom: 8px; background: #fafafa;">
+            <div style="font-size: 9px; font-weight: 800; color: #334155; margin-bottom: 3px;">گواہان کی تفصیلات (WITNESS DETAILS):</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 9px;">
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <span style="font-weight: 700; color: #475569; white-space: nowrap;">1. گواہ نام:</span>
+                <span style="font-weight: 800; border-bottom: 1px dotted #0f172a; flex: 1; padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${inv.witness1Name || '____________________'}</span>
+                <span style="font-weight: 700; color: #475569; white-space: nowrap;">CNIC:</span>
+                ${renderCNICBoxes(inv.witness1Cnic)}
+              </div>
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <span style="font-weight: 700; color: #475569; white-space: nowrap;">2. گواہ نام:</span>
+                <span style="font-weight: 800; border-bottom: 1px dotted #0f172a; flex: 1; padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${inv.witness2Name || '____________________'}</span>
+                <span style="font-weight: 700; color: #475569; white-space: nowrap;">CNIC:</span>
+                ${renderCNICBoxes(inv.witness2Cnic)}
+              </div>
+            </div>
           </div>
 
-          <table class="witness-tbl">
-            <tr>
-              <td class="lbl">دستخط فریق اوّل (Seller):</td><td class="val">___________________________</td>
-              <td class="lbl">دستخط فریق دوئم (Buyer):</td><td class="val">___________________________</td>
-            </tr>
-            <tr>
-              <td class="lbl">گواہ شد (Witness 1):</td><td class="val">${inv.witness1Name || '___________________________'}</td>
-              <td class="lbl">گواہ شد (Witness 2):</td><td class="val">${inv.witness2Name || '___________________________'}</td>
-            </tr>
-            <tr>
-              <td class="lbl">N.I.C. No:</td><td class="val" colspan="3">${renderCNICBoxes(inv.witness1Cnic)}</td>
-            </tr>
-            <tr>
-              <td class="lbl">N.I.C. No:</td><td class="val" colspan="3">${renderCNICBoxes(inv.witness2Cnic)}</td>
-            </tr>
-          </table>
-
-          <div style="margin-top: 40px; text-align: right; font-weight: 900; font-size: 11px;">
-            Authorized Signature: ___________________________
+          <!-- Signatures Grid -->
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 26px; text-align: center;">
+            <div style="border-top: 1.5px solid #0f172a; padding-top: 4px;">
+              <div style="font-size: 8.5px; font-weight: 800; color: #0f172a;">دستخط فریق اوّل (فروخت کنندہ)</div>
+              <div style="font-size: 7.5px; color: #64748b; font-weight: 700;">Seller's Signature</div>
+            </div>
+            <div style="border-top: 1.5px solid #0f172a; padding-top: 4px;">
+              <div style="font-size: 8.5px; font-weight: 800; color: #0f172a;">دستخط فریق دوئم (خریدار)</div>
+              <div style="font-size: 7.5px; color: #64748b; font-weight: 700;">Buyer's Signature</div>
+            </div>
+            <div style="border-top: 1.5px solid #0f172a; padding-top: 4px;">
+              <div style="font-size: 8.5px; font-weight: 800; color: #0f172a;">دستخط گواہان (1 و 2)</div>
+              <div style="font-size: 7.5px; color: #64748b; font-weight: 700;">Witness Signatures</div>
+            </div>
+            <div style="border-top: 1.5px solid #0f172a; padding-top: 4px;">
+              <div style="font-size: 8.5px; font-weight: 900; color: #0284c7;">دستخط و مہر شوروم</div>
+              <div style="font-size: 7.5px; color: #0284c7; font-weight: 800;">For AL-ASR Motors</div>
+            </div>
           </div>
+
         </div>
       `;
     } else if (category === 'PAYMENT_VOUCHER') {
