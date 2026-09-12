@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { logoBase64 } from '../utils/logoBase64';
 import { 
   formatPKR, 
   parsePakistaniPrice, 
@@ -34,6 +35,21 @@ import {
   getCurrentFormattedTime, 
   getCurrentDayName 
 } from '../utils/priceFormatter';
+
+const formatDateStr = (dateVal) => {
+  if (!dateVal) return 'N/A';
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return String(dateVal);
+    return d.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  } catch (err) {
+    return String(dateVal);
+  }
+};
 
 const CameraCaptureWidget = ({ label, currentPhoto, onPhotoCaptured, onPhotoRemoved }) => {
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -732,11 +748,19 @@ export default function Invoices({ onNavigate }) {
 
   const exportInvoicePDF = (inv) => {
     const printWindow = window.open('', '_blank');
-    const createdDate = inv.dated || new Date(inv.createdAt).toLocaleDateString('en-US', {
+    if (!printWindow) {
+      alert('Please allow popups in your browser to print invoices and vouchers.');
+      return;
+    }
+    const createdDate = inv.dated || (inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
-    });
+    }) : new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    }));
 
     const receiptNo = inv.receiptNo || inv.invoiceNumber;
     const category = inv.category || 'SALES_RECEIPT';
@@ -1047,14 +1071,14 @@ export default function Invoices({ onNavigate }) {
               <div style="flex: 1;"><strong>Colour:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 55px); font-weight: bold;">${inv.color || ''}</span></div>
             </div>
             <div>
-              <strong>Total Deal:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 75px); font-family: monospace; font-weight: bold;">${totalPrice > 0 ? 'PKR ' + totalPrice.toLocaleString() : ''}</span>
+              <strong>Total Deal:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 75px); font-family: monospace; font-weight: bold;">${numericTotal > 0 ? 'PKR ' + numericTotal.toLocaleString() : ''}</span>
             </div>
             <div style="display: flex; gap: 15px;">
-              <div style="flex: 1;"><strong>Advance:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 65px); font-family: monospace; font-weight: bold;">${advanceAmount > 0 ? 'PKR ' + advanceAmount.toLocaleString() : ''}</span></div>
+              <div style="flex: 1;"><strong>Advance:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 65px); font-family: monospace; font-weight: bold;">${numericAdvance > 0 ? 'PKR ' + numericAdvance.toLocaleString() : ''}</span></div>
               <div style="flex: 1.5;"><strong>In words:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 65px); font-style: italic;">${agreedWords || ''}</span></div>
             </div>
             <div>
-              <strong>Balance:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 65px); font-family: monospace; font-weight: bold; color: #dc2626;">${remainingAmount > 0 ? 'PKR ' + remainingAmount.toLocaleString() : ''}</span>
+              <strong>Balance:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 65px); font-family: monospace; font-weight: bold; color: #dc2626;">${numericRemaining > 0 ? 'PKR ' + numericRemaining.toLocaleString() : ''}</span>
             </div>
           </div>
 
@@ -1063,7 +1087,7 @@ export default function Invoices({ onNavigate }) {
             <!-- Left: Bank Status Details -->
             <div style="flex: 1.1; font-size: 11px; line-height: 2.1; color: #002b66;">
               <div style="font-size: 13px; font-weight: 900; font-style: italic; border-bottom: 2px solid #002b66; margin-bottom: 6px;">Bank Status</div>
-              <div><strong>Cash:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 45px); font-family: monospace;">${inv.cashAmount ? 'PKR ' + parsePakistaniPrice(inv.cashAmount).toLocaleString() : (advanceAmount > 0 ? 'PKR ' + advanceAmount.toLocaleString() : '')}</span></div>
+              <div><strong>Cash:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 45px); font-family: monospace;">${inv.cashAmount ? 'PKR ' + parsePakistaniPrice(inv.cashAmount).toLocaleString() : (numericAdvance > 0 ? 'PKR ' + numericAdvance.toLocaleString() : '')}</span></div>
               <div><strong>Cheque # ./DD # .On line:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 170px); font-family: monospace;">${inv.chequeNo || ''}</span></div>
               <div><strong>Due Date:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 65px); font-family: monospace;">${inv.dueDate ? formatDateStr(inv.dueDate) : ''}</span></div>
               <div><strong>on Account:</strong> <span style="border-bottom: 1px dotted #002b66; display: inline-block; width: calc(100% - 80px);">${inv.onAccount || ''}</span></div>
@@ -1604,15 +1628,24 @@ export default function Invoices({ onNavigate }) {
           </style>
         </head>
         <body>
-          <div class="no-print" style="text-align: right;">
+          <div class="no-print" style="text-align: right; padding: 6px 4px 10px 4px;">
             <button onclick="window.print()" class="print-btn">🖨️ Print Official Voucher (پرنٹ کریں)</button>
           </div>
 
           ${innerHTMLBody}
+
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 300);
+            };
+          </script>
         </body>
       </html>
     `;
 
+    printWindow.document.open();
     printWindow.document.write(htmlContent);
     printWindow.document.close();
   };
