@@ -59,7 +59,7 @@ export default function Header({ currentTab, search, setSearch, onOpenModal, onT
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 20000); // 20s live poll
     return () => clearInterval(interval);
-  }, [isAdmin, isSuperAdmin]);
+  }, [isAdmin, isSuperAdmin, canAccessAccounts]);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -256,151 +256,153 @@ export default function Header({ currentTab, search, setSearch, onOpenModal, onT
           </button>
         )}
 
-        {/* NOTIFICATION BELL WITH UNREAD BADGE COUNT */}
-        <div className="relative" ref={notificationDropdownRef}>
-          <button
-            onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-            className={`p-2.5 rounded-xl border transition-all relative ${
-              unreadCount > 0 
-                ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20 shadow-glow' 
-                : 'bg-slate-900/90 text-slate-400 border-white/10 hover:text-white hover:bg-slate-800'
-            }`}
-            title="Inflow & Financial Notifications"
-          >
-            {unreadCount > 0 ? (
-              <BellRing className="w-4 h-4 animate-bounce" />
-            ) : (
-              <Bell className="w-4 h-4" />
-            )}
+        {/* NOTIFICATION BELL WITH UNREAD BADGE COUNT (Accounts Head & Accountant only) */}
+        {canAccessAccounts && (
+          <div className="relative" ref={notificationDropdownRef}>
+            <button
+              onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+              className={`p-2.5 rounded-xl border transition-all relative ${
+                unreadCount > 0 
+                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20 shadow-glow' 
+                  : 'bg-slate-900/90 text-slate-400 border-white/10 hover:text-white hover:bg-slate-800'
+              }`}
+              title="Inflow & Financial Notifications"
+            >
+              {unreadCount > 0 ? (
+                <BellRing className="w-4 h-4 animate-bounce" />
+              ) : (
+                <Bell className="w-4 h-4" />
+              )}
 
-            {/* Glowing Badge Count */}
-            {unreadCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-gradient-to-r from-rose-500 to-amber-500 text-white text-[10px] font-mono font-bold flex items-center justify-center shadow-lg shadow-rose-500/40 animate-pulse border border-white/20">
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </span>
-            )}
-          </button>
+              {/* Glowing Badge Count */}
+              {unreadCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-gradient-to-r from-rose-500 to-amber-500 text-white text-[10px] font-mono font-bold flex items-center justify-center shadow-lg shadow-rose-500/40 animate-pulse border border-white/20">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
 
-          {/* NOTIFICATION DROPDOWN PANEL */}
-          {isNotificationOpen && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 glass-modal rounded-2xl shadow-2xl border border-white/15 bg-slate-950/95 backdrop-blur-2xl z-50 overflow-hidden text-xs">
-              {/* Header */}
-              <div className="p-3.5 border-b border-white/10 flex items-center justify-between bg-slate-900/90">
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-bold text-white">Alerts & Notifications</span>
+            {/* NOTIFICATION DROPDOWN PANEL */}
+            {isNotificationOpen && (
+              <div className="absolute right-0 mt-2 w-80 sm:w-96 glass-modal rounded-2xl shadow-2xl border border-white/15 bg-slate-950/95 backdrop-blur-2xl z-50 overflow-hidden text-xs">
+                {/* Header */}
+                <div className="p-3.5 border-b border-white/10 flex items-center justify-between bg-slate-900/90">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-bold text-white">Alerts & Notifications</span>
+                    {unreadCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold border border-amber-500/30">
+                        {unreadCount} New
+                      </span>
+                    )}
+                  </div>
+
                   {unreadCount > 0 && (
-                    <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold border border-amber-500/30">
-                      {unreadCount} New
-                    </span>
+                    <button
+                      onClick={handleMarkAllAsRead}
+                      className="text-[11px] font-mono text-cyan-400 hover:underline flex items-center space-x-1"
+                    >
+                      <CheckCheck className="w-3 h-3" />
+                      <span>Mark all read</span>
+                    </button>
                   )}
                 </div>
 
-                {unreadCount > 0 && (
-                  <button
-                    onClick={handleMarkAllAsRead}
-                    className="text-[11px] font-mono text-cyan-400 hover:underline flex items-center space-x-1"
-                  >
-                    <CheckCheck className="w-3 h-3" />
-                    <span>Mark all read</span>
-                  </button>
-                )}
-              </div>
+                {/* Notifications List */}
+                <div className="max-h-96 overflow-y-auto divide-y divide-white/5">
+                  {notifications.length === 0 ? (
+                    <div className="py-12 text-center text-slate-500 font-mono">
+                      <Bell className="w-8 h-8 text-slate-600 mx-auto mb-2 opacity-50" />
+                      <p>No new notifications.</p>
+                    </div>
+                  ) : (
+                    notifications.map(notif => {
+                      const isUnread = !notif.isRead && (!notif.readBy || !notif.readBy.includes(user?.id));
+                      const isApproval = notif.type === 'APPROVAL_REQUEST' || notif.title.includes('Approval');
+                      const isSales = notif.type === 'SALES_RECEIPT' || notif.title.includes('Sales');
+                      const isBooking = notif.type === 'BOOKING_RECEIPT' || notif.title.includes('Booking');
 
-              {/* Notifications List */}
-              <div className="max-h-96 overflow-y-auto divide-y divide-white/5">
-                {notifications.length === 0 ? (
-                  <div className="py-12 text-center text-slate-500 font-mono">
-                    <Bell className="w-8 h-8 text-slate-600 mx-auto mb-2 opacity-50" />
-                    <p>No new notifications.</p>
-                  </div>
-                ) : (
-                  notifications.map(notif => {
-                    const isUnread = !notif.isRead && (!notif.readBy || !notif.readBy.includes(user?.id));
-                    const isApproval = notif.type === 'APPROVAL_REQUEST' || notif.title.includes('Approval');
-                    const isSales = notif.type === 'SALES_RECEIPT' || notif.title.includes('Sales');
-                    const isBooking = notif.type === 'BOOKING_RECEIPT' || notif.title.includes('Booking');
+                      return (
+                        <div
+                          key={notif.id}
+                          onClick={async () => {
+                            await handleMarkAsRead(notif.id);
+                            if (isApproval) {
+                              setIsNotificationOpen(false);
+                              if (onNavigate) onNavigate('approvals');
+                            }
+                          }}
+                          className={`p-3.5 hover:bg-white/5 transition-colors cursor-pointer relative group ${
+                            isUnread ? 'bg-cyan-500/5' : 'opacity-80'
+                          }`}
+                        >
+                          {/* Unread indicator dot */}
+                          {isUnread && (
+                            <span className="absolute left-1.5 top-4 w-1.5 h-1.5 rounded-full bg-amber-400 shadow-glow"></span>
+                          )}
 
-                    return (
-                      <div
-                        key={notif.id}
-                        onClick={async () => {
-                          await handleMarkAsRead(notif.id);
-                          if (isApproval) {
-                            setIsNotificationOpen(false);
-                            if (onNavigate) onNavigate('approvals');
-                          }
-                        }}
-                        className={`p-3.5 hover:bg-white/5 transition-colors cursor-pointer relative group ${
-                          isUnread ? 'bg-cyan-500/5' : 'opacity-80'
-                        }`}
-                      >
-                        {/* Unread indicator dot */}
-                        {isUnread && (
-                          <span className="absolute left-1.5 top-4 w-1.5 h-1.5 rounded-full bg-amber-400 shadow-glow"></span>
-                        )}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-start space-x-2.5">
+                              <div className={`p-1.5 rounded-lg flex-shrink-0 mt-0.5 ${
+                                isApproval ? 'bg-amber-500/20 text-amber-400' :
+                                isSales ? 'bg-emerald-500/20 text-emerald-400' :
+                                isBooking ? 'bg-cyan-500/20 text-cyan-400' :
+                                'bg-amber-500/20 text-amber-400'
+                              }`}>
+                                {isApproval ? <ShieldCheck className="w-3.5 h-3.5" /> : <DollarSign className="w-3.5 h-3.5" />}
+                              </div>
 
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-start space-x-2.5">
-                            <div className={`p-1.5 rounded-lg flex-shrink-0 mt-0.5 ${
-                              isApproval ? 'bg-amber-500/20 text-amber-400' :
-                              isSales ? 'bg-emerald-500/20 text-emerald-400' :
-                              isBooking ? 'bg-cyan-500/20 text-cyan-400' :
-                              'bg-amber-500/20 text-amber-400'
-                            }`}>
-                              {isApproval ? <ShieldCheck className="w-3.5 h-3.5" /> : <DollarSign className="w-3.5 h-3.5" />}
+                              <div>
+                                <p className="font-bold text-white text-[12px] leading-snug">{notif.title}</p>
+                                <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">{notif.message}</p>
+                                <span className="text-[10px] font-mono text-slate-500 mt-1.5 inline-block">
+                                  {formatTimeAgo(notif.createdAt)}
+                                </span>
+                              </div>
                             </div>
 
-                            <div>
-                              <p className="font-bold text-white text-[12px] leading-snug">{notif.title}</p>
-                              <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">{notif.message}</p>
-                              <span className="text-[10px] font-mono text-slate-500 mt-1.5 inline-block">
-                                {formatTimeAgo(notif.createdAt)}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Action Buttons */}
-                          <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                            {isUnread && (
+                            {/* Action Buttons */}
+                            <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                              {isUnread && (
+                                <button
+                                  onClick={(e) => handleMarkAsRead(notif.id, e)}
+                                  className="p-1 text-slate-400 hover:text-emerald-400 rounded bg-slate-800"
+                                  title="Mark as read"
+                                >
+                                  <Check className="w-3 h-3" />
+                                </button>
+                              )}
                               <button
-                                onClick={(e) => handleMarkAsRead(notif.id, e)}
-                                className="p-1 text-slate-400 hover:text-emerald-400 rounded bg-slate-800"
-                                title="Mark as read"
+                                onClick={(e) => handleDeleteNotification(notif.id, e)}
+                                className="p-1 text-slate-400 hover:text-rose-400 rounded bg-slate-800"
+                                title="Delete notification"
                               >
-                                <Check className="w-3 h-3" />
+                                <Trash2 className="w-3 h-3" />
                               </button>
-                            )}
-                            <button
-                              onClick={(e) => handleDeleteNotification(notif.id, e)}
-                              className="p-1 text-slate-400 hover:text-rose-400 rounded bg-slate-800"
-                              title="Delete notification"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+                      );
+                    })
+                  )}
+                </div>
 
-              {/* Dropdown Footer - View All */}
-              <div className="p-2.5 border-t border-white/10 bg-slate-900/90 text-center">
-                <button
-                  onClick={() => {
-                    setIsNotificationOpen(false);
-                    if (onNavigate) onNavigate('notifications');
-                  }}
-                  className="w-full py-2 px-3 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 font-bold text-xs flex items-center justify-center space-x-1.5 transition-all border border-cyan-500/20 shadow-sm"
-                >
-                  <span>Open Full Notifications Center</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </button>
+                {/* Dropdown Footer - View All */}
+                <div className="p-2.5 border-t border-white/10 bg-slate-900/90 text-center">
+                  <button
+                    onClick={() => {
+                      setIsNotificationOpen(false);
+                      if (onNavigate) onNavigate('notifications');
+                    }}
+                    className="w-full py-2 px-3 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 font-bold text-xs flex items-center justify-center space-x-1.5 transition-all border border-cyan-500/20 shadow-sm"
+                  >
+                    <span>Open Full Notifications Center</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* Quick Theme Switcher Button */}
         <button

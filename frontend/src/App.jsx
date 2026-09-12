@@ -186,7 +186,7 @@ function MainLayout() {
             <CurrentStock />
           </div>
 
-          <div className={currentTab === 'sold_cars' ? 'block' : 'hidden'}>
+          <div className={(currentTab === 'sold_cars' && canAccessAccounts) ? 'block' : 'hidden'}>
             <SoldCars />
           </div>
 
@@ -210,11 +210,11 @@ function MainLayout() {
             <SalesmanIncentives onNavigate={(tab) => setCurrentTab(tab)} />
           </div>
 
-          <div className={currentTab === 'customer_history' ? 'block' : 'hidden'}>
+          <div className={(currentTab === 'customer_history' && canAccessAccounts) ? 'block' : 'hidden'}>
             <CustomerHistory onNavigate={(tab) => setCurrentTab(tab)} />
           </div>
 
-          <div className={currentTab === 'notifications' ? 'block' : 'hidden'}>
+          <div className={(currentTab === 'notifications' && canAccessAccounts) ? 'block' : 'hidden'}>
             <Notifications onNavigate={(tab) => setCurrentTab(tab)} />
           </div>
 

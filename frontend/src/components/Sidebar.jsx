@@ -49,14 +49,16 @@ export default function Sidebar({ currentTab, setCurrentTab, isMobileOpen, setIs
     fetchCounts();
     const interval = setInterval(fetchCounts, 20000); // 20s live sync
     return () => clearInterval(interval);
-  }, [isAdmin, isSuperAdmin]);
+  }, [isAdmin, isSuperAdmin, canAccessAccounts]);
 
   const fetchCounts = async () => {
-    try {
-      const res = await api.getNotifications();
-      setUnreadCount(res.unreadCount || 0);
-    } catch (err) {
-      // quiet fail
+    if (canAccessAccounts) {
+      try {
+        const res = await api.getNotifications();
+        setUnreadCount(res.unreadCount || 0);
+      } catch (err) {
+        // quiet fail
+      }
     }
 
     if (isAdmin || isSuperAdmin) {
@@ -71,13 +73,13 @@ export default function Sidebar({ currentTab, setCurrentTab, isMobileOpen, setIs
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, role: 'ALL' },
-    { id: 'notifications', label: 'Inflow Notifications', icon: Bell, role: 'ALL', badge: unreadCount },
+    { id: 'notifications', label: 'Inflow Notifications', icon: Bell, role: 'ACCOUNTS', badge: unreadCount },
     { id: 'accounts', label: 'Accounts & Finance Hub', icon: Landmark, role: 'ACCOUNTS' },
     { id: 'accounts_stock', label: 'Accounts Current Stock', icon: Layers, role: 'ACCOUNTS' },
     { id: 'invoices', label: 'Invoices & Payment Vouchers', icon: Receipt, role: 'ACCOUNTS' },
     { id: 'audit_trail', label: 'Audit Trail & Day Book', icon: FileText, role: 'ACCOUNTS' },
     { id: 'salesman_incentives', label: 'Salesman Incentives', icon: Award, role: 'ALL' },
-    { id: 'customer_history', label: 'Trade & Customer History', icon: History, role: 'ALL' },
+    { id: 'customer_history', label: 'Trade & Customer History', icon: History, role: 'ACCOUNTS' },
     { id: 'all_sellers', label: 'All Sellers Inventory', icon: Car, role: 'ALL' },
     { id: 'my_sellers', label: 'My Sellers Leads', icon: UserCheck, role: 'ALL' },
     { id: 'commercial_sellers', label: 'Commercial Vehicle Sellers', icon: Truck, role: 'ALL' },
@@ -92,7 +94,7 @@ export default function Sidebar({ currentTab, setCurrentTab, isMobileOpen, setIs
     { id: 'deals', label: 'Closed Deals', icon: Handshake, role: 'ALL' },
     { id: 'collaboration', label: 'Collaboration Center', icon: Handshake, role: 'ALL' },
     { id: 'stock', label: 'Showroom Current Stock', icon: Package, role: 'ALL' },
-    { id: 'sold_cars', label: 'Sold Cars', icon: CheckCircle2, role: 'ALL' },
+    { id: 'sold_cars', label: 'Sold Cars', icon: CheckCircle2, role: 'ACCOUNTS' },
     { id: 'approvals', label: 'Approval Requests', icon: ShieldCheck, role: 'ADMIN', badge: pendingApprovalsCount },
     { id: 'users', label: 'User & Salesmen', icon: UserCheck, role: 'ADMIN' },
     { id: 'reports', label: 'Sales Reports', icon: BarChart3, role: 'ADMIN' },
