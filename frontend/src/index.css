@@ -1,8 +1,18 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --app-bg: #051424;
+  --app-surface: #0a1d30;
+  --app-card-bg: rgba(18, 33, 49, 0.75);
+  --app-border: rgba(255, 255, 255, 0.1);
+  --app-primary: #00d1ff;
+  --app-text: #f8fafc;
+  --app-text-muted: #94a3b8;
+}
 
 * {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
@@ -10,35 +20,38 @@
 
 body {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+  background-color: var(--app-bg);
+  color: var(--app-text);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .font-mono {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
 }
 
-@layer utilities {
-  .glass-card {
-    background: rgba(18, 33, 49, 0.75);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-  }
-  
-  .glass-card-hover {
-    transition: all 0.2s ease-in-out;
-  }
-  .glass-card-hover:hover {
-    background: rgba(28, 43, 60, 0.85);
-    border-color: rgba(0, 209, 255, 0.3);
-    box-shadow: 0 8px 32px 0 rgba(0, 209, 255, 0.1);
-  }
+/* Glass Card & Modal Utilities */
+.glass-card {
+  background: var(--app-card-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--app-border);
+  transition: all 0.25s ease;
+}
 
-  .glass-modal {
-    background: rgba(13, 28, 45, 0.95);
-    backdrop-filter: blur(24px);
-    border: 1px solid rgba(0, 209, 255, 0.2);
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
-  }
+.glass-card-hover {
+  transition: all 0.25s ease-in-out;
+}
+.glass-card-hover:hover {
+  border-color: var(--app-primary);
+  box-shadow: 0 8px 32px 0 rgba(0, 209, 255, 0.12);
+}
+
+.glass-modal {
+  background: var(--app-surface);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--app-border);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
 }
 
 /* Custom Scrollbars */
@@ -48,14 +61,112 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #051424;
+  background: var(--app-bg);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1c2b3c;
+  background: var(--app-surface);
   border-radius: 9999px;
+  border: 1px solid var(--app-border);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #00d1ff;
+  background: var(--app-primary);
+}
+
+/* Light Mode Overrides */
+[data-mode="light"] {
+  --app-bg: #f1f5f9;
+  --app-surface: #ffffff;
+  --app-card-bg: rgba(255, 255, 255, 0.94);
+  --app-border: rgba(15, 23, 42, 0.12);
+  --app-text: #0f172a;
+  --app-text-muted: #64748b;
+}
+
+[data-mode="light"] body {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+[data-mode="light"] .glass-card {
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+}
+
+[data-mode="light"] .glass-modal {
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.2);
+}
+
+[data-mode="light"] aside,
+[data-mode="light"] header {
+  background-color: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.1) !important;
+}
+
+[data-mode="light"] .bg-slate-900,
+[data-mode="light"] .bg-slate-900\/95,
+[data-mode="light"] .bg-slate-900\/90,
+[data-mode="light"] .bg-slate-900\/80,
+[data-mode="light"] .bg-slate-900\/40 {
+  background-color: #ffffff !important;
+}
+
+[data-mode="light"] .bg-slate-800 {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+}
+
+[data-mode="light"] .bg-\[\#051424\] {
+  background-color: #f1f5f9 !important;
+}
+
+[data-mode="light"] .border-white\/10,
+[data-mode="light"] .border-white\/5 {
+  border-color: rgba(15, 23, 42, 0.1) !important;
+}
+
+[data-mode="light"] .text-white {
+  color: #0f172a !important;
+}
+
+[data-mode="light"] .text-slate-400 {
+  color: #64748b !important;
+}
+
+[data-mode="light"] .text-slate-300 {
+  color: #475569 !important;
+}
+
+[data-mode="light"] tr:hover {
+  background-color: rgba(241, 245, 249, 0.8) !important;
+}
+
+[data-mode="light"] input,
+[data-mode="light"] select,
+[data-mode="light"] textarea {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: rgba(15, 23, 42, 0.15) !important;
+}
+
+[data-mode="light"] input::placeholder,
+[data-mode="light"] textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+[data-mode="light"] ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+[data-mode="light"] ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+[data-mode="light"] ::-webkit-scrollbar-thumb:hover {
+  background: #0284c7;
 }

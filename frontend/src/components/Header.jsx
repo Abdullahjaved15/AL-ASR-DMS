@@ -18,14 +18,19 @@ import {
   Sparkles, 
   X,
   ExternalLink,
-  ShieldCheck
+  ShieldCheck,
+  Sun,
+  Moon,
+  Palette
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { api } from '../services/api';
 import { formatPKR } from '../utils/priceFormatter';
 
 export default function Header({ currentTab, search, setSearch, onOpenModal, onToggleMobileMenu, onNavigate }) {
   const { user, isAdmin, isAccountsHead, isSuperAdmin, canAccessAccounts, logout } = useAuth();
+  const { themeId, isLightMode, changeTheme } = useTheme();
   const [localSearch, setLocalSearch] = useState(search);
 
   // Notification States
@@ -396,6 +401,19 @@ export default function Header({ currentTab, search, setSearch, onOpenModal, onT
             </div>
           )}
         </div>
+
+        {/* Quick Theme Switcher Button */}
+        <button
+          onClick={() => changeTheme(isLightMode ? 'dark' : 'light')}
+          className="p-2.5 rounded-xl border border-white/10 bg-slate-900/90 hover:bg-slate-800 text-cyan-400 transition-all flex items-center space-x-1.5 shadow-sm"
+          title={`Active Theme: ${themeId.toUpperCase()} • Click to switch ${isLightMode ? 'Dark Mode 🌙' : 'Light Mode ☀️'}`}
+        >
+          {isLightMode ? (
+            <Sun className="w-4 h-4 text-amber-400" />
+          ) : (
+            <Moon className="w-4 h-4 text-cyan-400" />
+          )}
+        </button>
 
         {/* Sign Out Button */}
         <button

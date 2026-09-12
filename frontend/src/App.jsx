@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { DataCacheProvider } from './context/DataCacheContext';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -66,7 +67,7 @@ function MainLayout() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#051424]">
+    <div className="flex min-h-screen transition-colors duration-300" style={{ backgroundColor: 'var(--app-bg)' }}>
       {/* Sidebar Navigation Rail */}
       <Sidebar
         currentTab={currentTab}
@@ -241,9 +242,11 @@ function MainLayout() {
 export default function App() {
   return (
     <AuthProvider>
-      <DataCacheProvider>
-        <MainLayout />
-      </DataCacheProvider>
+      <ThemeProvider>
+        <DataCacheProvider>
+          <MainLayout />
+        </DataCacheProvider>
+      </ThemeProvider>
     </AuthProvider>
   );
 }
