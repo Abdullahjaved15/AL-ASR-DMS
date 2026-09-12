@@ -858,7 +858,9 @@ const createInvoice = async (req, res) => {
       // Consignment & Salesman Fields
       isCustomerVehicle,
       salesmanName,
-      salesmanId
+      salesmanId,
+      // Accounts Current Stock Link
+      accountsStockId
     } = req.body;
 
     const finalSellerPhoto = sellerPhoto ? await handleCloudinaryUpload(sellerPhoto, 'sellers') : null;
@@ -1173,6 +1175,37 @@ const createInvoice = async (req, res) => {
           });
         }
 
+    // If not a customer-owned vehicle and category is SALES_RECEIPT, delete selected vehicle from Accounts Current Stock
+    if ((category === 'SALES_RECEIPT' || !category) && !Boolean(isCustomerVehicle)) {
+      try {
+        let stockToDelete = null;
+        if (accountsStockId) {
+          stockToDelete = await prisma.accountsStock.findUnique({ where: { id: accountsStockId } });
+        } else if (chassisNumber && String(chassisNumber).trim()) {
+          stockToDelete = await prisma.accountsStock.findFirst({
+            where: { chassisNumber: { equals: String(chassisNumber).trim(), mode: 'insensitive' } }
+          });
+        } else if (registrationNo && String(registrationNo).trim()) {
+          stockToDelete = await prisma.accountsStock.findFirst({
+            where: { regNumber: { equals: String(registrationNo).trim(), mode: 'insensitive' } }
+          });
+        }
+
+        if (stockToDelete) {
+          await prisma.accountsStock.delete({ where: { id: stockToDelete.id } });
+          await prisma.activityLog.create({
+            data: {
+              userId: req.user.id,
+              action: 'DELETE_ACCOUNTS_STOCK',
+              details: `Auto-deleted vehicle ${stockToDelete.vehicle} ${stockToDelete.model} (Chassis: ${stockToDelete.chassisNumber || 'N/A'}, Reg: ${stockToDelete.regNumber || 'N/A'}) from Accounts Current Stock upon Sales Receipt #${invoiceNumber}`
+            }
+          });
+        }
+      } catch (stockErr) {
+        console.warn('Could not auto-delete accounts stock item on sales receipt creation:', stockErr.message);
+      }
+    }
+
     await prisma.activityLog.create({
       data: {
         userId: req.user.id,
@@ -1278,7 +1311,9 @@ const updateInvoice = async (req, res) => {
       salesmanName,
       salesmanId,
       commissionAmount,
-      commissionPercent
+      commissionPercent,
+      // Accounts Current Stock Link
+      accountsStockId
     } = req.body;
 
     const finalSellerPhoto = sellerPhoto ? await handleCloudinaryUpload(sellerPhoto, 'sellers') : existing.sellerPhoto;
@@ -1509,6 +1544,27 @@ const updateInvoice = async (req, res) => {
         });
       } catch (bkErr) {
         console.warn('Failed to update linked booking receipt state on update:', bkErr.message);
+      }
+    }
+
+    if ((category === 'SALES_RECEIPT' || existing.category === 'SALES_RECEIPT') && !Boolean(isCustomerVehicle)) {
+      try {
+        let stockToDelete = null;
+        if (accountsStockId) {
+          stockToDelete = await prisma.accountsStock.findUnique({ where: { id: accountsStockId } });
+        }
+        if (stockToDelete) {
+          await prisma.accountsStock.delete({ where: { id: stockToDelete.id } });
+          await prisma.activityLog.create({
+            data: {
+              userId: req.user.id,
+              action: 'DELETE_ACCOUNTS_STOCK',
+              details: `Auto-deleted vehicle ${stockToDelete.vehicle} ${stockToDelete.model} (Chassis: ${stockToDelete.chassisNumber || 'N/A'}, Reg: ${stockToDelete.regNumber || 'N/A'}) from Accounts Current Stock upon updated Sales Receipt #${existing.invoiceNumber}`
+            }
+          });
+        }
+      } catch (stockErr) {
+        console.warn('Could not auto-delete accounts stock item on sales receipt update:', stockErr.message);
       }
     }
 

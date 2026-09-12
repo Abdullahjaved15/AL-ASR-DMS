@@ -288,6 +288,7 @@ export default function Invoices({ onNavigate }) {
     salesmanId: '',
     commissionAmount: '',
     commissionPercent: '',
+    accountsStockId: '',
     // Booking & Sales Receipt Linking Fields
     linkedBookingId: '',
     linkedBookingNumber: '',
@@ -314,12 +315,14 @@ export default function Invoices({ onNavigate }) {
   const [matchingBookings, setMatchingBookings] = useState([]);
   const [searchingBookings, setSearchingBookings] = useState(false);
   const [activeLinkedBooking, setActiveLinkedBooking] = useState(null);
+  const [accountsStockList, setAccountsStockList] = useState([]);
 
   useEffect(() => {
     fetchInvoices();
     api.getBankAndCashAccounts().then(data => setBankAccounts(data || [])).catch(() => {});
     api.getAccounts().then(data => setAllLedgers(data?.accounts || [])).catch(() => {});
     api.getUsers().then(data => setStaffUsers(data || [])).catch(() => {});
+    api.getAccountsStock().then(data => setAccountsStockList(data?.stock || [])).catch(() => {});
   }, [search, selectedCategory]);
 
   const checkBookingByPhone = async (phone) => {
@@ -526,8 +529,50 @@ export default function Invoices({ onNavigate }) {
     });
   };
 
+  const handleSelectAccountsStock = (stockId) => {
+    if (!stockId) {
+      setFormData(prev => ({
+        ...prev,
+        accountsStockId: ''
+      }));
+      return;
+    }
+    const stock = accountsStockList.find(s => s.id === stockId);
+    if (!stock) return;
+
+    setFormData(prev => {
+      const updated = {
+        ...prev,
+        accountsStockId: stock.id,
+        vehicleMaker: stock.vehicle || prev.vehicleMaker,
+        vehicleModel: stock.model || prev.vehicleModel,
+        carYear: stock.year ? String(stock.year) : prev.carYear,
+        color: stock.color || prev.color,
+        registrationNo: stock.regNumber || prev.registrationNo,
+        chassisNumber: stock.chassisNumber || prev.chassisNumber
+      };
+
+      const stockPrice = stock.askingPrice || stock.purchasePrice;
+      if (stockPrice) {
+        const total = parsePakistaniPrice(stockPrice);
+        const adv = parsePakistaniPrice(updated.advanceAmount);
+        updated.totalPrice = formatPKRShort(stockPrice);
+        updated.agreedAmount = formatPKRShort(stockPrice);
+        if (total > 0) {
+          updated.agreedAmountHalf = Math.round(total / 2).toString();
+          updated.remainingAmount = total >= adv ? (total - adv).toString() : '0';
+          const words = numberToWordsPKR(total);
+          updated.agreedAmountWords = words;
+          updated.inWords = words;
+        }
+      }
+      return updated;
+    });
+  };
+
   const openEditModal = (inv) => {
     api.getBankAndCashAccounts().then(data => setBankAccounts(data || [])).catch(() => {});
+    api.getAccountsStock().then(data => setAccountsStockList(data?.stock || [])).catch(() => {});
     setSelectedInvoice(inv);
     setMatchingBookings([]);
     setActiveLinkedBooking(inv.linkedBookingNumber ? { invoiceNumber: inv.linkedBookingNumber, id: inv.linkedBookingId } : null);
@@ -599,6 +644,7 @@ export default function Invoices({ onNavigate }) {
       salesmanId: inv.salesmanId || '',
       commissionAmount: formatPKRShort(inv.commissionAmount) || '',
       commissionPercent: inv.commissionPercent || '',
+      accountsStockId: inv.accountsStockId || '',
       linkedBookingId: inv.linkedBookingId || '',
       linkedBookingNumber: inv.linkedBookingNumber || '',
       bookingStatus: inv.bookingStatus || 'ACTIVE',
@@ -614,6 +660,7 @@ export default function Invoices({ onNavigate }) {
   const resetForm = () => {
     api.getBankAndCashAccounts().then(data => setBankAccounts(data || [])).catch(() => {});
     api.getUsers().then(data => setStaffUsers(data || [])).catch(() => {});
+    api.getAccountsStock().then(data => setAccountsStockList(data?.stock || [])).catch(() => {});
     setSelectedInvoice(null);
     setMatchingBookings([]);
     setActiveLinkedBooking(null);
@@ -685,6 +732,7 @@ export default function Invoices({ onNavigate }) {
       salesmanId: '',
       commissionAmount: '',
       commissionPercent: '',
+      accountsStockId: '',
       linkedBookingId: '',
       linkedBookingNumber: '',
       bookingStatus: 'ACTIVE',
@@ -712,7 +760,8 @@ export default function Invoices({ onNavigate }) {
         saleAmount: cleanPrice(formData.saleAmount || effectiveAmount),
         cashAmount: cleanPrice(formData.cashAmount || effectiveAmount),
         commissionAmount: cleanPrice(formData.commissionAmount),
-        isCustomerVehicle: Boolean(formData.isCustomerVehicle)
+        isCustomerVehicle: Boolean(formData.isCustomerVehicle),
+        accountsStockId: formData.isCustomerVehicle ? null : (formData.accountsStockId || null)
       };
 
       let savedResult;
@@ -3500,6 +3549,86 @@ export default function Invoices({ onNavigate }) {
                       </h3>
                       <span className="text-[10px] font-mono text-slate-400 font-bold bg-white/5 px-2.5 py-0.5 rounded border border-white/10">Step 4 of 7</span>
                     </div>
+
+                    {/* SELECT VEHICLE FROM ACCOUNTS CURRENT STOCK (WHEN NOT CUSTOMER-OWNED) */}
+                    {!formData.isCustomerVehicle && (
+                      <div className="p-4 bg-gradient-to-br from-cyan-950/40 via-slate-900 to-blue-950/30 rounded-xl border-2 border-cyan-500/50 shadow-xl space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-cyan-500/30 pb-2.5">
+                          <div className="flex items-center space-x-2.5">
+                            <span className="p-2 bg-cyan-500/20 text-cyan-300 rounded-lg text-sm font-bold">🏢</span>
+                            <div>
+                              <h4 className="text-xs font-black text-cyan-300 uppercase tracking-wider flex items-center gap-2">
+                                <span>Select Vehicle from Accounts Current Stock (اکاؤنٹس کرنٹ اسٹاک سے گاڑی منتخب کریں)</span>
+                              </h4>
+                              <p className="text-[11px] text-slate-400">
+                                Choose an existing showroom stock vehicle to auto-populate specifications & price
+                              </p>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 self-start sm:self-center">
+                            {accountsStockList.filter(s => s.status !== 'SOLD').length} Available in Stock
+                          </span>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-200 mb-1.5 flex items-center justify-between">
+                            <span>🚗 Showroom Inventory List:</span>
+                            {formData.accountsStockId && (
+                              <button
+                                type="button"
+                                onClick={() => handleSelectAccountsStock('')}
+                                className="text-[10px] font-mono text-rose-400 hover:text-rose-300 underline cursor-pointer"
+                              >
+                                ✕ Clear & Enter Custom Vehicle
+                              </button>
+                            )}
+                          </label>
+                          <select
+                            value={formData.accountsStockId || ''}
+                            onChange={(e) => handleSelectAccountsStock(e.target.value)}
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-cyan-500/60 text-cyan-200 text-xs font-bold focus:border-cyan-400 cursor-pointer shadow-inner"
+                          >
+                            <option value="">-- Choose a Vehicle from Accounts Current Stock (or type below manually) --</option>
+                            {accountsStockList
+                              .filter(s => s.status !== 'SOLD' || s.id === formData.accountsStockId)
+                              .map(stock => (
+                                <option key={stock.id} value={stock.id}>
+                                  {stock.vehicle} {stock.model} ({stock.year}) — Reg: {stock.regNumber || 'Unregistered'} | Chassis: {stock.chassisNumber || 'N/A'} | Price: PKR {parsePakistaniPrice(stock.askingPrice || stock.purchasePrice || 0).toLocaleString()} | Color: {stock.color || 'White'}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+
+                        {formData.accountsStockId && (() => {
+                          const selectedStockItem = accountsStockList.find(s => s.id === formData.accountsStockId);
+                          if (!selectedStockItem) return null;
+                          return (
+                            <div className="p-3 bg-slate-950/90 rounded-lg border border-cyan-500/40 space-y-2 text-xs">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-emerald-400 flex items-center gap-1.5">
+                                  <span>✓</span> Connected Stock Unit: <strong className="text-white">{selectedStockItem.vehicle} {selectedStockItem.model} ({selectedStockItem.year})</strong>
+                                </span>
+                                <span className="font-mono text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/40 font-bold">
+                                  Auto-Filled
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-300 font-mono bg-slate-900/60 p-2 rounded border border-white/5">
+                                <div><span className="text-slate-500">Reg #:</span> <strong className="text-cyan-300">{selectedStockItem.regNumber || 'N/A'}</strong></div>
+                                <div><span className="text-slate-500">Chassis:</span> <strong className="text-cyan-300">{selectedStockItem.chassisNumber || 'N/A'}</strong></div>
+                                <div><span className="text-slate-500">Color:</span> <strong className="text-white">{selectedStockItem.color || 'White'}</strong></div>
+                                <div><span className="text-slate-500">Price:</span> <strong className="text-emerald-400">PKR {parsePakistaniPrice(selectedStockItem.askingPrice || selectedStockItem.purchasePrice || 0).toLocaleString()}</strong></div>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-[11px] text-amber-300 bg-amber-500/10 px-2.5 py-1.5 rounded border border-amber-500/30">
+                                <span className="text-sm">⚠️</span>
+                                <span>
+                                  <strong>Auto-Stock Deletion:</strong> This vehicle will be automatically deleted from Accounts Current Stock upon saving this sales receipt.
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
