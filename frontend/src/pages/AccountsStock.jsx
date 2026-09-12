@@ -191,18 +191,13 @@ export default function AccountsStock({ onNavigate }) {
     });
   };
 
-  // Printable Financial Stock PDF Exporter with AL ASR Logo
+  // Printable Financial Stock PDF Exporter with AL ASR Logo & Fit to Page Engine
   const exportAccountsStockPDF = () => {
     const printWindow = window.open('', '_blank');
     const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
 
-    const pageSize = 22;
-    const pageChunks = [];
-    for (let i = 0; i < stockList.length; i += pageSize) {
-      pageChunks.push(stockList.slice(i, i + pageSize));
-    }
-    if (pageChunks.length === 0) pageChunks.push([]);
-    const totalPages = pageChunks.length;
+    // Fit to page: if total items <= 35, default to fitting on 1 single page!
+    const defaultPageSize = stockList.length <= 35 ? Math.max(1, stockList.length) : 30;
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -213,6 +208,48 @@ export default function AccountsStock({ onNavigate }) {
             @page { size: landscape; margin: 4mm 6mm; }
             * { box-sizing: border-box; }
             body { font-family: 'Segoe UI', Arial, sans-serif; padding: 0; margin: 0; color: #0f172a; background: #ffffff; font-size: 8.5px; line-height: 1.15; }
+            
+            /* Print Layout Bar (Hidden when printing) */
+            .no-print {
+              background: #0f172a;
+              color: #f8fafc;
+              padding: 10px 18px;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 12px;
+              font-family: system-ui, -apple-system, sans-serif;
+              font-size: 13px;
+              border-bottom: 2px solid #0284c7;
+              position: sticky;
+              top: 0;
+              z-index: 9999;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            }
+            .no-print-btn {
+              background: #0284c7;
+              color: white;
+              border: none;
+              padding: 6px 14px;
+              border-radius: 6px;
+              font-weight: 700;
+              font-size: 12px;
+              cursor: pointer;
+              transition: all 0.2s ease;
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+            }
+            .no-print-btn:hover { background: #0369a1; }
+            .no-print-btn.secondary {
+              background: #334155;
+            }
+            .no-print-btn.secondary:hover { background: #475569; }
+            .no-print-btn.active {
+              background: #38bdf8;
+              color: #0f172a;
+            }
+
             .sheet {
               page-break-after: always;
               break-after: page;
@@ -220,7 +257,8 @@ export default function AccountsStock({ onNavigate }) {
               display: flex;
               flex-direction: column;
               justify-content: space-between;
-              padding: 2px;
+              padding: 4px;
+              min-height: 100vh;
             }
             .sheet:last-child {
               page-break-after: auto;
@@ -235,7 +273,7 @@ export default function AccountsStock({ onNavigate }) {
             .stat-item strong { color: #0284c7; font-weight: 800; }
             table { width: 100%; border-collapse: collapse; margin-top: 3px; border: 1.5px solid #0f172a; font-size: 8.5px; font-weight: bold; }
             th { background: #0f172a; color: #ffffff; text-align: left; padding: 4px 6px; font-size: 8.5px; font-weight: 800; text-transform: uppercase; border: 1px solid #334155; }
-            td { padding: 3.5px 6px; border: 1px solid #64748b; font-size: 8.5px; font-weight: 700; vertical-align: middle; color: #0f172a; }
+            td { padding: 3px 6px; border: 1px solid #64748b; font-size: 8.5px; font-weight: 700; vertical-align: middle; color: #0f172a; }
             td * { font-size: 8.5px !important; font-weight: 700 !important; }
             tr:nth-child(even) { background: #f8fafc; }
             .badge { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 8.5px; font-weight: 800; }
@@ -248,93 +286,158 @@ export default function AccountsStock({ onNavigate }) {
             .asking-text { color: #15803d; font-weight: 800; font-family: monospace; font-size: 8.5px; }
             .margin-text { color: #0369a1; font-weight: 800; font-family: monospace; font-size: 8.5px; }
             .footer { margin-top: 6px; text-align: center; font-size: 8px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 3px; font-weight: bold; }
+            
+            @media print {
+              .no-print { display: none !important; }
+              .sheet { min-height: auto; }
+            }
           </style>
         </head>
         <body>
-          ${pageChunks.map((chunk, pageIdx) => {
-            const startIdx = pageIdx * pageSize;
-            return `
-              <div class="sheet">
-                <div>
-                  <div class="header">
-                    <div class="logo-box">
-                      <img src="${logoBase64}" alt="AL ASR MOTORS" style="height: 38px; width: auto; object-fit: contain;" />
-                      <div>
-                        <div class="title">AL ASR MOTORS — ACCOUNTS CURRENT STOCK & VALUATION</div>
-                        <div class="subtitle">Official Accounts & Financial Inventory Ledger • Generated: ${todayStr} • Sahiwal, Pakistan</div>
-                      </div>
-                    </div>
-                    <div class="stats-inline">
-                      <div class="stat-item">Total Units: <strong>${stats.totalUnits || stockList.length}</strong></div>
-                      <div class="stat-item">Cost Value: <strong style="color: #b45309;">Rs. ${(stats.totalPurchaseValuation || 0).toLocaleString()}</strong></div>
-                      <div class="stat-item">Asking Valuation: <strong style="color: #15803d;">Rs. ${(stats.totalValuation || 0).toLocaleString()}</strong></div>
-                      <div class="stat-item">Projected Profit: <strong style="color: #0284c7;">Rs. ${(stats.projectedProfit || 0).toLocaleString()}</strong></div>
-                      <div class="stat-item" style="color: #0284c7;">Sheet <strong>${pageIdx + 1} of ${totalPages}</strong></div>
-                    </div>
-                  </div>
+          <div class="no-print">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-weight: 800; letter-spacing: 0.5px; color: #38bdf8;">AL ASR MOTORS</span>
+              <span style="color: #64748b;">|</span>
+              <span>Financial Stock (<strong>${stockList.length}</strong> items)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 11px; color: #94a3b8;">Page Layout:</span>
+              <button class="no-print-btn secondary ${stockList.length <= 35 ? 'active' : ''}" onclick="applyPageSize(${stockList.length || 1}, this)">📄 Fit to 1 Page</button>
+              <button class="no-print-btn secondary ${stockList.length > 35 && defaultPageSize === 25 ? 'active' : ''}" onclick="applyPageSize(25, this)">📑 25 / Page</button>
+              <button class="no-print-btn secondary ${stockList.length > 35 && defaultPageSize === 35 ? 'active' : ''}" onclick="applyPageSize(35, this)">📑 35 / Page</button>
+              <button class="no-print-btn" onclick="window.print()">🖨️ Print Document</button>
+            </div>
+          </div>
 
-                  <table>
-                    <thead>
-                      <tr>
-                        <th style="width: 25px;">#</th>
-                        <th>Vehicle & Model Specs</th>
-                        <th style="width: 50px;">Year</th>
-                        <th style="width: 60px;">Color</th>
-                        <th style="width: 65px;">Mileage</th>
-                        <th style="width: 90px;">Reg / Plate #</th>
-                        <th style="width: 100px;">Purchase Cost (PKR)</th>
-                        <th style="width: 100px;">Asking Demand (PKR)</th>
-                        <th style="width: 95px;">Projected Margin</th>
-                        <th style="width: 75px;">Care Of</th>
-                        <th style="width: 75px;">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      ${chunk.length === 0 ? `
-                        <tr>
-                          <td colspan="11" style="text-align: center; padding: 20px; color: #64748b;">No accounts stock records found.</td>
-                        </tr>
-                      ` : chunk.map((item, idx) => {
-                        const globalIdx = startIdx + idx + 1;
-                        const cost = parsePakistaniPrice(item.purchasePrice);
-                        const asking = parsePakistaniPrice(item.askingPrice);
-                        const margin = asking > 0 && cost > 0 ? (asking - cost) : 0;
-                        const badgeClass = item.status === 'AVAILABLE'
-                          ? 'badge-available'
-                          : (item.status === 'At Customer' || item.status === 'AT_CUSTOMER')
-                          ? 'badge-customer'
-                          : item.status === 'RESERVED'
-                          ? 'badge-reserved'
-                          : 'badge-sold';
-                        return `
-                        <tr>
-                          <td><strong>${globalIdx}</strong></td>
-                          <td><strong>${item.vehicle || ''} ${item.model || ''}</strong></td>
-                          <td>${item.year || 'N/A'}</td>
-                          <td>${item.color || 'N/A'}</td>
-                          <td>${item.mileage ? item.mileage.toLocaleString() + ' km' : '0 km'}</td>
-                          <td><strong style="color: #0284c7; font-family: monospace;">${item.regNumber || 'UNREGISTERED'}</strong></td>
-                          <td><span class="cost-text">${cost > 0 ? 'Rs. ' + cost.toLocaleString() : 'N/A'}</span></td>
-                          <td><span class="asking-text">${asking > 0 ? 'Rs. ' + asking.toLocaleString() : 'N/A'}</span></td>
-                          <td><span class="margin-text">${margin !== 0 ? (margin > 0 ? '+Rs. ' + margin.toLocaleString() : '-Rs. ' + Math.abs(margin).toLocaleString()) : '-'}</span></td>
-                          <td><span class="badge badge-care">${item.careOf || 'AL Asr'}</span></td>
-                          <td><span class="badge ${badgeClass}">${item.status}</span></td>
-                        </tr>
-                        `;
-                      }).join('')}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div class="footer">
-                  AL ASR MOTORS Executive Accounts & Dealership Management System • Sheet ${pageIdx + 1} of ${totalPages} • Showing records ${chunk.length > 0 ? startIdx + 1 : 0} to ${startIdx + chunk.length} of ${stockList.length}
-                </div>
-              </div>
-            `;
-          }).join('')}
+          <div id="print-root"></div>
 
           <script>
-            window.onload = function() { window.print(); };
+            const stockData = ${JSON.stringify(stockList)};
+            const logoData = "${logoBase64}";
+            const todayStr = "${todayStr}";
+            const stats = ${JSON.stringify(stats)};
+
+            function parsePrice(val) {
+              if (!val) return 0;
+              const s = String(val).toLowerCase().replace(/,/g, '').trim();
+              if (s.includes('crore') || s.includes('cr')) {
+                const num = parseFloat(s.replace(/[^0-9.]/g, ''));
+                return isNaN(num) ? 0 : Math.round(num * 10000000);
+              }
+              if (s.includes('lac') || s.includes('lakh') || s.includes('lacs')) {
+                const num = parseFloat(s.replace(/[^0-9.]/g, ''));
+                return isNaN(num) ? 0 : Math.round(num * 100000);
+              }
+              const num = parseFloat(s.replace(/[^0-9.]/g, ''));
+              return isNaN(num) ? 0 : Math.round(num);
+            }
+
+            function renderSheets(pageSize) {
+              const root = document.getElementById('print-root');
+              const chunks = [];
+              for (let i = 0; i < stockData.length; i += pageSize) {
+                chunks.push(stockData.slice(i, i + pageSize));
+              }
+              if (chunks.length === 0) chunks.push([]);
+              const totalPages = chunks.length;
+
+              let html = '';
+              chunks.forEach((chunk, pageIdx) => {
+                const startIdx = pageIdx * pageSize;
+                html += \`
+                  <div class="sheet">
+                    <div>
+                      <div class="header">
+                        <div class="logo-box">
+                          <img src="\${logoData}" alt="AL ASR MOTORS" style="height: 38px; width: auto; object-fit: contain;" />
+                          <div>
+                            <div class="title">AL ASR MOTORS — ACCOUNTS CURRENT STOCK & VALUATION</div>
+                            <div class="subtitle">Official Accounts & Financial Inventory Ledger • Generated: \${todayStr} • Sahiwal, Pakistan</div>
+                          </div>
+                        </div>
+                        <div class="stats-inline">
+                          <div class="stat-item">Total Units: <strong>\${stats.totalUnits || stockData.length}</strong></div>
+                          <div class="stat-item">Cost Value: <strong style="color: #b45309;">Rs. \${(stats.totalPurchaseValuation || 0).toLocaleString()}</strong></div>
+                          <div class="stat-item">Asking Valuation: <strong style="color: #15803d;">Rs. \${(stats.totalValuation || 0).toLocaleString()}</strong></div>
+                          <div class="stat-item">Projected Profit: <strong style="color: #0284c7;">Rs. \${(stats.projectedProfit || 0).toLocaleString()}</strong></div>
+                          <div class="stat-item" style="color: #0284c7;">Sheet <strong>\${pageIdx + 1} of \${totalPages}</strong></div>
+                        </div>
+                      </div>
+
+                      <table>
+                        <thead>
+                          <tr>
+                            <th style="width: 25px;">#</th>
+                            <th>Vehicle & Model Specs</th>
+                            <th style="width: 50px;">Year</th>
+                            <th style="width: 60px;">Color</th>
+                            <th style="width: 65px;">Mileage</th>
+                            <th style="width: 90px;">Reg / Plate #</th>
+                            <th style="width: 100px;">Purchase Cost (PKR)</th>
+                            <th style="width: 100px;">Asking Demand (PKR)</th>
+                            <th style="width: 95px;">Projected Margin</th>
+                            <th style="width: 75px;">Care Of</th>
+                            <th style="width: 75px;">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          \${chunk.length === 0 ? \`
+                            <tr>
+                              <td colspan="11" style="text-align: center; padding: 20px; color: #64748b;">No accounts stock records found.</td>
+                            </tr>
+                          \` : chunk.map((item, idx) => {
+                            const globalIdx = startIdx + idx + 1;
+                            const cost = parsePrice(item.purchasePrice);
+                            const asking = parsePrice(item.askingPrice);
+                            const margin = asking > 0 && cost > 0 ? (asking - cost) : 0;
+                            const badgeClass = item.status === 'AVAILABLE'
+                              ? 'badge-available'
+                              : (item.status === 'At Customer' || item.status === 'AT_CUSTOMER')
+                              ? 'badge-customer'
+                              : item.status === 'RESERVED'
+                              ? 'badge-reserved'
+                              : 'badge-sold';
+                            return \`
+                            <tr>
+                              <td><strong>\${globalIdx}</strong></td>
+                              <td><strong>\${item.vehicle || ''} \${item.model || ''}</strong></td>
+                              <td>\${item.year || 'N/A'}</td>
+                              <td>\${item.color || 'N/A'}</td>
+                              <td>\${item.mileage ? item.mileage.toLocaleString() + ' km' : '0 km'}</td>
+                              <td><strong style="color: #0284c7; font-family: monospace;">\${item.regNumber || 'UNREGISTERED'}</strong></td>
+                              <td><span class="cost-text">\${cost > 0 ? 'Rs. ' + cost.toLocaleString() : 'N/A'}</span></td>
+                              <td><span class="asking-text">\${asking > 0 ? 'Rs. ' + asking.toLocaleString() : 'N/A'}</span></td>
+                              <td><span class="margin-text">\${margin !== 0 ? (margin > 0 ? '+Rs. ' + margin.toLocaleString() : '-Rs. ' + Math.abs(margin).toLocaleString()) : '-'}</span></td>
+                              <td><span class="badge badge-care">\${item.careOf || 'AL Asr'}</span></td>
+                              <td><span class="badge \${badgeClass}">\${item.status}</span></td>
+                            </tr>
+                            \`;
+                          }).join('')}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div class="footer">
+                      AL ASR MOTORS Executive Accounts & Dealership Management System • Sheet \${pageIdx + 1} of \${totalPages} • Showing records \${chunk.length > 0 ? startIdx + 1 : 0} to \${startIdx + chunk.length} of \${stockData.length}
+                    </div>
+                  </div>
+                \`;
+              });
+              root.innerHTML = html;
+            }
+
+            function applyPageSize(size, btn) {
+              if (btn) {
+                document.querySelectorAll('.no-print-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+              }
+              renderSheets(size);
+            }
+
+            window.onload = function() {
+              renderSheets(${defaultPageSize});
+              setTimeout(() => { window.print(); }, 400);
+            };
           </script>
         </body>
       </html>

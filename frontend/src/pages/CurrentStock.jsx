@@ -144,18 +144,18 @@ export default function CurrentStock() {
     });
   };
 
-  // Daily Printable PDF Exporter with AL ASR Logo
+  // Daily Printable PDF Exporter with AL ASR Logo & Smart Fit-To-Page Engine
   const exportStockPDF = () => {
     const printWindow = window.open('', '_blank');
-    const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
-
-    const pageSize = 25;
-    const pageChunks = [];
-    for (let i = 0; i < stockList.length; i += pageSize) {
-      pageChunks.push(stockList.slice(i, i + pageSize));
+    if (!printWindow) {
+      alert('Please allow popups in your browser to print.');
+      return;
     }
-    if (pageChunks.length === 0) pageChunks.push([]);
-    const totalPages = pageChunks.length;
+    const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+    const totalCount = stockList.length;
+
+    // Smart default: If total <= 35, fit all on 1 page! Otherwise default to 32
+    const defaultPageSize = totalCount <= 35 ? Math.max(1, totalCount) : 32;
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -163,22 +163,84 @@ export default function CurrentStock() {
         <head>
           <title>AL ASR MOTORS - Showroom Current Stock (${todayStr})</title>
           <style>
-            @page { size: portrait; margin: 4mm 6mm; }
+            @media print {
+              @page { size: portrait; margin: 4mm 6mm; }
+              body { padding: 0 !important; background: #ffffff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              .no-print { display: none !important; }
+              .sheet { page-break-after: always; break-after: page; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; padding: 2px; }
+              .sheet:last-child { page-break-after: auto; break-after: auto; }
+            }
             * { box-sizing: border-box; }
-            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 0; margin: 0; color: #0f172a; background: #ffffff; font-size: 8.5px; line-height: 1.15; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 10px; margin: 0; color: #0f172a; background: #f8fafc; font-size: 8.5px; line-height: 1.15; }
             .sheet {
-              page-break-after: always;
-              break-after: page;
+              background: #ffffff;
+              border: 1px solid #e2e8f0;
+              border-radius: 6px;
+              margin: 0 auto 16px auto;
+              max-width: 210mm;
+              padding: 12px;
+              box-shadow: 0 4px 15px rgba(0,0,0,0.06);
               box-sizing: border-box;
               display: flex;
               flex-direction: column;
               justify-content: space-between;
-              padding: 2px;
+              min-height: 275mm;
             }
-            .sheet:last-child {
-              page-break-after: auto;
-              break-after: auto;
+            @media print {
+              .sheet { border: none; border-radius: 0; margin: 0; max-width: none; padding: 0; box-shadow: none; min-height: 0; }
             }
+            .no-print-bar {
+              position: sticky;
+              top: 0;
+              z-index: 1000;
+              background: #0f172a;
+              color: white;
+              padding: 8px 16px;
+              border-radius: 8px;
+              max-width: 210mm;
+              margin: 0 auto 12px auto;
+              display: flex;
+              flex-wrap: wrap;
+              align-items: center;
+              justify-content: space-between;
+              gap: 8px;
+              box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+              font-family: 'Segoe UI', Arial, sans-serif;
+              font-size: 12px;
+            }
+            .btn-action {
+              background: #1e293b;
+              color: #38bdf8;
+              border: 1px solid #38bdf8;
+              padding: 5px 12px;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: bold;
+              font-size: 11px;
+              display: inline-flex;
+              align-items: center;
+              gap: 4px;
+              transition: all 0.2s;
+            }
+            .btn-action:hover, .btn-action.active {
+              background: #0284c7;
+              color: white;
+              border-color: #0284c7;
+            }
+            .btn-print {
+              background: #0284c7;
+              color: white;
+              border: none;
+              padding: 6px 18px;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: 800;
+              font-size: 12px;
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+            }
+            .btn-print:hover { background: #0369a1; }
             .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #0284c7; padding-bottom: 4px; margin-bottom: 4px; }
             .logo-box { display: flex; align-items: center; gap: 8px; }
             .title { font-size: 13px; font-weight: 800; color: #0f172a; letter-spacing: 0.3px; }
@@ -191,91 +253,149 @@ export default function CurrentStock() {
             td { padding: 3.5px 5px; border: 1px solid #64748b; font-size: 8.5px; font-weight: 800; vertical-align: middle; color: #0f172a; }
             td * { font-size: 8.5px !important; font-weight: 800 !important; color: #0f172a !important; }
             tr:nth-child(even) { background: #f8fafc; }
-            .badge { display: inline-block; padding: 1px 4px; border-radius: 3px; font-size: 8.5px; font-weight: 800; }
-            .badge-available { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; font-weight: 800; }
-            .badge-reserved { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-weight: 800; }
-            .badge-customer { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-weight: 800; }
-            .badge-sold { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; font-weight: 800; }
-            .badge-care { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-weight: 800; }
             .footer { margin-top: 6px; text-align: center; font-size: 8px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 3px; font-weight: bold; }
           </style>
         </head>
         <body>
-          ${pageChunks.map((chunk, pageIdx) => {
-            const startIdx = pageIdx * pageSize;
-            return `
-              <div class="sheet">
-                <div>
-                  <div class="header">
-                    <div class="logo-box">
-                      <img src="${logoBase64}" alt="AL ASR MOTORS" style="height: 36px; width: auto; object-fit: contain;" />
-                      <div>
-                        <div class="title">AL ASR MOTORS — SHOWROOM CURRENT STOCK</div>
-                        <div class="subtitle">Official Floor Stock Inventory • Generated: ${todayStr} • Sahiwal, Pakistan</div>
-                      </div>
-                    </div>
-                    <div class="stats-inline">
-                      <div class="stat-item">Total Units: <strong>${stats.totalUnits || stockList.length}</strong></div>
-                      <div class="stat-item">Available: <strong>${stats.availableUnits || 0}</strong></div>
-                      <div class="stat-item">At Customer: <strong>${stats.atCustomerUnits || 0}</strong></div>
-                      <div class="stat-item">Valuation: <strong>Rs. ${(stats.totalValuation || 0).toLocaleString()}</strong></div>
-                      <div class="stat-item" style="color: #0284c7;">Sheet <strong>${pageIdx + 1} of ${totalPages}</strong></div>
-                    </div>
-                  </div>
+          <div class="no-print no-print-bar">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-weight: 900; color: #38bdf8;">AL ASR MOTORS</span>
+              <span style="color: #94a3b8;">• Layout Controls (${totalCount} Units)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <button class="btn-action ${defaultPageSize >= totalCount ? 'active' : ''}" onclick="applyPageSize(${Math.max(1, totalCount)})">📄 Fit to 1 Page (${totalCount} rows)</button>
+              <button class="btn-action ${defaultPageSize === 25 ? 'active' : ''}" onclick="applyPageSize(25)">📑 25 / Page</button>
+              <button class="btn-action ${defaultPageSize === 35 ? 'active' : ''}" onclick="applyPageSize(35)">📑 35 / Page</button>
+              <button class="btn-print" onclick="window.print()">🖨️ Print Document</button>
+            </div>
+          </div>
 
-                  <table>
-                    <thead>
-                      <tr>
-                        <th style="width: 25px;">#</th>
-                        <th>Vehicle & Model Specs</th>
-                        <th style="width: 50px;">Year</th>
-                        <th style="width: 65px;">Color</th>
-                        <th style="width: 75px;">Mileage</th>
-                        <th style="width: 95px;">Asking Price (PKR)</th>
-                        <th style="width: 65px;">Care Of</th>
-                        <th style="width: 100px;">Reg / Plate #</th>
-                        <th style="width: 75px;">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      ${chunk.length === 0 ? `
-                        <tr>
-                          <td colspan="9" style="text-align: center; padding: 20px; color: #64748b;">No stock records found.</td>
-                        </tr>
-                      ` : chunk.map((item, idx) => {
-                        const globalIdx = startIdx + idx + 1;
-                        return `
-                        <tr>
-                          <td><strong>${globalIdx}</strong></td>
-                          <td><strong>${item.vehicle || ''} ${item.model || ''}</strong></td>
-                          <td><strong>${item.year || 'N/A'}</strong></td>
-                          <td><strong>${item.color || 'N/A'}</strong></td>
-                          <td><strong>${item.mileage ? item.mileage.toLocaleString() + ' km' : '0 km'}</strong></td>
-                          <td><strong>${formatPKR(item.askingPrice)}</strong></td>
-                          <td><strong>${item.careOf || 'AL Asr'}</strong></td>
-                          <td><strong>${item.regNumber || 'UNREGISTERED'}</strong></td>
-                          <td><strong>${item.status || 'AVAILABLE'}</strong></td>
-                        </tr>
-                        `;
-                      }).join('')}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div class="footer">
-                  AL ASR MOTORS Dealership Executive System • Sheet ${pageIdx + 1} of ${totalPages} • Showing records ${chunk.length > 0 ? startIdx + 1 : 0} to ${startIdx + chunk.length} of ${stockList.length}
-                </div>
-              </div>
-            `;
-          }).join('')}
+          <div id="sheets-container"></div>
 
           <script>
-            window.onload = function() { window.print(); };
+            const stockData = ${JSON.stringify(stockList)};
+            const statsData = ${JSON.stringify(stats)};
+            const todayStr = "${todayStr}";
+            const logoBase64 = "${logoBase64}";
+
+            function formatPKR(val) {
+              if (val === null || val === undefined || val === '') return 'Rs. 0';
+              const num = typeof val === 'number' ? val : parseFloat(val);
+              if (isNaN(num)) return String(val);
+              if (num >= 10000000) {
+                const crore = (num / 10000000).toFixed(2).replace(/\\.00$/, '');
+                return 'Rs. ' + crore + ' Crore';
+              }
+              if (num >= 100000) {
+                const lac = (num / 100000).toFixed(2).replace(/\\.00$/, '');
+                return 'Rs. ' + lac + ' Lac';
+              }
+              return 'Rs. ' + num.toLocaleString();
+            }
+
+            function applyPageSize(size) {
+              const container = document.getElementById('sheets-container');
+              const pageChunks = [];
+              for (let i = 0; i < stockData.length; i += size) {
+                pageChunks.push(stockData.slice(i, i + size));
+              }
+              if (pageChunks.length === 0) pageChunks.push([]);
+              const totalPages = pageChunks.length;
+
+              // Update active button styling in toolbar
+              document.querySelectorAll('.btn-action').forEach(b => b.classList.remove('active'));
+              if (size >= stockData.length) {
+                document.querySelectorAll('.btn-action')[0]?.classList.add('active');
+              } else if (size === 25) {
+                document.querySelectorAll('.btn-action')[1]?.classList.add('active');
+              } else if (size === 35) {
+                document.querySelectorAll('.btn-action')[2]?.classList.add('active');
+              }
+
+              container.innerHTML = pageChunks.map((chunk, pageIdx) => {
+                const startIdx = pageIdx * size;
+                return \`
+                  <div class="sheet">
+                    <div>
+                      <div class="header">
+                        <div class="logo-box">
+                          <img src="\${logoBase64}" alt="AL ASR MOTORS" style="height: 36px; width: auto; object-fit: contain;" />
+                          <div>
+                            <div class="title">AL ASR MOTORS — SHOWROOM CURRENT STOCK</div>
+                            <div class="subtitle">Official Floor Stock Inventory • Generated: \${todayStr} • Sahiwal, Pakistan</div>
+                          </div>
+                        </div>
+                        <div class="stats-inline">
+                          <div class="stat-item">Total Units: <strong>\${statsData.totalUnits || stockData.length}</strong></div>
+                          <div class="stat-item">Available: <strong>\${statsData.availableUnits || 0}</strong></div>
+                          <div class="stat-item">At Customer: <strong>\${statsData.atCustomerUnits || 0}</strong></div>
+                          <div class="stat-item">Valuation: <strong>Rs. \${(statsData.totalValuation || 0).toLocaleString()}</strong></div>
+                          <div class="stat-item" style="color: #0284c7;">Sheet <strong>\${pageIdx + 1} of \${totalPages}</strong></div>
+                        </div>
+                      </div>
+
+                      <table>
+                        <thead>
+                          <tr>
+                            <th style="width: 25px;">#</th>
+                            <th>Vehicle & Model Specs</th>
+                            <th style="width: 50px;">Year</th>
+                            <th style="width: 65px;">Color</th>
+                            <th style="width: 75px;">Mileage</th>
+                            <th style="width: 95px;">Asking Price (PKR)</th>
+                            <th style="width: 65px;">Care Of</th>
+                            <th style="width: 100px;">Reg / Plate #</th>
+                            <th style="width: 75px;">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          \${chunk.length === 0 ? \`
+                            <tr>
+                              <td colspan="9" style="text-align: center; padding: 20px; color: #64748b;">No stock records found.</td>
+                            </tr>
+                          \` : chunk.map((item, idx) => {
+                            const globalIdx = startIdx + idx + 1;
+                            return \`
+                            <tr>
+                              <td><strong>\${globalIdx}</strong></td>
+                              <td><strong>\${item.vehicle || ''} \${item.model || ''}</strong></td>
+                              <td><strong>\${item.year || 'N/A'}</strong></td>
+                              <td><strong>\${item.color || 'N/A'}</strong></td>
+                              <td><strong>\${item.mileage ? item.mileage.toLocaleString() + ' km' : '0 km'}</strong></td>
+                              <td><strong>\${formatPKR(item.askingPrice)}</strong></td>
+                              <td><strong>\${item.careOf || 'AL Asr'}</strong></td>
+                              <td><strong>\${item.regNumber || 'UNREGISTERED'}</strong></td>
+                              <td><strong>\${item.status || 'AVAILABLE'}</strong></td>
+                            </tr>
+                            \`;
+                          }).join('')}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div class="footer">
+                      AL ASR MOTORS Dealership Executive System • Sheet \${pageIdx + 1} of \${totalPages} • Showing records \${chunk.length > 0 ? startIdx + 1 : 0} to \${startIdx + chunk.length} of \${stockData.length}
+                    </div>
+                  </div>
+                \`;
+              }).join('');
+            }
+
+            // Initial Render
+            applyPageSize(${defaultPageSize});
+
+            // Automatically trigger system print dialog
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 300);
+            };
           </script>
         </body>
       </html>
     `;
 
+    printWindow.document.open();
     printWindow.document.write(htmlContent);
     printWindow.document.close();
   };
