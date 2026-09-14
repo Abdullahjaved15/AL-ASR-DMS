@@ -15,21 +15,20 @@ const {
   exportAttendanceCSV
 } = require('../controllers/attendanceController');
 
-// All endpoints in Attendance Module require Authentication AND Admin/Super Admin Role
+// All endpoints in Attendance Module require Authentication
 router.use(authenticateToken);
-router.use(requireRole('ADMIN'));
 
 // Employee Roster Routes
 router.get('/employees', getEmployees);
-router.post('/employees', createEmployee);
-router.put('/employees/:id', updateEmployee);
-router.delete('/employees/:id', deleteEmployee);
+router.post('/employees', requireRole('ADMIN', 'SUPER_ADMIN', 'ACCOUNTS_HEAD'), createEmployee);
+router.put('/employees/:id', requireRole('ADMIN', 'SUPER_ADMIN', 'ACCOUNTS_HEAD'), updateEmployee);
+router.delete('/employees/:id', requireRole('ADMIN', 'SUPER_ADMIN'), deleteEmployee);
 
 // Attendance Logging Routes
 router.get('/', getAttendance);
 router.post('/', saveAttendance);
 router.post('/bulk', saveBulkAttendance);
-router.delete('/:id', deleteAttendance);
+router.delete('/:id', requireRole('ADMIN', 'SUPER_ADMIN'), deleteAttendance);
 
 // Reports & CSV Export Routes
 router.get('/reports', getAttendanceReports);

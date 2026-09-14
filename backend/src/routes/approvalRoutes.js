@@ -12,11 +12,11 @@ const {
 // All approval routes require authentication
 router.use(authenticateToken);
 
-// List approval requests (Super Admin sees all, Admin sees their own requests)
-router.get('/', requireRole('ADMIN'), getApprovalRequests);
+// List approval requests (Super Admin sees all, other users see their own)
+router.get('/', getApprovalRequests);
 
-// Submit an approval request (Admin or Super Admin)
-router.post('/request', requireRole('ADMIN'), createApprovalRequest);
+// Submit an approval request (Any authenticated user can submit for approval)
+router.post('/request', createApprovalRequest);
 
 // Super Admin only: Approve request
 router.post('/:id/approve', requireRole('SUPER_ADMIN'), approveRequest);

@@ -5,6 +5,11 @@ const requireRole = (...allowedRoles) => {
     }
 
     const role = req.user.role;
+    // SUPER_ADMIN has access to all roles
+    if (role === 'SUPER_ADMIN') {
+      return next();
+    }
+
     const hasPermission = 
       allowedRoles.includes(role) ||
       (allowedRoles.includes('ADMIN') && role === 'SUPER_ADMIN') ||
@@ -12,7 +17,7 @@ const requireRole = (...allowedRoles) => {
       (allowedRoles.includes('ACCOUNTS_HEAD') && role === 'SUPER_ADMIN');
 
     if (!hasPermission) {
-      return res.status(403).json({ message: 'Forbidden: Insufficient permissions for accounts and finance' });
+      return res.status(403).json({ message: `Forbidden: Access restricted. Required role: ${allowedRoles.join(', ')}` });
     }
 
     next();
