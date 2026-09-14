@@ -852,6 +852,8 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
 
   // --- EXCEL & SPREADSHEET PRINTING AND CSV EXPORTS ---
 
+  // --- EXCEL & SPREADSHEET PRINTING AND CSV EXPORTS ---
+
   const printLedgerStatement = () => {
     if (!selectedAccountLedger) return;
 
@@ -867,16 +869,22 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
       year: 'numeric' 
     });
 
-    const accName = selectedAccountLedger.account?.name || selectedAccountLedger.name || 'Account Ledger';
-    const accCode = selectedAccountLedger.account?.code || selectedAccountLedger.code || '';
-    const accType = selectedAccountLedger.account?.type || selectedAccountLedger.type || '';
-    const accSubType = selectedAccountLedger.account?.subType || selectedAccountLedger.subType || '';
-    const bankDetails = selectedAccountLedger.account?.accountNumber ? `${selectedAccountLedger.account.bankName || ''} - ${selectedAccountLedger.account.accountNumber}` : '';
+    const account = selectedAccountLedger.account || selectedAccountLedger;
+    const accName = account.name || 'Account Ledger';
+    const accCode = account.code || '';
+    const accType = account.type || '';
+    const accSubType = account.subType || '';
+    const bankDetails = account.accountNumber ? `${account.bankName || ''} - ${account.accountNumber}` : '';
+    const isNormalDebit = selectedAccountLedger.isDebitNormal !== undefined ? selectedAccountLedger.isDebitNormal : ['ASSET', 'EXPENSE'].includes(accType);
     
     const entries = selectedAccountLedger.entries || [];
-    const totalDebit = selectedAccountLedger.totalDebit || 0;
-    const totalCredit = selectedAccountLedger.totalCredit || 0;
-    const closingBalance = selectedAccountLedger.closingBalance !== undefined ? selectedAccountLedger.closingBalance : (selectedAccountLedger.currentBalance || 0);
+    const totalDebit = Number(selectedAccountLedger.totalDebit) || 0;
+    const totalCredit = Number(selectedAccountLedger.totalCredit) || 0;
+    const openingBal = Number(selectedAccountLedger.openingBalance) || 0;
+    const openingBalType = selectedAccountLedger.openingBalanceType || (isNormalDebit ? (openingBal >= 0 ? 'Dr' : 'Cr') : (openingBal >= 0 ? 'Cr' : 'Dr'));
+    
+    const closingBal = Number(selectedAccountLedger.closingBalance !== undefined ? selectedAccountLedger.closingBalance : (account.currentBalance || 0));
+    const closingBalType = selectedAccountLedger.closingBalanceType || (isNormalDebit ? (closingBal >= 0 ? 'Dr' : 'Cr') : (closingBal >= 0 ? 'Cr' : 'Dr'));
 
     const filterSubtitle = (ledgerDateFilter.startDate || ledgerDateFilter.endDate || ledgerDateFilter.search)
       ? `Filtered Period: ${ledgerDateFilter.startDate || 'Beginning'} to ${ledgerDateFilter.endDate || 'Present'}${ledgerDateFilter.search ? ` • Keyword: "${ledgerDateFilter.search}"` : ''}`
@@ -914,7 +922,6 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
             thead th { background-color: #1e293b; color: #ffffff; text-align: left; padding: 6px 8px; font-size: 9.5px; font-weight: 800; text-transform: uppercase; border: 1px solid #475569; letter-spacing: 0.3px; }
             thead th.num { text-align: right; }
             tbody td { padding: 5px 8px; border: 1px solid #cbd5e1; vertical-align: middle; font-size: 9.5px; font-weight: 700; color: #0f172a; }
-            tbody td * { font-size: 9.5px !important; font-weight: 700 !important; }
             tbody td.num { text-align: right; font-family: monospace; font-weight: 800; }
             tbody tr:nth-child(even) { background-color: #f8fafc; }
             tbody tr:hover { background-color: #f1f5f9; }
@@ -928,6 +935,9 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
             .signature-col { width: 28%; text-align: center; border-top: 1px dashed #64748b; padding-top: 4px; font-size: 8.5px; font-weight: 700; color: #334155; }
             
             .print-footer { margin-top: 12px; text-align: center; font-size: 8px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 4px; font-family: monospace; font-weight: bold; }
+            .tag { display: inline-block; padding: 1px 4px; font-size: 8px; border-radius: 3px; font-weight: 800; font-family: monospace; margin-left: 3px; }
+            .tag-dr { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+            .tag-cr { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
           </style>
         </head>
         <body>
@@ -948,32 +958,34 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
           <div class="acc-banner">
             <div>
               <div class="acc-name">${accName}</div>
-              <div class="acc-meta">Account Code: <strong>${accCode}</strong> • Type: <strong>${accType}</strong> • Subtype: <strong>${accSubType}</strong> ${bankDetails ? '• ' + bankDetails : ''}</div>
+              <div class="acc-meta">Account Code: <strong>${accCode}</strong> • Classification: <strong>${accType}</strong> (${isNormalDebit ? 'Debit Nature Dr' : 'Credit Nature Cr'}) • Subtype: <strong>${accSubType}</strong> ${bankDetails ? '• ' + bankDetails : ''}</div>
             </div>
             <div style="text-align: right;">
-              <div style="font-size: 8px; font-weight: 700; color: #64748b; text-transform: uppercase;">Current Balance</div>
-              <div style="font-size: 15px; font-weight: 800; font-family: monospace; color: ${closingBalance >= 0 ? '#15803d' : '#b91c1c'};">
-                Rs. ${closingBalance.toLocaleString()}
+              <div style="font-size: 8px; font-weight: 700; color: #64748b; text-transform: uppercase;">Closing Ledger Balance</div>
+              <div style="font-size: 15px; font-weight: 800; font-family: monospace; color: #0f172a;">
+                Rs. ${Math.abs(closingBal).toLocaleString()} <span class="tag ${closingBalType === 'Dr' ? 'tag-dr' : 'tag-cr'}">${closingBalType}</span>
               </div>
             </div>
           </div>
 
           <div class="kpi-row">
             <div class="kpi-box">
-              <div class="kpi-title">Total Debits (+ Inflow)</div>
-              <div class="kpi-value green">+Rs. ${totalDebit.toLocaleString()}</div>
+              <div class="kpi-title">Opening Balance</div>
+              <div class="kpi-value" style="color: #334155;">
+                Rs. ${Math.abs(openingBal).toLocaleString()} <span class="tag ${openingBalType === 'Dr' ? 'tag-dr' : 'tag-cr'}">${openingBalType}</span>
+              </div>
             </div>
             <div class="kpi-box">
-              <div class="kpi-title">Total Credits (- Outflow)</div>
-              <div class="kpi-value red">-Rs. ${totalCredit.toLocaleString()}</div>
+              <div class="kpi-title">Total Debits (Dr)</div>
+              <div class="kpi-value green">Rs. ${totalDebit.toLocaleString()}</div>
             </div>
             <div class="kpi-box">
-              <div class="kpi-title">Closing Running Balance</div>
-              <div class="kpi-value blue">Rs. ${closingBalance.toLocaleString()}</div>
+              <div class="kpi-title">Total Credits (Cr)</div>
+              <div class="kpi-value red">Rs. ${totalCredit.toLocaleString()}</div>
             </div>
             <div class="kpi-box">
-              <div class="kpi-title">Total Entries</div>
-              <div class="kpi-value" style="color: #334155;">${entries.length} Txns</div>
+              <div class="kpi-title">Closing Balance (${closingBalType})</div>
+              <div class="kpi-value blue">Rs. ${Math.abs(closingBal).toLocaleString()} ${closingBalType}</div>
             </div>
           </div>
 
@@ -981,26 +993,27 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
             <thead>
               <tr>
                 <th style="width: 25px;">#</th>
-                <th style="width: 110px;">Date & Time</th>
-                <th style="width: 120px;">Txn / Ref #</th>
+                <th style="width: 105px;">Date & Time</th>
+                <th style="width: 110px;">Voucher / Txn #</th>
                 <th>Particulars / Description</th>
-                <th style="width: 90px;">Reference</th>
-                <th style="width: 95px;" class="num">Debit (+In)</th>
-                <th style="width: 95px;" class="num">Credit (-Out)</th>
-                <th style="width: 105px;" class="num">Running Balance</th>
+                <th style="width: 85px;">Ref / Chassis</th>
+                <th style="width: 90px;" class="num">Debit (Dr)</th>
+                <th style="width: 90px;" class="num">Credit (Cr)</th>
+                <th style="width: 105px;" class="num">Balance (Dr/Cr)</th>
               </tr>
             </thead>
             <tbody>
               ${entries.length === 0 ? `
                 <tr>
                   <td colspan="8" style="text-align: center; padding: 25px; color: #64748b; font-style: italic;">
-                    No ledger transactions recorded for this account.
+                    No ledger transactions recorded for this account in the selected period.
                   </td>
                 </tr>
               ` : entries.map((entry, idx) => {
                 const isDebit = entry.entryType === 'DEBIT';
                 const amt = Number(entry.amount) || 0;
                 const runningBal = Number(entry.runningBalance) || 0;
+                const balType = entry.runningBalanceType || (isNormalDebit ? (runningBal >= 0 ? 'Dr' : 'Cr') : (runningBal >= 0 ? 'Cr' : 'Dr'));
 
                 return `
                   <tr>
@@ -1009,12 +1022,15 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                     <td style="font-family: monospace; font-weight: 700; color: #0369a1;">${entry.transactionNumber || '-'}</td>
                     <td>
                       <div style="font-weight: 600;">${entry.description || 'Transaction entry'}</div>
-                      ${entry.chassisNumber ? `<div style="font-size: 7.5px; color: #0284c7; font-family: monospace;">Chassis: ${entry.chassisNumber}</div>` : ''}
                     </td>
-                    <td style="font-family: monospace; font-size: 8px;">${entry.referenceNumber || '-'}</td>
+                    <td style="font-family: monospace; font-size: 8px;">
+                      ${entry.referenceNumber || ''} ${entry.chassisNumber ? `<br/><span style="color:#0284c7;">Chassis: ${entry.chassisNumber}</span>` : ''}
+                    </td>
                     <td class="num" style="color: #15803d;">${isDebit ? amt.toLocaleString() : '-'}</td>
                     <td class="num" style="color: #b91c1c;">${!isDebit ? amt.toLocaleString() : '-'}</td>
-                    <td class="num" style="color: #0f172a;">Rs. ${runningBal.toLocaleString()}</td>
+                    <td class="num" style="color: #0f172a;">
+                      Rs. ${Math.abs(runningBal).toLocaleString()} <span class="tag ${balType === 'Dr' ? 'tag-dr' : 'tag-cr'}">${balType}</span>
+                    </td>
                   </tr>
                 `;
               }).join('')}
@@ -1024,7 +1040,7 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                 <td colspan="5" style="text-align: right; text-transform: uppercase;">Total Ledger Summary:</td>
                 <td class="num" style="color: #15803d; border-bottom: 3px double #0f172a;">Rs. ${totalDebit.toLocaleString()}</td>
                 <td class="num" style="color: #b91c1c; border-bottom: 3px double #0f172a;">Rs. ${totalCredit.toLocaleString()}</td>
-                <td class="num" style="color: #0369a1; border-bottom: 3px double #0f172a;">Rs. ${closingBalance.toLocaleString()}</td>
+                <td class="num" style="color: #0369a1; border-bottom: 3px double #0f172a;">Rs. ${Math.abs(closingBal).toLocaleString()} ${closingBalType}</td>
               </tr>
             </tfoot>
           </table>
@@ -1064,26 +1080,32 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
       return;
     }
 
-    const accName = selectedAccountLedger.account?.name || selectedAccountLedger.name || 'Account';
-    const accCode = selectedAccountLedger.account?.code || selectedAccountLedger.code || '';
+    const account = selectedAccountLedger.account || selectedAccountLedger;
+    const accName = account.name || 'Account';
+    const accCode = account.code || '';
+    const accType = account.type || '';
+    const isNormalDebit = selectedAccountLedger.isDebitNormal !== undefined ? selectedAccountLedger.isDebitNormal : ['ASSET', 'EXPENSE'].includes(accType);
 
-    const headers = ['#', 'Date', 'Time', 'Voucher / Txn #', 'Particulars / Description', 'Reference #', 'Chassis #', 'Debit (+In PKR)', 'Credit (-Out PKR)', 'Running Balance (PKR)'];
+    const headers = ['#', 'Date', 'Time', 'Voucher / Txn #', 'Type', 'Particulars / Description', 'Reference #', 'Chassis #', 'Debit (Dr PKR)', 'Credit (Cr PKR)', 'Running Balance (PKR)', 'Balance Type'];
     const rows = entries.map((entry, idx) => {
       const isDebit = entry.entryType === 'DEBIT';
       const amt = Number(entry.amount) || 0;
       const runningBal = Number(entry.runningBalance) || 0;
+      const balType = entry.runningBalanceType || (isNormalDebit ? (runningBal >= 0 ? 'Dr' : 'Cr') : (runningBal >= 0 ? 'Cr' : 'Dr'));
 
       return [
         idx + 1,
         new Date(entry.date).toLocaleDateString('en-GB'),
         new Date(entry.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         `"${(entry.transactionNumber || '').replace(/"/g, '""')}"`,
+        `"${(entry.type || '').replace(/"/g, '""')}"`,
         `"${(entry.description || '').replace(/"/g, '""')}"`,
         `"${(entry.referenceNumber || '').replace(/"/g, '""')}"`,
         `"${(entry.chassisNumber || '').replace(/"/g, '""')}"`,
         isDebit ? amt : 0,
         !isDebit ? amt : 0,
-        runningBal
+        Math.abs(runningBal),
+        balType
       ].join(',');
     });
 
@@ -1833,9 +1855,24 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                             </td>
 
                             <td className="py-3.5 px-4 text-right font-mono font-bold text-sm whitespace-nowrap">
-                              <span className={acc.currentBalance >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
-                                {formatPKR(acc.currentBalance)}
-                              </span>
+                              {(() => {
+                                const isNormalDebit = ['ASSET', 'EXPENSE'].includes(acc.type);
+                                const bal = Number(acc.currentBalance) || 0;
+                                const isDr = isNormalDebit ? bal >= 0 : bal < 0;
+                                const tag = isDr ? 'Dr' : 'Cr';
+                                return (
+                                  <div className="flex items-center justify-end space-x-1.5">
+                                    <span className={bal >= 0 ? 'text-white' : 'text-rose-400'}>
+                                      {formatPKR(Math.abs(bal))}
+                                    </span>
+                                    <span className={`px-1.5 py-0.2 text-[9px] font-mono font-extrabold rounded ${
+                                      tag === 'Dr' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                                    }`}>
+                                      {tag}
+                                    </span>
+                                  </div>
+                                );
+                              })()}
                             </td>
 
                             <td className="py-3.5 px-4 text-center">
@@ -3296,270 +3333,349 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
       {/* ========================================================================= */}
       {/* MODAL 3: RUNNING LEDGER STATEMENT & PRINT DRAWER                          */}
       {/* ========================================================================= */}
-      {isLedgerModalOpen && selectedAccountLedger && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="glass-modal rounded-3xl p-6 w-full max-w-4xl border border-white/10 shadow-2xl my-8 max-h-[90vh] flex flex-col">
-            {/* Modal Header */}
-            <div className="flex justify-between items-center pb-4 border-b border-white/10 flex-shrink-0">
-              <div>
-                <div className="flex items-center space-x-2">
-                  <h3 className="text-lg font-bold text-white">{selectedAccountLedger.account?.name || selectedAccountLedger.name}</h3>
-                  <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded text-[10px] font-mono">
-                    Code: {selectedAccountLedger.account?.code || selectedAccountLedger.code}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 font-mono mt-0.5">
-                  Type: {selectedAccountLedger.account?.type || selectedAccountLedger.type} • Subtype: {selectedAccountLedger.account?.subType || selectedAccountLedger.subType}
-                </p>
-              </div>
+      {isLedgerModalOpen && selectedAccountLedger && (() => {
+        const account = selectedAccountLedger.account || selectedAccountLedger;
+        const isNormalDebit = selectedAccountLedger.isDebitNormal !== undefined 
+          ? selectedAccountLedger.isDebitNormal 
+          : ['ASSET', 'EXPENSE'].includes(account.type);
+        const normalType = selectedAccountLedger.normalBalanceType || (isNormalDebit ? 'DEBIT' : 'CREDIT');
+        
+        const openBal = Number(selectedAccountLedger.openingBalance) || 0;
+        const openBalType = selectedAccountLedger.openingBalanceType || (isNormalDebit ? (openBal >= 0 ? 'Dr' : 'Cr') : (openBal >= 0 ? 'Cr' : 'Dr'));
+        
+        const totalDeb = Number(selectedAccountLedger.totalDebit) || 0;
+        const totalCred = Number(selectedAccountLedger.totalCredit) || 0;
+        const netChange = selectedAccountLedger.netChange !== undefined ? selectedAccountLedger.netChange : (isNormalDebit ? (totalDeb - totalCred) : (totalCred - totalDeb));
 
-              <div className="flex items-center space-x-2 flex-wrap gap-1">
-                <button
-                  onClick={() => openReceiveModal(selectedAccountLedger.account?.id || selectedAccountLedger.id)}
-                  className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-mono font-bold flex items-center space-x-1.5 shadow-sm"
-                  title="Receive money directly into this account ledger"
-                >
-                  <ArrowDownLeft className="w-3.5 h-3.5" />
-                  <span>+ Receive in this Ledger</span>
-                </button>
-                <button
-                  onClick={() => openPayModal(selectedAccountLedger.account?.id || selectedAccountLedger.id)}
-                  className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 rounded-xl text-xs font-mono font-bold flex items-center space-x-1.5 shadow-sm"
-                  title="Record payment / outflow directly from this account ledger"
-                >
-                  <ArrowUpRight className="w-3.5 h-3.5" />
-                  <span>- Pay from this Ledger</span>
-                </button>
-                <button
-                  onClick={exportLedgerToCSV}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-mono font-bold flex items-center space-x-1.5 transition-all shadow-sm"
-                  title="Download Ledger Statement records as an Excel-compatible CSV spreadsheet"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                  <span>Export Excel / CSV</span>
-                </button>
-                <button
-                  onClick={printLedgerStatement}
-                  className="px-3.5 py-1.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-mono font-bold rounded-xl text-xs flex items-center space-x-1.5 transition-all shadow-lg shadow-cyan-500/20"
-                  title="Print formatted Excel-style Ledger statement with rows, columns and signature blocks"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print Ledger (Excel Sheet)</span>
-                </button>
-                <button onClick={() => setIsLedgerModalOpen(false)} className="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-800">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
+        const closeBal = Number(selectedAccountLedger.closingBalance !== undefined ? selectedAccountLedger.closingBalance : (account.currentBalance || 0));
+        const closeBalType = selectedAccountLedger.closingBalanceType || (isNormalDebit ? (closeBal >= 0 ? 'Dr' : 'Cr') : (closeBal >= 0 ? 'Cr' : 'Dr'));
 
-            {/* Custom Date Search & Filter Toolbar */}
-            <div className="py-3 px-1 border-b border-white/10 space-y-2 flex-shrink-0 bg-slate-900/40 rounded-2xl p-3 my-2">
-              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
-                {/* Quick Date Presets */}
-                <div className="flex items-center space-x-1.5 overflow-x-auto flex-wrap">
-                  <span className="text-[10px] font-mono text-slate-400 font-bold uppercase mr-1">Presets:</span>
-                  {[
-                    { label: 'All Time', getDates: () => ({ startDate: '', endDate: '' }) },
-                    { 
-                      label: 'Today', 
-                      getDates: () => {
-                        const today = new Date().toISOString().slice(0, 10);
-                        return { startDate: today, endDate: today };
-                      } 
-                    },
-                    { 
-                      label: 'This Month', 
-                      getDates: () => {
-                        const now = new Date();
-                        const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-                        const today = now.toISOString().slice(0, 10);
-                        return { startDate: start, endDate: today };
-                      } 
-                    },
-                    { 
-                      label: 'Last 30 Days', 
-                      getDates: () => {
-                        const now = new Date();
-                        const thirtyDays = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-                        const today = now.toISOString().slice(0, 10);
-                        return { startDate: thirtyDays, endDate: today };
-                      } 
-                    }
-                  ].map(preset => (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      onClick={() => {
-                        const dates = preset.getDates();
-                        const updated = { ...ledgerDateFilter, ...dates };
-                        setLedgerDateFilter(updated);
-                        handleFilterLedger(null, updated);
-                      }}
-                      className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-white/5 rounded-lg text-[11px] font-mono transition-all"
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
+        return (
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <div className="glass-modal rounded-3xl p-6 w-full max-w-5xl border border-white/10 shadow-2xl my-6 max-h-[92vh] flex flex-col">
+              {/* Modal Header */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center pb-4 border-b border-white/10 flex-shrink-0 gap-3">
+                <div>
+                  <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                    <h3 className="text-lg font-bold text-white">{account.name}</h3>
+                    <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rounded text-[10px] font-mono font-bold">
+                      Code: {account.code}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                      account.type === 'ASSET' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' :
+                      account.type === 'LIABILITY' ? 'bg-rose-500/15 text-rose-400 border-rose-500/30' :
+                      account.type === 'EXPENSE' ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' :
+                      account.type === 'REVENUE' ? 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30' :
+                      'bg-purple-500/15 text-purple-400 border-purple-500/30'
+                    }`}>
+                      {account.type}
+                    </span>
+                    <span className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded text-[10px] font-mono border border-white/10">
+                      Normal Nature: <strong className={isNormalDebit ? 'text-emerald-300' : 'text-cyan-300'}>{normalType} ({isNormalDebit ? 'Dr' : 'Cr'})</strong>
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 font-mono mt-1">
+                    Subtype: <span className="text-slate-200">{account.subType || 'GENERAL'}</span>
+                    {account.accountNumber ? ` • ${account.bankName || 'Bank'} A/C: ${account.accountNumber}` : ''}
+                    {account.description ? ` • ${account.description}` : ''}
+                  </p>
                 </div>
 
-                {/* Filter Form */}
-                <form onSubmit={handleFilterLedger} className="flex flex-wrap items-center gap-2">
-                  <div className="flex items-center space-x-1 bg-slate-950 border border-white/10 rounded-xl px-2 py-1">
-                    <span className="text-[9px] font-mono text-cyan-400 font-bold uppercase">From:</span>
-                    <input
-                      type="date"
-                      value={ledgerDateFilter.startDate}
-                      onChange={(e) => setLedgerDateFilter({ ...ledgerDateFilter, startDate: e.target.value })}
-                      className="bg-transparent text-xs text-white focus:outline-none font-mono cursor-pointer"
-                    />
-                  </div>
-
-                  <div className="flex items-center space-x-1 bg-slate-950 border border-white/10 rounded-xl px-2 py-1">
-                    <span className="text-[9px] font-mono text-cyan-400 font-bold uppercase">To:</span>
-                    <input
-                      type="date"
-                      value={ledgerDateFilter.endDate}
-                      onChange={(e) => setLedgerDateFilter({ ...ledgerDateFilter, endDate: e.target.value })}
-                      className="bg-transparent text-xs text-white focus:outline-none font-mono cursor-pointer"
-                    />
-                  </div>
-
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search entries..."
-                      value={ledgerDateFilter.search}
-                      onChange={(e) => setLedgerDateFilter({ ...ledgerDateFilter, search: e.target.value })}
-                      className="bg-slate-950 border border-white/10 rounded-xl pl-2.5 pr-2 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono w-32 sm:w-36"
-                    />
-                  </div>
-
+                <div className="flex items-center space-x-2 flex-wrap gap-1.5 self-end md:self-auto">
                   <button
-                    type="submit"
-                    disabled={ledgerLoading}
-                    className="px-3 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-mono font-bold flex items-center space-x-1 shadow-sm transition-all"
-                    title="Search and filter ledger entries by date and keywords"
+                    onClick={() => openReceiveModal(account.id)}
+                    className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-mono font-bold flex items-center space-x-1.5 shadow-sm transition-all cursor-pointer"
+                    title="Receive money directly into this account ledger"
                   >
-                    <Search className="w-3 h-3" />
-                    <span>Search</span>
+                    <ArrowDownLeft className="w-3.5 h-3.5" />
+                    <span>+ Receive (آمد)</span>
                   </button>
-
-                  {(ledgerDateFilter.startDate || ledgerDateFilter.endDate || ledgerDateFilter.search) && (
-                    <button
-                      type="button"
-                      onClick={handleResetLedgerFilter}
-                      className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-mono flex items-center space-x-1"
-                      title="Clear all ledger filters"
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                      <span>Clear</span>
-                    </button>
-                  )}
-                </form>
-              </div>
-
-              {/* Active Filter Badge */}
-              {(ledgerDateFilter.startDate || ledgerDateFilter.endDate || ledgerDateFilter.search) && (
-                <div className="flex items-center space-x-2 text-[10.5px] font-mono text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-lg">
-                  <Filter className="w-3 h-3 text-cyan-400" />
-                  <span>
-                    Filtered: {ledgerDateFilter.startDate ? `From ${ledgerDateFilter.startDate}` : 'Beginning'} to {ledgerDateFilter.endDate ? ledgerDateFilter.endDate : 'Present'}
-                    {ledgerDateFilter.search ? ` • Keyword: "${ledgerDateFilter.search}"` : ''} 
-                    {' '}({selectedAccountLedger.entries?.length || 0} entries found)
-                  </span>
+                  <button
+                    onClick={() => openPayModal(account.id)}
+                    className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 rounded-xl text-xs font-mono font-bold flex items-center space-x-1.5 shadow-sm transition-all cursor-pointer"
+                    title="Record payment / outflow directly from this account ledger"
+                  >
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                    <span>- Pay (ادائیگی)</span>
+                  </button>
+                  <button
+                    onClick={exportLedgerToCSV}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-mono font-bold flex items-center space-x-1.5 transition-all shadow-sm cursor-pointer"
+                    title="Download Ledger Statement records as an Excel-compatible CSV spreadsheet"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                    <span>Export Excel</span>
+                  </button>
+                  <button
+                    onClick={printLedgerStatement}
+                    className="px-3.5 py-1.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-mono font-bold rounded-xl text-xs flex items-center space-x-1.5 transition-all shadow-lg shadow-cyan-500/20 cursor-pointer"
+                    title="Print official standard Ledger statement with signature blocks"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Print Statement</span>
+                  </button>
+                  <button onClick={() => setIsLedgerModalOpen(false)} className="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-800 cursor-pointer">
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
-              )}
-            </div>
+              </div>
 
-            {/* Balances Summary Bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 py-2.5 border-b border-white/10 flex-shrink-0 text-center">
-              <div className="p-2 rounded-xl bg-slate-900 border border-white/5">
-                <span className="text-[10px] font-mono text-slate-400">Opening Balance</span>
-                <p className="text-xs sm:text-sm font-bold font-mono text-slate-200 mt-0.5">
-                  {formatPKR(selectedAccountLedger.openingBalance || 0)}
-                </p>
-              </div>
-              <div className="p-2 rounded-xl bg-slate-900 border border-white/5">
-                <span className="text-[10px] font-mono text-emerald-400">Total Debits (+In)</span>
-                <p className="text-xs sm:text-sm font-bold font-mono text-emerald-400 mt-0.5">
-                  +{formatPKR(selectedAccountLedger.totalDebit || 0)}
-                </p>
-              </div>
-              <div className="p-2 rounded-xl bg-slate-900 border border-white/5">
-                <span className="text-[10px] font-mono text-rose-400">Total Credits (-Out)</span>
-                <p className="text-xs sm:text-sm font-bold font-mono text-rose-400 mt-0.5">
-                  -{formatPKR(selectedAccountLedger.totalCredit || 0)}
-                </p>
-              </div>
-              <div className="p-2 rounded-xl bg-slate-900 border border-cyan-500/20 bg-cyan-950/10">
-                <span className="text-[10px] font-mono text-cyan-400">Closing Balance</span>
-                <p className="text-xs sm:text-sm font-bold font-mono text-white mt-0.5">
-                  {formatPKR(selectedAccountLedger.closingBalance !== undefined ? selectedAccountLedger.closingBalance : (selectedAccountLedger.currentBalance || 0))}
-                </p>
-              </div>
-            </div>
+              {/* Custom Date Search & Filter Toolbar */}
+              <div className="py-2.5 px-3 border-b border-white/10 space-y-2 flex-shrink-0 bg-slate-900/60 rounded-2xl my-2.5">
+                <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
+                  {/* Quick Date Presets */}
+                  <div className="flex items-center space-x-1.5 overflow-x-auto flex-wrap">
+                    <span className="text-[10px] font-mono text-slate-400 font-bold uppercase mr-1">Presets:</span>
+                    {[
+                      { label: 'All Time', getDates: () => ({ startDate: '', endDate: '' }) },
+                      { 
+                        label: 'Today', 
+                        getDates: () => {
+                          const today = new Date().toISOString().slice(0, 10);
+                          return { startDate: today, endDate: today };
+                        } 
+                      },
+                      { 
+                        label: 'This Month', 
+                        getDates: () => {
+                          const now = new Date();
+                          const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+                          const today = now.toISOString().slice(0, 10);
+                          return { startDate: start, endDate: today };
+                        } 
+                      },
+                      { 
+                        label: 'Last 30 Days', 
+                        getDates: () => {
+                          const now = new Date();
+                          const thirtyDays = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+                          const today = now.toISOString().slice(0, 10);
+                          return { startDate: thirtyDays, endDate: today };
+                        } 
+                      }
+                    ].map(preset => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => {
+                          const dates = preset.getDates();
+                          const updated = { ...ledgerDateFilter, ...dates };
+                          setLedgerDateFilter(updated);
+                          handleFilterLedger(null, updated);
+                        }}
+                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-white/5 rounded-lg text-[11px] font-mono transition-all cursor-pointer"
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
 
-            {/* Scrollable Entries List */}
-            <div className="overflow-y-auto flex-1 mt-4 divide-y divide-white/5">
-              {ledgerLoading ? (
-                <div className="py-12 text-center text-slate-400 font-mono">
-                  <div className="flex items-center justify-center space-x-2">
-                    <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
-                    <span>Loading ledger transactions...</span>
+                  {/* Filter Form */}
+                  <form onSubmit={handleFilterLedger} className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center space-x-1 bg-slate-950 border border-white/10 rounded-xl px-2.5 py-1">
+                      <span className="text-[9px] font-mono text-cyan-400 font-bold uppercase">From:</span>
+                      <input
+                        type="date"
+                        value={ledgerDateFilter.startDate}
+                        onChange={(e) => setLedgerDateFilter({ ...ledgerDateFilter, startDate: e.target.value })}
+                        className="bg-transparent text-xs text-white focus:outline-none font-mono cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="flex items-center space-x-1 bg-slate-950 border border-white/10 rounded-xl px-2.5 py-1">
+                      <span className="text-[9px] font-mono text-cyan-400 font-bold uppercase">To:</span>
+                      <input
+                        type="date"
+                        value={ledgerDateFilter.endDate}
+                        onChange={(e) => setLedgerDateFilter({ ...ledgerDateFilter, endDate: e.target.value })}
+                        className="bg-transparent text-xs text-white focus:outline-none font-mono cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Search particulars / ref / chassis..."
+                        value={ledgerDateFilter.search}
+                        onChange={(e) => setLedgerDateFilter({ ...ledgerDateFilter, search: e.target.value })}
+                        className="bg-slate-950 border border-white/10 rounded-xl pl-2.5 pr-2 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono w-40 sm:w-48"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={ledgerLoading}
+                      className="px-3 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-mono font-bold flex items-center space-x-1 shadow-sm transition-all cursor-pointer"
+                      title="Search and filter ledger entries by date and keywords"
+                    >
+                      <Search className="w-3 h-3" />
+                      <span>Search</span>
+                    </button>
+
+                    {(ledgerDateFilter.startDate || ledgerDateFilter.endDate || ledgerDateFilter.search) && (
+                      <button
+                        type="button"
+                        onClick={handleResetLedgerFilter}
+                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-mono flex items-center space-x-1 cursor-pointer"
+                        title="Clear all ledger filters"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>Clear</span>
+                      </button>
+                    )}
+                  </form>
+                </div>
+
+                {/* Active Filter Badge */}
+                {(ledgerDateFilter.startDate || ledgerDateFilter.endDate || ledgerDateFilter.search) && (
+                  <div className="flex items-center space-x-2 text-[10.5px] font-mono text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-lg">
+                    <Filter className="w-3 h-3 text-cyan-400" />
+                    <span>
+                      Filtered Period: {ledgerDateFilter.startDate ? `From ${ledgerDateFilter.startDate}` : 'Beginning'} to {ledgerDateFilter.endDate ? ledgerDateFilter.endDate : 'Present'}
+                      {ledgerDateFilter.search ? ` • Keyword: "${ledgerDateFilter.search}"` : ''} 
+                      {' '}({selectedAccountLedger.entries?.length || 0} entries found)
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Balances Summary Cards Bar */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 py-2 border-b border-white/10 flex-shrink-0 text-center">
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-white/5">
+                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">Opening Balance</span>
+                  <div className="flex items-center justify-center space-x-1.5 mt-1">
+                    <p className="text-xs sm:text-sm font-bold font-mono text-slate-200">
+                      {formatPKR(Math.abs(openBal))}
+                    </p>
+                    <span className={`px-1.5 py-0.2 text-[9px] font-mono font-extrabold rounded ${
+                      openBalType === 'Dr' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                    }`}>
+                      {openBalType}
+                    </span>
                   </div>
                 </div>
-              ) : selectedAccountLedger.entries?.length === 0 ? (
-                <div className="py-12 text-center text-slate-500 font-mono">
-                  No recorded transactions in this ledger yet.
+
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-emerald-500/20 bg-emerald-950/10">
+                  <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-wider block">Total Debits (Dr)</span>
+                  <p className="text-xs sm:text-sm font-bold font-mono text-emerald-400 mt-1">
+                    +{formatPKR(totalDeb)}
+                  </p>
                 </div>
-              ) : (
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="text-slate-400 font-mono text-[10px] uppercase border-b border-white/10">
-                      <th className="py-2">Date & Time</th>
-                      <th className="py-2">Txn / Ref #</th>
-                      <th className="py-2">Particulars / Description</th>
-                      <th className="py-2 text-right">Debit (In)</th>
-                      <th className="py-2 text-right">Credit (Out)</th>
-                      <th className="py-2 text-right">Running Balance</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {selectedAccountLedger.entries?.map(entry => {
-                      const isDebit = entry.entryType === 'DEBIT';
-                      return (
-                        <tr key={entry.id} className="hover:bg-white/5">
-                          <td className="py-2.5 font-mono text-slate-400 text-[11px] whitespace-nowrap">
-                            {new Date(entry.date).toLocaleDateString()} {new Date(entry.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </td>
-                          <td className="py-2.5 font-mono text-cyan-400 font-semibold whitespace-nowrap">
-                            {entry.transactionNumber}
-                          </td>
-                          <td className="py-2.5 text-white">
-                            <p className="font-medium">{entry.description}</p>
-                            {entry.referenceNumber && (
-                              <p className="text-[10px] font-mono text-slate-400">Ref: {entry.referenceNumber} {entry.chassisNumber ? `• Chassis: ${entry.chassisNumber}` : ''}</p>
-                            )}
-                          </td>
-                          <td className="py-2.5 text-right font-mono font-bold text-emerald-400">
-                            {isDebit ? formatPKR(entry.amount) : '-'}
-                          </td>
-                          <td className="py-2.5 text-right font-mono font-bold text-rose-400">
-                            {!isDebit ? formatPKR(entry.amount) : '-'}
-                          </td>
-                          <td className="py-2.5 text-right font-mono font-bold text-slate-200">
-                            {formatPKR(entry.runningBalance)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
+
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-rose-500/20 bg-rose-950/10">
+                  <span className="text-[10px] font-mono text-rose-400 uppercase tracking-wider block">Total Credits (Cr)</span>
+                  <p className="text-xs sm:text-sm font-bold font-mono text-rose-400 mt-1">
+                    -{formatPKR(totalCred)}
+                  </p>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-white/5">
+                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">Net Period Movement</span>
+                  <p className={`text-xs sm:text-sm font-bold font-mono mt-1 ${netChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {netChange >= 0 ? '+' : '-'}{formatPKR(Math.abs(netChange))}
+                  </p>
+                </div>
+
+                <div className="col-span-2 sm:col-span-1 p-2.5 rounded-xl bg-slate-900 border border-cyan-500/30 bg-cyan-950/20 shadow-lg shadow-cyan-500/10">
+                  <span className="text-[10px] font-mono text-cyan-400 font-bold uppercase tracking-wider block">Closing Balance</span>
+                  <div className="flex items-center justify-center space-x-1.5 mt-1">
+                    <p className="text-xs sm:text-sm font-extrabold font-mono text-white">
+                      {formatPKR(Math.abs(closeBal))}
+                    </p>
+                    <span className={`px-1.5 py-0.2 text-[9px] font-mono font-extrabold rounded ${
+                      closeBalType === 'Dr' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                    }`}>
+                      {closeBalType}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Scrollable Entries List */}
+              <div className="overflow-y-auto flex-1 mt-3 divide-y divide-white/5">
+                {ledgerLoading ? (
+                  <div className="py-12 text-center text-slate-400 font-mono">
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+                      <span>Calculating ledger balances...</span>
+                    </div>
+                  </div>
+                ) : selectedAccountLedger.entries?.length === 0 ? (
+                  <div className="py-12 text-center text-slate-500 font-mono">
+                    No recorded transactions in this ledger for the selected date range.
+                  </div>
+                ) : (
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="text-slate-400 font-mono text-[10px] uppercase border-b border-white/10 sticky top-0 bg-slate-950/90 backdrop-blur z-10">
+                        <th className="py-2.5 px-2">#</th>
+                        <th className="py-2.5 px-2">Date & Time</th>
+                        <th className="py-2.5 px-2">Voucher / Txn #</th>
+                        <th className="py-2.5 px-3">Particulars / Narration</th>
+                        <th className="py-2.5 px-2 text-right">Debit (Dr)</th>
+                        <th className="py-2.5 px-2 text-right">Credit (Cr)</th>
+                        <th className="py-2.5 px-3 text-right">Running Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {selectedAccountLedger.entries?.map((entry, idx) => {
+                        const isDebit = entry.entryType === 'DEBIT';
+                        const runningBal = Number(entry.runningBalance) || 0;
+                        const balType = entry.runningBalanceType || (isNormalDebit ? (runningBal >= 0 ? 'Dr' : 'Cr') : (runningBal >= 0 ? 'Cr' : 'Dr'));
+
+                        return (
+                          <tr key={entry.id} className="hover:bg-white/5 transition-colors">
+                            <td className="py-2.5 px-2 font-mono text-slate-500 text-[10px]">
+                              {idx + 1}
+                            </td>
+                            <td className="py-2.5 px-2 font-mono text-slate-400 text-[11px] whitespace-nowrap">
+                              {new Date(entry.date).toLocaleDateString()} <span className="text-slate-500 text-[10px]">{new Date(entry.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            </td>
+                            <td className="py-2.5 px-2 font-mono font-semibold whitespace-nowrap">
+                              <span className="text-cyan-400">{entry.transactionNumber}</span>
+                              {entry.type && (
+                                <span className="ml-1.5 px-1.5 py-0.2 bg-slate-800 text-slate-400 rounded text-[9px] font-mono">
+                                  {entry.type}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-white max-w-md">
+                              <p className="font-medium text-slate-200">{entry.description}</p>
+                              {(entry.referenceNumber || entry.chassisNumber || entry.createdBy) && (
+                                <div className="flex items-center space-x-2 text-[10px] font-mono text-slate-400 mt-0.5 flex-wrap gap-y-0.5">
+                                  {entry.referenceNumber && <span>Ref: {entry.referenceNumber}</span>}
+                                  {entry.chassisNumber && <span className="text-cyan-400 font-bold">• Chassis: {entry.chassisNumber}</span>}
+                                  {entry.createdBy && <span className="text-slate-500">• By: {entry.createdBy}</span>}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-2 text-right font-mono font-bold text-emerald-400 whitespace-nowrap">
+                              {isDebit ? formatPKR(entry.amount) : '-'}
+                            </td>
+                            <td className="py-2.5 px-2 text-right font-mono font-bold text-rose-400 whitespace-nowrap">
+                              {!isDebit ? formatPKR(entry.amount) : '-'}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono font-bold whitespace-nowrap">
+                              <span className="text-white mr-1.5">
+                                {formatPKR(Math.abs(runningBal))}
+                              </span>
+                              <span className={`px-1.5 py-0.2 text-[9px] font-mono font-extrabold rounded ${
+                                balType === 'Dr' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                              }`}>
+                                {balType}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* MODAL 4: ISSUE SECURITY CHEQUE                                            */}

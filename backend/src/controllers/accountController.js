@@ -182,8 +182,13 @@ const createAccount = async (req, res) => {
       }
     });
 
-    // If opening balance > 0, log opening balance transaction
+    // If opening balance !== 0, log opening balance transaction
     if (numOpening !== 0) {
+      const isDebitNormal = ['ASSET', 'EXPENSE'].includes(finalType);
+      const entryType = isDebitNormal
+        ? (numOpening > 0 ? 'DEBIT' : 'CREDIT')
+        : (numOpening > 0 ? 'CREDIT' : 'DEBIT');
+
       const txnNumber = await generateTxnNumber('OB');
       await prisma.transaction.create({
         data: {
@@ -199,7 +204,7 @@ const createAccount = async (req, res) => {
             create: [
               {
                 accountId: newAccount.id,
-                type: 'DEBIT',
+                type: entryType,
                 amount: Math.abs(numOpening),
                 description: `Opening Balance for ${newAccount.name}`
               }
@@ -253,75 +258,60 @@ const updateAccount = async (req, res) => {
     const updated = await prisma.account.update({
       where: { id },
       data: {
-        name: name !== undefined ? name.trim() : account.name,
-        code: code !== undefined ? code.trim() : account.code,
-        type: type !== undefined ? type : account.type,
-        subType: subType !== undefined ? subType : account.subType,
-        bankName: bankName !== undefined ? bankName : account.bankName,
-        accountNumber: accountNumber !== undefined ? accountNumber : account.accountNumber,
-        branch: branch !== undefined ? branch : account.branch,
-        description: description !== undefined ? description : account.description,
-        openingBalance: openingBalance !== undefined ? parseFloat(openingBalance) : account.openingBalance,
-        currentBalance: currentBalance !== undefined ? parseFloat(currentBalance) : account.currentBalance,
-        isActive: isActive !== undefined ? Boolean(isActive) : account.isActive
+        ...(name && { name: name.trim() }),
+        ...(code && { code: code.trim() }),
+        ...(type && { type }),
+        ...(subType && { subType }),
+        ...(bankName !== undefined && { bankName }),
+        ...(accountNumber !== undefined && { accountNumber }),
+        ...(branch !== undefined && { branch }),
+        ...(description !== undefined && { description }),
+        ...(openingBalance !== undefined && { openingBalance: parseFloat(openingBalance) }),
+        ...(currentBalance !== undefined && { currentBalance: parseFloat(currentBalance) }),
+        ...(isActive !== undefined && { isActive })
       }
     });
 
     return res.json({ message: 'Account updated successfully', account: updated });
   } catch (error) {
+    console.error('updateAccount error:', error);
     return res.status(500).json({ message: 'Failed to update account', error: error.message });
   }
 };
 
-// 5. Delete Account (Accounts Head / Super Admin only)
+// 5. Delete Account (Only if no transactions linked)
 const deleteAccount = async (req, res) => {
   try {
     const { id } = req.params;
 
     const account = await prisma.account.findUnique({
       where: { id },
-      include: { _count: { select: { entries: true, securityCheques: true } } }
+      include: { _count: { select: { entries: true } } }
     });
 
     if (!account) {
       return res.status(404).json({ message: 'Account not found' });
     }
 
-    // Direct cascade delete & cleanup for all linked entries and references
-    await prisma.$transaction(async (tx) => {
-      // 1. Delete associated transaction entries for this account
-      await tx.transactionEntry.deleteMany({ where: { accountId: id } });
+    if (account.isSystem) {
+      return res.status(400).json({ message: 'System accounts cannot be deleted' });
+    }
 
-      // 2. Clean up transactions that now have zero entries (orphaned transactions)
-      const emptyTransactions = await tx.transaction.findMany({
-        where: {
-          entries: { none: {} }
-        },
-        select: { id: true }
+    if (account._count.entries > 0) {
+      return res.status(400).json({
+        message: `Cannot delete account "${account.name}". It contains ${account._count.entries} transaction entries. You can deactivate it instead.`
       });
-      if (emptyTransactions.length > 0) {
-        await tx.transaction.deleteMany({
-          where: { id: { in: emptyTransactions.map(t => t.id) } }
-        });
-      }
+    }
 
-      // 3. Nullify references in linked models
-      await tx.securityCheque.updateMany({ where: { bankAccountId: id }, data: { bankAccountId: null } });
-      await tx.installmentItem.updateMany({ where: { bankAccountId: id }, data: { bankAccountId: null } });
-      await tx.invoice.updateMany({ where: { bankAccountId: id }, data: { bankAccountId: null } });
-
-      // 4. Delete the account
-      await tx.account.delete({ where: { id } });
-    });
-
-    return res.json({ message: `Account ${account.name} deleted successfully` });
+    await prisma.account.delete({ where: { id } });
+    return res.json({ message: 'Account deleted successfully' });
   } catch (error) {
     console.error('deleteAccount error:', error);
     return res.status(500).json({ message: 'Failed to delete account', error: error.message });
   }
 };
 
-// 6. Get Account Ledger (Running balance, debits, credits, timestamps)
+// 6. Get Account Ledger (Standard Accounting Running balance, debits, credits, timestamps)
 const getAccountLedger = async (req, res) => {
   try {
     const { id } = req.params;
@@ -332,7 +322,8 @@ const getAccountLedger = async (req, res) => {
       return res.status(404).json({ message: 'Account not found' });
     }
 
-    const isNormalDebit = ['ASSET', 'EXPENSE'].includes(account.type);
+    const isDebitNormal = ['ASSET', 'EXPENSE'].includes(account.type);
+    const normalBalanceType = isDebitNormal ? 'DEBIT' : 'CREDIT';
 
     // Calculate prior balance if filtering from a specific startDate
     let periodOpeningBalance = 0;
@@ -353,10 +344,19 @@ const getAccountLedger = async (req, res) => {
       );
       periodOpeningBalance = hasPriorOB ? 0 : (account.openingBalance || 0);
       for (const pe of priorEntries) {
-        if (pe.type === 'DEBIT') {
-          periodOpeningBalance += pe.amount;
+        const amt = Number(pe.amount) || 0;
+        if (isDebitNormal) {
+          if (pe.type === 'DEBIT') {
+            periodOpeningBalance += amt;
+          } else {
+            periodOpeningBalance -= amt;
+          }
         } else {
-          periodOpeningBalance -= pe.amount;
+          if (pe.type === 'CREDIT') {
+            periodOpeningBalance += amt;
+          } else {
+            periodOpeningBalance -= amt;
+          }
         }
       }
     } else {
@@ -408,14 +408,27 @@ const getAccountLedger = async (req, res) => {
     let totalCredit = 0;
 
     const statementEntries = entries.map(entry => {
-      const amt = entry.amount;
-      if (entry.type === 'DEBIT') {
+      const amt = Number(entry.amount) || 0;
+      const isDebit = entry.type === 'DEBIT';
+      if (isDebit) {
         totalDebit += amt;
-        running += amt; // Debit (Receive / Inflow)
+        if (isDebitNormal) {
+          running += amt;
+        } else {
+          running -= amt;
+        }
       } else {
         totalCredit += amt;
-        running -= amt; // Credit (Pay / Outflow)
+        if (isDebitNormal) {
+          running -= amt;
+        } else {
+          running += amt;
+        }
       }
+
+      const runningBalType = isDebitNormal
+        ? (running >= 0 ? 'Dr' : 'Cr')
+        : (running >= 0 ? 'Cr' : 'Dr');
 
       return {
         id: entry.id,
@@ -423,22 +436,41 @@ const getAccountLedger = async (req, res) => {
         transactionNumber: entry.transaction.transactionNumber,
         type: entry.transaction.type,
         entryType: entry.type,
+        debitAmount: isDebit ? amt : 0,
+        creditAmount: !isDebit ? amt : 0,
         amount: amt,
         description: entry.description || entry.transaction.description,
         referenceNumber: entry.transaction.referenceNumber,
         referenceType: entry.transaction.referenceType,
         chassisNumber: entry.transaction.chassisNumber,
         createdBy: entry.transaction.createdByUser?.name || 'System',
-        runningBalance: running
+        runningBalance: running,
+        runningBalanceAbs: Math.abs(running),
+        runningBalanceType: runningBalType
       };
     });
 
+    const openingBalType = isDebitNormal
+      ? (periodOpeningBalance >= 0 ? 'Dr' : 'Cr')
+      : (periodOpeningBalance >= 0 ? 'Cr' : 'Dr');
+
+    const closingBalType = isDebitNormal
+      ? (running >= 0 ? 'Dr' : 'Cr')
+      : (running >= 0 ? 'Cr' : 'Dr');
+
     return res.json({
       account,
+      normalBalanceType,
+      isDebitNormal,
       openingBalance: periodOpeningBalance,
+      openingBalanceAbs: Math.abs(periodOpeningBalance),
+      openingBalanceType: openingBalType,
       totalDebit,
       totalCredit,
+      netChange: isDebitNormal ? (totalDebit - totalCredit) : (totalCredit - totalDebit),
       closingBalance: running,
+      closingBalanceAbs: Math.abs(running),
+      closingBalanceType: closingBalType,
       entries: statementEntries.reverse() // show most recent first in UI
     });
   } catch (error) {
