@@ -864,71 +864,75 @@ export default function Invoices({ onNavigate }) {
       alert('Please allow popups in your browser to print invoices and vouchers.');
       return;
     }
-    const createdDate = inv.dated || (inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    }) : new Date().toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    }));
 
-    const receiptNo = inv.receiptNo || inv.invoiceNumber;
-    const category = inv.category || 'SALES_RECEIPT';
-    const buyerName = inv.buyerName || inv.customerName || 'N/A';
-    const buyerFather = inv.buyerFatherName || 'N/A';
-    const buyerAddress = inv.buyerAddress || inv.customerCity || 'N/A';
-    const buyerPhone = inv.buyerPhone || inv.customerPhone || 'N/A';
+    try {
+      const createdDate = inv.dated || (inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      }) : new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      }));
 
-    const sellerName = inv.sellerName || 'N/A';
-    const sellerFather = inv.sellerFatherName || 'N/A';
-    const sellerAddress = inv.sellerAddress || 'N/A';
-    const sellerPhone = inv.sellerPhone || 'N/A';
+      const receiptNo = inv.receiptNo || inv.invoiceNumber;
+      const category = inv.category || 'SALES_RECEIPT';
+      const buyerName = inv.buyerName || inv.customerName || 'N/A';
+      const buyerFather = inv.buyerFatherName || 'N/A';
+      const buyerAddress = inv.buyerAddress || inv.customerCity || 'N/A';
+      const buyerPhone = inv.buyerPhone || inv.customerPhone || 'N/A';
+      const buyer = buyerName;
 
-    const vehicleMaker = inv.vehicleMaker || inv.carVehicle || 'N/A';
-    const vehicleModel = inv.vehicleModel || inv.carModel || 'N/A';
-    const regNo = inv.registrationNo || inv.carRegNumber || 'UNREGISTERED';
-    const chassisNo = inv.chassisNumber || 'N/A';
-    const engineNo = inv.engineNumber || 'N/A';
-    const powerCapacity = inv.powerCapacity || 'N/A';
-    const postOffice = inv.postOffice || 'N/A';
-    const lastToken = inv.lastToken || 'N/A';
-    const regName = inv.regName || 'N/A';
-    const regFatherName = inv.regFatherName || 'N/A';
-    const regAddress = inv.regAddress || 'N/A';
+      const sellerName = inv.sellerName || 'N/A';
+      const sellerFather = inv.sellerFatherName || 'N/A';
+      const sellerAddress = inv.sellerAddress || 'N/A';
+      const sellerPhone = inv.sellerPhone || 'N/A';
 
-    const numericTotal = parsePakistaniPrice(inv.totalPrice || inv.agreedAmount || inv.saleAmount || inv.totalAmount || 0);
-    const numericAdvance = parsePakistaniPrice(inv.advanceAmount || inv.cashAmountReceived || inv.advance || 0);
-    const numericRemaining = inv.remainingAmount !== undefined && inv.remainingAmount !== null && inv.remainingAmount !== ''
-      ? parsePakistaniPrice(inv.remainingAmount)
-      : Math.max(0, numericTotal - numericAdvance);
+      const vehicleMaker = inv.vehicleMaker || inv.carVehicle || 'N/A';
+      const vehicleModel = inv.vehicleModel || inv.carModel || 'N/A';
+      const vehicle = `${vehicleMaker !== 'N/A' ? vehicleMaker : ''} ${vehicleModel !== 'N/A' ? vehicleModel : ''}`.trim() || 'Vehicle';
+      const regNo = inv.registrationNo || inv.carRegNumber || 'UNREGISTERED';
+      const chassisNo = inv.chassisNumber || 'N/A';
+      const engineNo = inv.engineNumber || 'N/A';
+      const powerCapacity = inv.powerCapacity || 'N/A';
+      const postOffice = inv.postOffice || 'N/A';
+      const lastToken = inv.lastToken || 'N/A';
+      const regName = inv.regName || 'N/A';
+      const regFatherName = inv.regFatherName || 'N/A';
+      const regAddress = inv.regAddress || 'N/A';
 
-    const numericAgreed = parsePakistaniPrice(inv.agreedAmount || inv.totalPrice || inv.saleAmount || 0) || numericTotal;
-    const numericAgreedHalf = parsePakistaniPrice(inv.agreedAmountHalf) || Math.round(numericAgreed / 2);
-    const agreedWords = inv.agreedAmountWords || inv.inWords || (numericAgreed > 0 ? numberToWordsPKR(numericAgreed) : '');
-    const agreementTime = inv.agreementTime || inv.time || 'N/A';
-    const agreementDay = inv.agreementDay || 'N/A';
-    const paymentDuration = inv.paymentDuration || 'As Agreed';
+      const numericTotal = parsePakistaniPrice(inv.totalPrice || inv.agreedAmount || inv.saleAmount || inv.totalAmount || 0);
+      const numericAdvance = parsePakistaniPrice(inv.advanceAmount || inv.cashAmountReceived || inv.advance || 0);
+      const numericRemaining = inv.remainingAmount !== undefined && inv.remainingAmount !== null && inv.remainingAmount !== ''
+        ? parsePakistaniPrice(inv.remainingAmount)
+        : Math.max(0, numericTotal - numericAdvance);
 
-    const renderCNICBoxes = (cnicStr) => {
-      const digits = (cnicStr || '').replace(/\D/g, '').padEnd(13, ' ').slice(0, 13);
-      const part1 = digits.slice(0, 5).split('');
-      const part2 = digits.slice(5, 12).split('');
-      const part3 = digits.slice(12, 13).split('');
+      const numericAgreed = parsePakistaniPrice(inv.agreedAmount || inv.totalPrice || inv.saleAmount || 0) || numericTotal;
+      const numericAgreedHalf = parsePakistaniPrice(inv.agreedAmountHalf) || Math.round(numericAgreed / 2);
+      const agreedWords = inv.agreedAmountWords || inv.inWords || (numericAgreed > 0 ? numberToWordsPKR(numericAgreed) : '');
+      const agreementTime = inv.agreementTime || inv.time || 'N/A';
+      const agreementDay = inv.agreementDay || 'N/A';
+      const paymentDuration = inv.paymentDuration || 'As Agreed';
 
-      return `
-        <span class="cnic-box-group" title="${cnicStr || 'CNIC Number'}">
-          ${part1.map(d => `<span class="cnic-digit">${d !== ' ' ? d : '&nbsp;'}</span>`).join('')}
-          <span class="cnic-hyphen">-</span>
-          ${part2.map(d => `<span class="cnic-digit">${d !== ' ' ? d : '&nbsp;'}</span>`).join('')}
-          <span class="cnic-hyphen">-</span>
-          ${part3.map(d => `<span class="cnic-digit">${d !== ' ' ? d : '&nbsp;'}</span>`).join('')}
-        </span>
-      `;
-    };
+      const renderCNICBoxes = (cnicStr) => {
+        const digits = (cnicStr || '').replace(/\D/g, '').padEnd(13, ' ').slice(0, 13);
+        const part1 = digits.slice(0, 5).split('');
+        const part2 = digits.slice(5, 12).split('');
+        const part3 = digits.slice(12, 13).split('');
 
-    let innerHTMLBody = '';
+        return `
+          <span class="cnic-box-group" title="${cnicStr || 'CNIC Number'}">
+            ${part1.map(d => `<span class="cnic-digit">${d !== ' ' ? d : '&nbsp;'}</span>`).join('')}
+            <span class="cnic-hyphen">-</span>
+            ${part2.map(d => `<span class="cnic-digit">${d !== ' ' ? d : '&nbsp;'}</span>`).join('')}
+            <span class="cnic-hyphen">-</span>
+            ${part3.map(d => `<span class="cnic-digit">${d !== ' ' ? d : '&nbsp;'}</span>`).join('')}
+          </span>
+        `;
+      };
+
+      let innerHTMLBody = '';
 
     if (category === 'DELIVERY_LETTER') {
       const effectiveTime = inv.time || inv.agreementTime || agreementTime || 'N/A';
@@ -1852,7 +1856,22 @@ export default function Invoices({ onNavigate }) {
     printWindow.document.open();
     printWindow.document.write(htmlContent);
     printWindow.document.close();
-  };
+  } catch (err) {
+    console.error('Failed to export invoice PDF:', err);
+    if (printWindow) {
+      printWindow.document.open();
+      printWindow.document.write(`
+        <html>
+          <body style="font-family: sans-serif; padding: 20px; color: #b91c1c;">
+            <h2>Error Printing Voucher</h2>
+            <p>${err.message || 'An error occurred while generating the printable invoice document.'}</p>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
+  }
+};
 
   // If user does not have accounts access, show unauthorized security gate
   if (!canAccessAccounts) {
