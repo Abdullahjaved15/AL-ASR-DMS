@@ -9,13 +9,9 @@ function parsePakistaniPrice(input) {
     return 0;
   }
 
-  // If already a valid number
+  // If already a valid number, return rounded value directly without arbitrary multiplication
   if (typeof input === 'number') {
     if (isNaN(input) || input <= 0) return 0;
-    // If entered as small shorthand number (e.g., 40 in Pakistani car dealership means 40 Lac)
-    if (input > 0 && input < 500) {
-      return Math.round(input * 100000);
-    }
     return Math.round(input);
   }
 
@@ -79,7 +75,6 @@ function parsePakistaniPrice(input) {
   }
 
   // 2. Plain numbers (with optional commas/periods)
-  // Strip non-digit and non-decimal characters
   const cleanNumStr = str.replace(/,/g, '').replace(/[^\d.]/g, '');
   const parsedVal = parseFloat(cleanNumStr);
 
@@ -87,17 +82,12 @@ function parsePakistaniPrice(input) {
     return 0;
   }
 
-  // In Pakistani automotive market context, values < 500 (e.g. 40, 55, 120, 3.5) represent Lacs
-  if (parsedVal > 0 && parsedVal < 500) {
-    return Math.round(parsedVal * 100000);
-  }
-
   return Math.round(parsedVal);
 }
 
 /**
- * Normalizes user-entered price to human Pakistani notation (e.g. "5 Lac", "40 Lac", "1.5 Crore", "50k")
- * so that "5 lac" is preserved and stored as "5 Lac" instead of expanding into "500000".
+ * Normalizes user-entered price to clean Pakistani notation (e.g. "5 Lac", "40 Lac", "1.5 Crore", "50k")
+ * only when explicit shorthand units were typed. Plain numeric inputs (e.g. "20000", "2000") are preserved.
  */
 function normalizePriceInput(val) {
   if (val === null || val === undefined || val === '') return '';
@@ -109,25 +99,6 @@ function normalizePriceInput(val) {
       .replace(/\b(lac|lacs|lakh|lakhs)\b/gi, 'Lac')
       .replace(/\b(crore|cror|cr)\b/gi, 'Crore')
       .replace(/\b(k|thousand)\b/gi, 'k');
-  }
-
-  const cleanNum = parseFloat(str.replace(/,/g, '').replace(/[^\d.]/g, ''));
-  if (!isNaN(cleanNum) && cleanNum > 0) {
-    if (cleanNum < 500) {
-      return `${cleanNum} Lac`;
-    }
-    if (cleanNum >= 10000000) {
-      const cr = (cleanNum / 10000000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
-      return `${cr} Crore`;
-    }
-    if (cleanNum >= 100000) {
-      const lac = (cleanNum / 100000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
-      return `${lac} Lac`;
-    }
-    if (cleanNum >= 1000) {
-      const k = (cleanNum / 1000).toFixed(1).replace(/\.0$/, '');
-      return `${k}k`;
-    }
   }
 
   return str;

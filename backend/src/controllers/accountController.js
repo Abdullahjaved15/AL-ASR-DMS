@@ -1,4 +1,5 @@
 const prisma = require('../config/db');
+const { parsePakistaniPrice } = require('../utils/priceParser');
 
 // Helper to generate transaction number
 const generateTxnNumber = async (prefix = 'TXN') => {
@@ -163,7 +164,7 @@ const createAccount = async (req, res) => {
       return res.status(400).json({ message: `Account code ${finalCode} is already taken. Please specify a unique code.` });
     }
 
-    const numOpening = parseFloat(openingBalance) || 0;
+    const numOpening = openingBalance !== undefined && openingBalance !== '' ? parsePakistaniPrice(openingBalance) : 0;
 
     const newAccount = await prisma.account.create({
       data: {
@@ -266,8 +267,8 @@ const updateAccount = async (req, res) => {
         ...(accountNumber !== undefined && { accountNumber }),
         ...(branch !== undefined && { branch }),
         ...(description !== undefined && { description }),
-        ...(openingBalance !== undefined && { openingBalance: parseFloat(openingBalance) }),
-        ...(currentBalance !== undefined && { currentBalance: parseFloat(currentBalance) }),
+        ...(openingBalance !== undefined && { openingBalance: parsePakistaniPrice(openingBalance) }),
+        ...(currentBalance !== undefined && { currentBalance: parsePakistaniPrice(currentBalance) }),
         ...(isActive !== undefined && { isActive })
       }
     });
@@ -499,7 +500,7 @@ const transferFunds = async (req, res) => {
       return res.status(400).json({ message: 'Source and destination accounts cannot be the same' });
     }
 
-    const numAmount = parseFloat(amount);
+    const numAmount = parsePakistaniPrice(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
       return res.status(400).json({ message: 'Invalid transfer amount' });
     }
@@ -596,7 +597,7 @@ const receiveAmountInLedger = async (req, res) => {
       return res.status(400).json({ message: 'Target ledger account and amount are required.' });
     }
 
-    const numAmount = parseFloat(amount);
+    const numAmount = parsePakistaniPrice(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
       return res.status(400).json({ message: 'Please enter a valid positive amount.' });
     }
@@ -753,7 +754,7 @@ const payAmountFromLedger = async (req, res) => {
       return res.status(400).json({ message: 'Source account and amount are required.' });
     }
 
-    const numAmount = parseFloat(amount);
+    const numAmount = parsePakistaniPrice(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
       return res.status(400).json({ message: 'Please enter a valid positive amount.' });
     }

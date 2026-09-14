@@ -9,13 +9,9 @@ export function parsePakistaniPrice(input) {
     return 0;
   }
 
-  // If already a valid number
+  // If already a valid number, return rounded value directly
   if (typeof input === 'number') {
     if (isNaN(input) || input <= 0) return 0;
-    // In Pakistani car market shorthand, a small number (e.g. 5 or 40) means 5 Lac or 40 Lacs
-    if (input > 0 && input < 500) {
-      return Math.round(input * 100000);
-    }
     return Math.round(input);
   }
 
@@ -86,17 +82,12 @@ export function parsePakistaniPrice(input) {
     return 0;
   }
 
-  // In Pakistani automotive market context, values < 500 represent Lacs (e.g. 5 = 500,000 PKR, 40 = 4,000,000 PKR)
-  if (parsedVal > 0 && parsedVal < 500) {
-    return Math.round(parsedVal * 100000);
-  }
-
   return Math.round(parsedVal);
 }
 
 /**
- * Normalizes user-entered price to human Pakistani notation (e.g. "5 Lac", "40 Lac", "1.5 Crore", "50k")
- * so that "5 lac" is preserved and stored as "5 Lac" instead of expanding into "500000".
+ * Normalizes user-entered price to clean Pakistani notation (e.g. "5 Lac", "40 Lac", "1.5 Crore", "50k")
+ * only when explicit shorthand units were typed. Plain numeric inputs (e.g. "20000", "2000") are preserved.
  */
 export function normalizePriceInput(val) {
   if (val === null || val === undefined || val === '') return '';
@@ -111,31 +102,12 @@ export function normalizePriceInput(val) {
       .replace(/\b(k|thousand)\b/gi, 'k');
   }
 
-  const cleanNum = parseFloat(str.replace(/,/g, '').replace(/[^\d.]/g, ''));
-  if (!isNaN(cleanNum) && cleanNum > 0) {
-    if (cleanNum < 500) {
-      return `${cleanNum} Lac`;
-    }
-    if (cleanNum >= 10000000) {
-      const cr = (cleanNum / 10000000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
-      return `${cr} Crore`;
-    }
-    if (cleanNum >= 100000) {
-      const lac = (cleanNum / 100000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
-      return `${lac} Lac`;
-    }
-    if (cleanNum >= 1000) {
-      const k = (cleanNum / 1000).toFixed(1).replace(/\.0$/, '');
-      return `${k}k`;
-    }
-  }
-
   return str;
 }
 
 /**
- * Format any input (number or string) to standard Pakistani Lac/Crore display
- * e.g. 500000 -> "Rs. 5 Lac", 4000000 -> "Rs. 40 Lac", "5 lac" -> "Rs. 5 Lac"
+ * Format any input (number or string) to standard formatted PKR currency
+ * e.g. 20000 -> "Rs. 20,000", 2000 -> "Rs. 2,000", 2000000 -> "Rs. 2,000,000", "5 lac" -> "Rs. 5 Lac"
  */
 export function formatPKR(val, withPrefix = true) {
   if (val === null || val === undefined || val === '' || val === 0 || val === '0') {
@@ -158,17 +130,6 @@ export function formatPKR(val, withPrefix = true) {
 
   const num = parsePakistaniPrice(val);
   if (!num || num <= 0) return `${prefix}0`;
-
-  if (num >= 10000000) {
-    const cr = (num / 10000000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
-    return `${prefix}${cr} Crore`;
-  } else if (num >= 100000) {
-    const lac = (num / 100000).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
-    return `${prefix}${lac} Lac`;
-  } else if (num >= 1000) {
-    const k = (num / 1000).toFixed(1).replace(/\.0$/, '');
-    return `${prefix}${k}k`;
-  }
 
   return `${prefix}${num.toLocaleString()}`;
 }

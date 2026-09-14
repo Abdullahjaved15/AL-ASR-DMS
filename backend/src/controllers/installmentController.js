@@ -1,4 +1,5 @@
 const prisma = require('../config/db');
+const { parsePakistaniPrice } = require('../utils/priceParser');
 
 // Helper to generate plan & transaction numbers
 const generatePlanNumber = async () => {
@@ -152,13 +153,13 @@ const createInstallmentPlan = async (req, res) => {
       return res.status(400).json({ message: 'Customer name, vehicle name, total price, and installments count are required' });
     }
 
-    const numTotal = parseFloat(totalPrice);
-    const numAdvance = parseFloat(advanceAmount) || 0;
+    const numTotal = parsePakistaniPrice(totalPrice);
+    const numAdvance = parsePakistaniPrice(advanceAmount) || 0;
     const numInstallmentsCount = parseInt(totalInstallments, 10);
     const numRemaining = Math.max(0, numTotal - numAdvance);
 
     const calculatedInstallmentAmt = installmentAmount 
-      ? parseFloat(installmentAmount) 
+      ? parsePakistaniPrice(installmentAmount) 
       : Math.round(numRemaining / numInstallmentsCount);
 
     const planNumber = await generatePlanNumber();
@@ -244,7 +245,7 @@ const recordInstallmentPayment = async (req, res) => {
       notes
     } = req.body;
 
-    const numPaid = parseFloat(paidAmount);
+    const numPaid = parsePakistaniPrice(paidAmount);
     if (isNaN(numPaid) || numPaid <= 0) {
       return res.status(400).json({ message: 'Valid payment amount is required' });
     }

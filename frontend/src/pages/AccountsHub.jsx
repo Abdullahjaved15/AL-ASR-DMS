@@ -481,7 +481,10 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
   const handleCreateAccount = async (e) => {
     e.preventDefault();
     try {
-      await api.createAccount(accountFormData);
+      await api.createAccount({
+        ...accountFormData,
+        openingBalance: accountFormData.openingBalance !== '' ? parsePakistaniPrice(accountFormData.openingBalance) : 0
+      });
       setIsAddAccountModalOpen(false);
       setAccountFormData({
         code: '',
@@ -505,7 +508,10 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
   const handleTransferFunds = async (e) => {
     e.preventDefault();
     try {
-      await api.transferFunds(transferFormData);
+      await api.transferFunds({
+        ...transferFormData,
+        amount: parsePakistaniPrice(transferFormData.amount)
+      });
       setIsTransferModalOpen(false);
       setTransferFormData({
         fromAccountId: '',
@@ -560,7 +566,7 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
     try {
       const res = await api.receiveAmountInLedger({
         ...receiveFormData,
-        amount: normalizePriceInput(receiveFormData.amount)
+        amount: parsePakistaniPrice(receiveFormData.amount)
       });
       alert(res.message || 'Amount received and posted to ledger successfully!');
       setIsReceiveModalOpen(false);
@@ -581,7 +587,7 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
     try {
       const res = await api.payAmountFromLedger({
         ...payFormData,
-        amount: normalizePriceInput(payFormData.amount)
+        amount: parsePakistaniPrice(payFormData.amount)
       });
       alert(res.message || 'Payment recorded and deducted from ledger successfully!');
       setIsPayModalOpen(false);
@@ -600,7 +606,10 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
   const handleCreateCheque = async (e) => {
     e.preventDefault();
     try {
-      await api.createSecurityCheque(chequeFormData);
+      await api.createSecurityCheque({
+        ...chequeFormData,
+        amount: parsePakistaniPrice(chequeFormData.amount)
+      });
       setIsAddChequeModalOpen(false);
       setChequeFormData({
         chequeNumber: '',
@@ -648,7 +657,10 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
     e.preventDefault();
     if (!selectedInstallmentPlan) return;
     try {
-      await api.recordInstallmentPayment(selectedInstallmentPlan.id, paymentFormData);
+      await api.recordInstallmentPayment(selectedInstallmentPlan.id, {
+        ...paymentFormData,
+        paidAmount: parsePakistaniPrice(paymentFormData.paidAmount)
+      });
       setIsPaymentModalOpen(false);
       setPaymentFormData({
         itemId: '',
@@ -674,7 +686,12 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
   const handleCreateInstallmentPlan = async (e) => {
     e.preventDefault();
     try {
-      await api.createInstallmentPlan(newPlanFormData);
+      await api.createInstallmentPlan({
+        ...newPlanFormData,
+        totalPrice: parsePakistaniPrice(newPlanFormData.totalPrice),
+        advanceAmount: parsePakistaniPrice(newPlanFormData.advanceAmount),
+        installmentAmount: newPlanFormData.installmentAmount ? parsePakistaniPrice(newPlanFormData.installmentAmount) : undefined
+      });
       setIsAddPlanModalOpen(false);
       setNewPlanFormData({
         customerName: '',
@@ -723,7 +740,11 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
     e.preventDefault();
     if (!selectedAccountToEdit) return;
     try {
-      await api.updateAccount(selectedAccountToEdit.id, editAccountFormData);
+      await api.updateAccount(selectedAccountToEdit.id, {
+        ...editAccountFormData,
+        openingBalance: editAccountFormData.openingBalance !== '' ? parsePakistaniPrice(editAccountFormData.openingBalance) : 0,
+        currentBalance: editAccountFormData.currentBalance !== '' ? parsePakistaniPrice(editAccountFormData.currentBalance) : 0
+      });
       setIsEditAccountModalOpen(false);
       setSelectedAccountToEdit(null);
       fetchAccountsData();

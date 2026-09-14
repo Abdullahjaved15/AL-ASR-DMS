@@ -1,4 +1,5 @@
 const prisma = require('../config/db');
+const { parsePakistaniPrice } = require('../utils/priceParser');
 
 // Helper to generate transaction number
 const generateTxnNumber = async (prefix = 'TXN') => {
@@ -107,7 +108,7 @@ const createSecurityCheque = async (req, res) => {
       return res.status(400).json({ message: 'Cheque number, party name, amount, and due date are required' });
     }
 
-    const numAmount = parseFloat(amount);
+    const numAmount = parsePakistaniPrice(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
       return res.status(400).json({ message: 'Valid amount is required' });
     }
