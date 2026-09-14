@@ -1745,190 +1745,313 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
             </div>
           </div>
 
-          {/* Accounts Table */}
-          <div className="glass-card rounded-2xl overflow-hidden border border-white/10 shadow-xl">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-900/95 border-b border-white/10 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
-                    <th className="py-3 px-4">Code</th>
-                    <th className="py-3 px-4">Account Title / Ledger</th>
-                    <th className="py-3 px-4">Classification</th>
-                    <th className="py-3 px-4">Subtype / Bank Details</th>
-                    <th className="py-3 px-4 text-right">Current Balance</th>
-                    <th className="py-3 px-4 text-center">Quick Ledger Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5 text-xs">
-                  {loading ? (
-                    <tr>
-                      <td colSpan="6" className="py-12 text-center text-slate-400 font-mono">
-                        <div className="flex items-center justify-center space-x-2">
-                          <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
-                          <span>Loading Chart of Accounts...</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : accounts.length === 0 ? (
-                    <tr>
-                      <td colSpan="6" className="py-12 text-center text-slate-500 font-mono">
-                        No accounts found matching your filter criteria.
-                      </td>
-                    </tr>
-                  ) : (
-                    accounts
-                      .filter(acc => {
-                        if (!searchQuery.trim()) return true;
-                        const q = searchQuery.toLowerCase();
-                        return (
-                          (acc.code && String(acc.code).toLowerCase().includes(q)) ||
-                          (acc.name && acc.name.toLowerCase().includes(q)) ||
-                          (acc.subType && acc.subType.toLowerCase().includes(q)) ||
-                          (acc.bankName && acc.bankName.toLowerCase().includes(q)) ||
-                          (acc.accountNumber && String(acc.accountNumber).toLowerCase().includes(q)) ||
-                          (acc.description && acc.description.toLowerCase().includes(q))
-                        );
-                      })
-                      .map(acc => {
-                        const isAsset = acc.type === 'ASSET';
-                        const isExpense = acc.type === 'EXPENSE';
-                        const isRevenue = acc.type === 'REVENUE';
-                        const isLiability = acc.type === 'LIABILITY';
+          {/* Responsive Accounts Container: Desktop Table & Mobile Cards */}
+          {(() => {
+            const filteredAccounts = accounts.filter(acc => {
+              if (!searchQuery.trim()) return true;
+              const q = searchQuery.toLowerCase();
+              return (
+                (acc.code && String(acc.code).toLowerCase().includes(q)) ||
+                (acc.name && acc.name.toLowerCase().includes(q)) ||
+                (acc.subType && acc.subType.toLowerCase().includes(q)) ||
+                (acc.bankName && acc.bankName.toLowerCase().includes(q)) ||
+                (acc.accountNumber && String(acc.accountNumber).toLowerCase().includes(q)) ||
+                (acc.description && acc.description.toLowerCase().includes(q))
+              );
+            });
 
-                        return (
-                          <tr 
-                            key={acc.id} 
-                            className="hover:bg-white/5 transition-colors cursor-pointer group"
-                            onClick={() => handleOpenLedger(acc)}
-                          >
-                            <td className="py-3.5 px-4 font-mono font-bold text-cyan-400 whitespace-nowrap">
-                              <div className="flex items-center space-x-1.5">
-                                <span>{acc.code}</span>
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); handleCopyToClipboard(acc.code, `code-${acc.id}`); }}
-                                  className="text-slate-500 hover:text-cyan-300 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  title="Copy account code"
-                                >
-                                  {copiedId === `code-${acc.id}` ? (
-                                    <Check className="w-3 h-3 text-emerald-400" />
-                                  ) : (
-                                    <Copy className="w-3 h-3" />
+            if (loading) {
+              return (
+                <div className="glass-card rounded-2xl p-12 text-center text-slate-400 font-mono border border-white/10">
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+                    <span>Loading Chart of Accounts...</span>
+                  </div>
+                </div>
+              );
+            }
+
+            if (filteredAccounts.length === 0) {
+              return (
+                <div className="glass-card rounded-2xl p-12 text-center text-slate-500 font-mono border border-white/10">
+                  No accounts found matching your filter criteria.
+                </div>
+              );
+            }
+
+            return (
+              <>
+                {/* 1. DESKTOP & TABLET VIEW (Clean, horizontal, non-wrapping table) */}
+                <div className="hidden md:block glass-card rounded-2xl overflow-hidden border border-white/10 shadow-xl">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[850px]">
+                      <thead>
+                        <tr className="bg-slate-900/95 border-b border-white/10 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
+                          <th className="py-3 px-4 w-24">Code</th>
+                          <th className="py-3 px-4">Account Title / Ledger</th>
+                          <th className="py-3 px-4 w-32">Classification</th>
+                          <th className="py-3 px-4 w-44">Subtype / Bank Details</th>
+                          <th className="py-3 px-4 text-right w-36">Current Balance</th>
+                          <th className="py-3 px-4 text-right w-72 pr-6">Quick Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 text-xs">
+                        {filteredAccounts.map(acc => {
+                          const isAsset = acc.type === 'ASSET';
+                          const isExpense = acc.type === 'EXPENSE';
+                          const isRevenue = acc.type === 'REVENUE';
+                          const isLiability = acc.type === 'LIABILITY';
+
+                          const isNormalDebit = ['ASSET', 'EXPENSE'].includes(acc.type);
+                          const bal = Number(acc.currentBalance) || 0;
+                          const isDr = isNormalDebit ? bal >= 0 : bal < 0;
+                          const tag = isDr ? 'Dr' : 'Cr';
+
+                          return (
+                            <tr 
+                              key={acc.id} 
+                              className="hover:bg-white/5 transition-colors cursor-pointer group"
+                              onClick={() => handleOpenLedger(acc)}
+                            >
+                              <td className="py-3 px-4 font-mono font-bold text-cyan-400 whitespace-nowrap">
+                                <div className="flex items-center space-x-1.5">
+                                  <span>{acc.code}</span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); handleCopyToClipboard(acc.code, `code-${acc.id}`); }}
+                                    className="text-slate-500 hover:text-cyan-300 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    title="Copy account code"
+                                  >
+                                    {copiedId === `code-${acc.id}` ? (
+                                      <Check className="w-3 h-3 text-emerald-400" />
+                                    ) : (
+                                      <Copy className="w-3 h-3" />
+                                    )}
+                                  </button>
+                                </div>
+                              </td>
+
+                              <td className="py-3 px-4 font-semibold text-white">
+                                <div className="flex items-center space-x-2">
+                                  <span className="group-hover:text-cyan-300 transition-colors font-bold">{acc.name}</span>
+                                  {acc.isSystem && (
+                                    <span className="px-1.5 py-0.2 bg-slate-800 text-slate-400 rounded text-[9px] font-mono border border-white/5">
+                                      SYSTEM
+                                    </span>
                                   )}
-                                </button>
-                              </div>
-                            </td>
+                                </div>
+                                {acc.description && (
+                                  <p className="text-[11px] text-slate-400 font-normal truncate max-w-sm mt-0.5">{acc.description}</p>
+                                )}
+                              </td>
 
-                            <td className="py-3.5 px-4 font-semibold text-white">
-                              <div className="flex items-center space-x-2">
-                                <span className="group-hover:text-cyan-300 transition-colors">{acc.name}</span>
-                                {acc.isSystem && (
-                                  <span className="px-1.5 py-0.5 bg-slate-800 text-slate-400 rounded text-[9px] font-mono border border-white/5">
-                                    SYSTEM
+                              <td className="py-3 px-4 font-mono whitespace-nowrap">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                  isAsset ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
+                                  isLiability ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' :
+                                  isRevenue ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' :
+                                  isExpense ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' :
+                                  'bg-purple-500/10 text-purple-400 border-purple-500/30'
+                                }`}>
+                                  {acc.type}
+                                </span>
+                              </td>
+
+                              <td className="py-3 px-4 font-mono text-slate-300 whitespace-nowrap">
+                                <p className="font-semibold text-slate-200">{acc.subType || 'OTHER'}</p>
+                                {acc.accountNumber && (
+                                  <p className="text-[10px] text-slate-400 truncate flex items-center space-x-1 mt-0.5">
+                                    <span>{acc.bankName} - {acc.accountNumber}</span>
+                                  </p>
+                                )}
+                              </td>
+
+                              <td className="py-3 px-4 text-right font-mono font-bold text-sm whitespace-nowrap">
+                                <div className="flex items-center justify-end space-x-1.5">
+                                  <span className={bal >= 0 ? 'text-white' : 'text-rose-400'}>
+                                    {formatPKR(Math.abs(bal))}
                                   </span>
-                                )}
-                              </div>
-                              {acc.description && (
-                                <p className="text-[11px] text-slate-400 font-normal truncate max-w-md mt-0.5">{acc.description}</p>
-                              )}
-                            </td>
+                                  <span className={`px-1.5 py-0.2 text-[9px] font-mono font-extrabold rounded ${
+                                    tag === 'Dr' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                                  }`}>
+                                    {tag}
+                                  </span>
+                                </div>
+                              </td>
 
-                            <td className="py-3.5 px-4 font-mono">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                                isAsset ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
-                                isLiability ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' :
-                                isRevenue ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' :
-                                isExpense ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' :
-                                'bg-purple-500/10 text-purple-400 border-purple-500/30'
-                              }`}>
-                                {acc.type}
+                              <td className="py-3 px-4 text-right whitespace-nowrap pr-6">
+                                <div className="flex items-center justify-end space-x-1.5 flex-nowrap">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); openReceiveModal(acc.id); }}
+                                    className="px-2.5 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 rounded-lg text-[11px] font-mono font-bold transition-all flex items-center space-x-1 shadow-sm whitespace-nowrap cursor-pointer"
+                                    title="Receive / Inflow into this Ledger (آمد و وصولی)"
+                                  >
+                                    <ArrowDownLeft className="w-3 h-3 text-emerald-400" />
+                                    <span>+ Receive</span>
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); openPayModal(acc.id); }}
+                                    className="px-2.5 py-1 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 rounded-lg text-[11px] font-mono font-bold transition-all flex items-center space-x-1 shadow-sm whitespace-nowrap cursor-pointer"
+                                    title="Pay / Outflow from this Ledger (ادائیگی واؤچر)"
+                                  >
+                                    <ArrowUpRight className="w-3 h-3 text-rose-400" />
+                                    <span>- Pay</span>
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleOpenLedger(acc); }}
+                                    className="px-2.5 py-1 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 rounded-lg text-xs font-mono font-bold transition-all flex items-center space-x-1 shadow-sm whitespace-nowrap cursor-pointer"
+                                    title="View Running Ledger Statement (کھاتہ تفصیل)"
+                                  >
+                                    <FileText className="w-3 h-3 text-cyan-400" />
+                                    <span>Ledger</span>
+                                  </button>
+                                  {canManageAccounts && (
+                                    <div className="flex items-center space-x-1 ml-1 pl-1 border-l border-white/10">
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); handleOpenEditAccount(acc); }}
+                                        className="p-1.5 bg-slate-800 hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 border border-white/10 hover:border-amber-500/30 rounded-lg transition-all cursor-pointer"
+                                        title="Edit Account Title & Properties"
+                                      >
+                                        <Edit className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteAccount(acc); }}
+                                        className="p-1.5 bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-white/10 hover:border-rose-500/30 rounded-lg transition-all cursor-pointer"
+                                        title="Delete Account from Chart of Accounts"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* 2. MOBILE CARD VIEW (< md screens) */}
+                <div className="md:hidden space-y-3">
+                  {filteredAccounts.map(acc => {
+                    const isNormalDebit = ['ASSET', 'EXPENSE'].includes(acc.type);
+                    const bal = Number(acc.currentBalance) || 0;
+                    const isDr = isNormalDebit ? bal >= 0 : bal < 0;
+                    const tag = isDr ? 'Dr' : 'Cr';
+
+                    return (
+                      <div 
+                        key={acc.id}
+                        onClick={() => handleOpenLedger(acc)}
+                        className="glass-card rounded-2xl p-4 border border-white/10 bg-slate-900/90 hover:border-cyan-500/40 transition-all cursor-pointer space-y-3 shadow-lg"
+                      >
+                        {/* Header: Code + Name + Type */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                            <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-300 font-mono font-bold text-xs rounded border border-cyan-500/30">
+                              {acc.code}
+                            </span>
+                            <h4 className="text-sm font-bold text-white">{acc.name}</h4>
+                            {acc.isSystem && (
+                              <span className="px-1.5 py-0.2 bg-slate-800 text-slate-400 rounded text-[9px] font-mono border border-white/5">
+                                SYSTEM
                               </span>
-                            </td>
+                            )}
+                          </div>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono border whitespace-nowrap ${
+                            acc.type === 'ASSET' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
+                            acc.type === 'LIABILITY' ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' :
+                            acc.type === 'REVENUE' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' :
+                            acc.type === 'EXPENSE' ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' :
+                            'bg-purple-500/10 text-purple-400 border-purple-500/30'
+                          }`}>
+                            {acc.type}
+                          </span>
+                        </div>
 
-                            <td className="py-3.5 px-4 font-mono text-slate-300">
-                              <p className="font-semibold text-slate-200">{acc.subType || 'OTHER'}</p>
-                              {acc.accountNumber && (
-                                <p className="text-[10px] text-slate-400 truncate flex items-center space-x-1 mt-0.5">
-                                  <span>{acc.bankName} - {acc.accountNumber}</span>
-                                </p>
-                              )}
-                            </td>
+                        {/* Subtype & Bank details */}
+                        {(acc.subType || acc.bankName || acc.accountNumber || acc.description) && (
+                          <div className="text-xs font-mono text-slate-400 space-y-0.5 bg-slate-950/40 p-2 rounded-xl border border-white/5">
+                            {acc.accountNumber ? (
+                              <p className="text-slate-300">{acc.bankName} - {acc.accountNumber}</p>
+                            ) : (
+                              <p className="text-slate-400">Subtype: <span className="text-slate-200">{acc.subType || 'OTHER'}</span></p>
+                            )}
+                            {acc.description && <p className="text-[11px] text-slate-500 truncate">{acc.description}</p>}
+                          </div>
+                        )}
 
-                            <td className="py-3.5 px-4 text-right font-mono font-bold text-sm whitespace-nowrap">
-                              {(() => {
-                                const isNormalDebit = ['ASSET', 'EXPENSE'].includes(acc.type);
-                                const bal = Number(acc.currentBalance) || 0;
-                                const isDr = isNormalDebit ? bal >= 0 : bal < 0;
-                                const tag = isDr ? 'Dr' : 'Cr';
-                                return (
-                                  <div className="flex items-center justify-end space-x-1.5">
-                                    <span className={bal >= 0 ? 'text-white' : 'text-rose-400'}>
-                                      {formatPKR(Math.abs(bal))}
-                                    </span>
-                                    <span className={`px-1.5 py-0.2 text-[9px] font-mono font-extrabold rounded ${
-                                      tag === 'Dr' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
-                                    }`}>
-                                      {tag}
-                                    </span>
-                                  </div>
-                                );
-                              })()}
-                            </td>
+                        {/* Balance Row */}
+                        <div className="flex items-center justify-between pt-1 border-t border-white/5">
+                          <span className="text-xs font-mono text-slate-400">Current Balance:</span>
+                          <div className="flex items-center space-x-1.5">
+                            <span className={`text-base font-bold font-mono ${bal >= 0 ? 'text-white' : 'text-rose-400'}`}>
+                              {formatPKR(Math.abs(bal))}
+                            </span>
+                            <span className={`px-1.5 py-0.2 text-[9px] font-mono font-extrabold rounded ${
+                              tag === 'Dr' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                            }`}>
+                              {tag}
+                            </span>
+                          </div>
+                        </div>
 
-                            <td className="py-3.5 px-4 text-center">
-                              <div className="flex items-center justify-center space-x-1.5 flex-wrap gap-y-1">
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); openReceiveModal(acc.id); }}
-                                  className="px-2 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 rounded-lg text-[11px] font-mono transition-all flex items-center space-x-1 shadow-sm"
-                                  title="Receive / Inflow into this Ledger (آمد و وصولی واؤچر)"
-                                >
-                                  <ArrowDownLeft className="w-3 h-3 text-emerald-400" />
-                                  <span>+ Receive</span>
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); openPayModal(acc.id); }}
-                                  className="px-2 py-1 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 rounded-lg text-[11px] font-mono transition-all flex items-center space-x-1 shadow-sm"
-                                  title="Pay / Outflow from this Ledger (ادائیگی واؤچر)"
-                                >
-                                  <ArrowUpRight className="w-3 h-3 text-rose-400" />
-                                  <span>- Pay</span>
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleOpenLedger(acc); }}
-                                  className="px-2.5 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-lg text-xs font-mono transition-all flex items-center space-x-1 shadow-sm"
-                                  title="View Running Ledger Statement (کھاتہ تفصیل)"
-                                >
-                                  <FileText className="w-3 h-3 text-cyan-400" />
-                                  <span>Ledger</span>
-                                </button>
-                                {canManageAccounts && (
-                                  <>
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); handleOpenEditAccount(acc); }}
-                                      className="p-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg transition-all"
-                                      title="Edit Account Title & Properties"
-                                    >
-                                      <Edit className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); handleDeleteAccount(acc); }}
-                                      className="p-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg transition-all"
-                                      title="Delete Account from Chart of Accounts"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                        {/* Actions Toolbar */}
+                        <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-1.5 flex-wrap">
+                          <div className="grid grid-cols-3 gap-1.5 flex-1 min-w-[200px]">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openReceiveModal(acc.id); }}
+                              className="py-1.5 px-2 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 rounded-xl text-[11px] font-mono font-bold flex items-center justify-center space-x-1"
+                              title="Receive / Inflow into this Ledger"
+                            >
+                              <ArrowDownLeft className="w-3 h-3 text-emerald-400" />
+                              <span>+ Receive</span>
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openPayModal(acc.id); }}
+                              className="py-1.5 px-2 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 rounded-xl text-[11px] font-mono font-bold flex items-center justify-center space-x-1"
+                              title="Pay / Outflow from this Ledger"
+                            >
+                              <ArrowUpRight className="w-3 h-3 text-rose-400" />
+                              <span>- Pay</span>
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleOpenLedger(acc); }}
+                              className="py-1.5 px-2 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 rounded-xl text-[11px] font-mono font-bold flex items-center justify-center space-x-1"
+                              title="Open Ledger Statement"
+                            >
+                              <FileText className="w-3 h-3 text-cyan-400" />
+                              <span>Ledger</span>
+                            </button>
+                          </div>
+                          {canManageAccounts && (
+                            <div className="flex items-center space-x-1 pl-1 border-l border-white/10">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleOpenEditAccount(acc); }}
+                                className="p-1.5 bg-slate-800 text-slate-400 hover:text-amber-300 rounded-xl border border-white/10"
+                                title="Edit Account"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteAccount(acc); }}
+                                className="p-1.5 bg-slate-800 text-slate-400 hover:text-rose-300 rounded-xl border border-white/10"
+                                title="Delete Account"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
 
