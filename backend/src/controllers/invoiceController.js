@@ -571,24 +571,34 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
 
     const isTradeIn = Boolean(inv.isTradeIn);
     const numericTradeInValuation = isTradeIn ? parsePakistaniPrice(inv.tradeInValuation) : 0;
-    const numericTradeInCash = isTradeIn ? parsePakistaniPrice(inv.tradeInCashAdvance || inv.cashAmountReceived || inv.bankAmountReceived || 0) : 0;
+    const numericTradeInCash = isTradeIn ? parsePakistaniPrice(inv.tradeInCashAdvance || 0) : 0;
+    const hasTradeInInventory = isTradeIn && numericTradeInValuation > 0 && !(inv.category === 'SALES_RECEIPT' && inv.linkedBookingId);
 
     if (isConsignment) {
       // Customer-owned vehicle: Dealership does NOT receive total car price into Safe/Bank.
       // The car sale price is paid directly to the customer/seller who brought the vehicle.
       // ONLY the commission earned by dealership is deposited into Safe/Bank.
       effectiveTotalReceived = parsePakistaniPrice(inv.commissionAmount || 0);
-    } else if (isTradeIn) {
-      // For Trade-in / Car Exchange:
-      // Cash/Bank inflow is ONLY the extra cash portion (if any)
-      effectiveTotalReceived = numericTradeInCash;
     } else if (inv.category === 'BOOKING_RECEIPT') {
-      // For Booking Receipt, the initial inflow into cash safe / bank is the advance payment
-      effectiveTotalReceived = numericAdvance > 0 ? numericAdvance : numericTotalPrice;
+      if (isTradeIn) {
+        // For Booking Receipt with Trade-in / Car Exchange:
+        // Cash/Bank inflow is ONLY the extra cash advance portion (if any)
+        effectiveTotalReceived = numericTradeInCash;
+      } else {
+        effectiveTotalReceived = numericAdvance > 0 ? numericAdvance : numericTotalPrice;
+      }
     } else if (inv.category === 'SALES_RECEIPT') {
-      // For standard showroom Sales Receipt, if an advance was already collected in booking receipt (advance > 0),
-      // ONLY the remaining balance is collected and deposited into cash safe / bank now!
-      effectiveTotalReceived = numericAdvance > 0 ? numericRemaining : numericTotalPrice;
+      if (inv.linkedBookingId) {
+        // Converted from booking receipt: advance was already collected in booking.
+        // ONLY collect remaining balance into cash safe / bank now!
+        effectiveTotalReceived = numericRemaining;
+      } else if (isTradeIn) {
+        // Direct Sales Receipt with Trade-In:
+        // Liquid inflow into Cash/Bank is total price minus trade-in car value
+        effectiveTotalReceived = Math.max(0, numericTotalPrice - numericTradeInValuation);
+      } else {
+        effectiveTotalReceived = numericAdvance > 0 ? numericRemaining : numericTotalPrice;
+      }
     } else {
       // DELIVERY_LETTER or fallback
       effectiveTotalReceived = numericAdvance > 0 ? numericRemaining : numericTotalPrice;
@@ -616,21 +626,33 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
     } else {
       if (inv.paymentMethod === 'CASH') {
         cashReceived = effectiveTotalReceived;
+        bankReceived = 0;
       } else if (inv.paymentMethod === 'BANK') {
         bankReceived = effectiveTotalReceived;
+        cashReceived = 0;
       } else if (inv.paymentMethod === 'SPLIT') {
-        cashReceived = parsePakistaniPrice(inv.cashAmountReceived);
-        bankReceived = parsePakistaniPrice(inv.bankAmountReceived);
-        if (cashReceived === 0 && bankReceived === 0) {
+        const splitCash = parsePakistaniPrice(inv.cashAmountReceived);
+        const splitBank = parsePakistaniPrice(inv.bankAmountReceived);
+        if (splitCash + splitBank > 0) {
+          if (splitCash + splitBank === effectiveTotalReceived) {
+            cashReceived = splitCash;
+            bankReceived = splitBank;
+          } else {
+            const ratio = splitCash / (splitCash + splitBank);
+            cashReceived = Math.round(effectiveTotalReceived * ratio);
+            bankReceived = effectiveTotalReceived - cashReceived;
+          }
+        } else {
           cashReceived = effectiveTotalReceived;
+          bankReceived = 0;
         }
       } else {
         cashReceived = effectiveTotalReceived;
+        bankReceived = 0;
       }
     }
 
     const totalReceived = cashReceived + bankReceived;
-    const hasTradeInInventory = isTradeIn && numericTradeInValuation > 0;
 
     if (totalReceived > 0 || hasTradeInInventory) {
       let inventoryAccount = null;
@@ -1281,41 +1303,61 @@ const createInvoice = async (req, res) => {
             }
           });
         }
+      } catch (delStockErr) {
+        console.warn('Failed to auto-delete accounts stock on sales receipt:', delStockErr.message);
+      }
     }
 
-    // If this is a Trade-In Sale / Exchange, auto-create Accounts Current Stock for the customer's old car
+    // If this is a Trade-In Sale / Exchange (Booking Receipt or Sales Receipt), auto-create Accounts Current Stock for the customer's old car
     if (isTradeInSale && numericTradeInValuation > 0) {
       try {
-        const tradeInStock = await prisma.accountsStock.create({
-          data: {
-            vehicle: (tradeInVehicle && String(tradeInVehicle).trim()) ? String(tradeInVehicle).trim() : 'Customer Trade-In',
-            model: (tradeInModel && String(tradeInModel).trim()) ? String(tradeInModel).trim() : 'Car',
-            year: tradeInYear ? String(tradeInYear) : '',
-            color: tradeInColor || 'White',
-            mileage: 0,
-            regNumber: tradeInRegNumber ? String(tradeInRegNumber).trim() : null,
-            chassisNumber: tradeInChassisNumber ? String(tradeInChassisNumber).trim() : null,
-            purchasePrice: String(numericTradeInValuation),
-            askingPrice: String(numericTradeInValuation),
-            status: 'AVAILABLE',
-            location: 'Main Showroom',
-            careOf: finalBuyerName || 'Customer Trade-In',
-            notes: `Trade-In Old Car received as PKR ${numericTradeInValuation.toLocaleString()} advance credit for ${category || 'Invoice'} #${invoiceNumber}`
+        // If linked to an existing booking that already created the trade-in stock item, inherit it
+        let existingBookingStock = null;
+        if (finalLinkedBookingId) {
+          const linkedBooking = await prisma.invoice.findUnique({ where: { id: finalLinkedBookingId } });
+          if (linkedBooking && linkedBooking.tradeInStockId) {
+            existingBookingStock = await prisma.accountsStock.findUnique({ where: { id: linkedBooking.tradeInStockId } });
+            if (existingBookingStock) {
+              await prisma.invoice.update({
+                where: { id: newInvoice.id },
+                data: { tradeInStockId: existingBookingStock.id }
+              });
+            }
           }
-        });
+        }
 
-        await prisma.invoice.update({
-          where: { id: newInvoice.id },
-          data: { tradeInStockId: tradeInStock.id }
-        });
+        if (!existingBookingStock) {
+          const tradeInStock = await prisma.accountsStock.create({
+            data: {
+              vehicle: (tradeInVehicle && String(tradeInVehicle).trim()) ? String(tradeInVehicle).trim() : 'Customer Trade-In',
+              model: (tradeInModel && String(tradeInModel).trim()) ? String(tradeInModel).trim() : 'Car',
+              year: tradeInYear ? String(tradeInYear) : '',
+              color: tradeInColor || 'White',
+              mileage: 0,
+              regNumber: tradeInRegNumber ? String(tradeInRegNumber).trim() : null,
+              chassisNumber: tradeInChassisNumber ? String(tradeInChassisNumber).trim() : null,
+              purchasePrice: String(numericTradeInValuation),
+              askingPrice: String(numericTradeInValuation),
+              status: 'AVAILABLE',
+              location: 'Main Showroom',
+              careOf: finalBuyerName || 'Customer Trade-In',
+              notes: `Trade-In Old Car received as PKR ${numericTradeInValuation.toLocaleString()} advance credit for ${category || 'Invoice'} #${invoiceNumber}`
+            }
+          });
 
-        await prisma.activityLog.create({
-          data: {
-            userId: req.user.id,
-            action: 'CREATE_ACCOUNTS_STOCK',
-            details: `Auto-added Trade-In Vehicle ${tradeInStock.vehicle} ${tradeInStock.model} (Valuation: Rs. ${numericTradeInValuation.toLocaleString()}) to Accounts Current Stock upon ${category || 'Invoice'} #${invoiceNumber}`
-          }
-        });
+          await prisma.invoice.update({
+            where: { id: newInvoice.id },
+            data: { tradeInStockId: tradeInStock.id }
+          });
+
+          await prisma.activityLog.create({
+            data: {
+              userId: req.user.id,
+              action: 'CREATE_ACCOUNTS_STOCK',
+              details: `Auto-added Trade-In Vehicle ${tradeInStock.vehicle} ${tradeInStock.model} (Valuation: Rs. ${numericTradeInValuation.toLocaleString()}) to Accounts Current Stock upon ${category || 'Invoice'} #${invoiceNumber}`
+            }
+          });
+        }
       } catch (tradeErr) {
         console.warn('Failed to auto-create Accounts Current Stock for trade-in vehicle:', tradeErr.message);
       }
@@ -1709,6 +1751,86 @@ const updateInvoice = async (req, res) => {
         }
       } catch (stockErr) {
         console.warn('Could not auto-delete accounts stock item on sales receipt update:', stockErr.message);
+      }
+    }
+
+    // ----------------------------------------------------
+    // SYNC TRADE-IN VEHICLE IN ACCOUNTS CURRENT STOCK ON UPDATE
+    // ----------------------------------------------------
+    if (isTradeInSale && numericTradeInValuation > 0) {
+      try {
+        let existingTradeStock = null;
+        if (existing.tradeInStockId) {
+          existingTradeStock = await prisma.accountsStock.findUnique({ where: { id: existing.tradeInStockId } });
+        }
+        if (!existingTradeStock && (tradeInChassisNumber || tradeInRegNumber)) {
+          existingTradeStock = await prisma.accountsStock.findFirst({
+            where: {
+              OR: [
+                ...(tradeInChassisNumber ? [{ chassisNumber: { equals: String(tradeInChassisNumber).trim(), mode: 'insensitive' } }] : []),
+                ...(tradeInRegNumber ? [{ regNumber: { equals: String(tradeInRegNumber).trim(), mode: 'insensitive' } }] : [])
+              ]
+            }
+          });
+        }
+
+        if (existingTradeStock) {
+          await prisma.accountsStock.update({
+            where: { id: existingTradeStock.id },
+            data: {
+              vehicle: (tradeInVehicle && String(tradeInVehicle).trim()) ? String(tradeInVehicle).trim() : existingTradeStock.vehicle,
+              model: (tradeInModel && String(tradeInModel).trim()) ? String(tradeInModel).trim() : existingTradeStock.model,
+              year: tradeInYear !== undefined ? (tradeInYear ? String(tradeInYear) : '') : existingTradeStock.year,
+              color: tradeInColor !== undefined ? (tradeInColor || 'White') : existingTradeStock.color,
+              regNumber: tradeInRegNumber !== undefined ? (tradeInRegNumber ? String(tradeInRegNumber).trim() : null) : existingTradeStock.regNumber,
+              chassisNumber: tradeInChassisNumber !== undefined ? (tradeInChassisNumber ? String(tradeInChassisNumber).trim() : null) : existingTradeStock.chassisNumber,
+              purchasePrice: String(numericTradeInValuation),
+              askingPrice: String(numericTradeInValuation),
+              careOf: finalBuyerName || existingTradeStock.careOf,
+              notes: `Trade-In Old Car received as PKR ${numericTradeInValuation.toLocaleString()} advance credit for ${existing.category || 'Invoice'} #${existing.invoiceNumber}`
+            }
+          });
+          if (!existing.tradeInStockId) {
+            await prisma.invoice.update({
+              where: { id },
+              data: { tradeInStockId: existingTradeStock.id }
+            });
+          }
+        } else {
+          const tradeInStock = await prisma.accountsStock.create({
+            data: {
+              vehicle: (tradeInVehicle && String(tradeInVehicle).trim()) ? String(tradeInVehicle).trim() : 'Customer Trade-In',
+              model: (tradeInModel && String(tradeInModel).trim()) ? String(tradeInModel).trim() : 'Car',
+              year: tradeInYear ? String(tradeInYear) : '',
+              color: tradeInColor || 'White',
+              mileage: 0,
+              regNumber: tradeInRegNumber ? String(tradeInRegNumber).trim() : null,
+              chassisNumber: tradeInChassisNumber ? String(tradeInChassisNumber).trim() : null,
+              purchasePrice: String(numericTradeInValuation),
+              askingPrice: String(numericTradeInValuation),
+              status: 'AVAILABLE',
+              location: 'Main Showroom',
+              careOf: finalBuyerName || 'Customer Trade-In',
+              notes: `Trade-In Old Car received as PKR ${numericTradeInValuation.toLocaleString()} advance credit for ${existing.category || 'Invoice'} #${existing.invoiceNumber}`
+            }
+          });
+          await prisma.invoice.update({
+            where: { id },
+            data: { tradeInStockId: tradeInStock.id }
+          });
+        }
+      } catch (tradeErr) {
+        console.warn('Failed to sync Accounts Current Stock for trade-in vehicle on update:', tradeErr.message);
+      }
+    } else if (!isTradeInSale && existing.tradeInStockId) {
+      try {
+        await prisma.accountsStock.delete({ where: { id: existing.tradeInStockId } });
+        await prisma.invoice.update({
+          where: { id },
+          data: { tradeInStockId: null }
+        });
+      } catch (delTradeErr) {
+        console.warn('Failed to delete trade-in stock on disable:', delTradeErr.message);
       }
     }
 

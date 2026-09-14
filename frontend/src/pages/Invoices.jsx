@@ -1216,19 +1216,26 @@ export default function Invoices({ onNavigate }) {
 
           ${inv.isTradeIn ? `
             <!-- Vehicle Trade-In / Car Exchange Details in Booking Receipt -->
-            <div style="margin-top: 10px; border: 1.5px solid #d97706; border-radius: 4px; overflow: hidden; background: #ffffff;">
-              <div style="background: #d97706; color: #ffffff; padding: 3px 8px; font-size: 9.5px; font-weight: 800; display: flex; justify-content: space-between;">
-                <span>🔄 تبادلہ شدہ پرانی گاڑی کی تفصیلات (VEHICLE TRADE-IN / EXCHANGE DETAILS)</span>
-                <span>بطور بیعانہ وصولی</span>
+            <div style="margin-top: 10px; border: 2px solid #d97706; border-radius: 6px; overflow: hidden; background: #ffffff;">
+              <div style="background: #d97706; color: #ffffff; padding: 4px 10px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center;">
+                <span>🔄 گاڑی کا باہمی تبادلہ و بیعانہ معاہدہ (VEHICLE TRADE-IN EXCHANGE FOR NEW VEHICLE)</span>
+                <span>پرانی گاڑی بطور بیعانہ ایڈجسٹمنٹ</span>
               </div>
-              <div style="padding: 5px 8px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; font-size: 9px; background: #fffbeb; border-bottom: 1px solid #fde68a;">
-                <div><strong>گاڑی (Maker/Model):</strong> <span style="font-weight: 700;">${inv.tradeInVehicle || ''} ${inv.tradeInModel || ''} (${inv.tradeInYear || ''})</span></div>
+              <div style="padding: 6px 10px; background: #fffbeb; border-bottom: 1px solid #fde68a; font-size: 9.5px; color: #92400e; font-weight: 600; line-height: 1.4;">
+                خریدار <strong>${buyerName}</strong> نے اپنی پرانی گاڑی <strong>${inv.tradeInVehicle || ''} ${inv.tradeInModel || ''} (${inv.tradeInYear || ''})</strong> مالیت <strong>Rs. ${parsePakistaniPrice(inv.tradeInValuation || 0).toLocaleString()}</strong> شوروم کو دے کر نئی گاڑی <strong>${vehicle} (رجسٹریشن: ${regNo || 'Unregistered'})</strong> کی بکنگ کے پیشگی بیعانہ کے طور پر ایڈجسٹ کروائی ہے۔
+                <br/>
+                <span style="font-size: 8.5px; color: #78350f; font-style: italic;">(Customer traded in their old vehicle ${inv.tradeInVehicle || ''} ${inv.tradeInModel || ''} valued at PKR ${parsePakistaniPrice(inv.tradeInValuation || 0).toLocaleString()} in exchange towards the booking of new vehicle ${vehicle}).</span>
+              </div>
+              <div style="padding: 5px 10px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; font-size: 9px; background: #ffffff; border-bottom: 1px solid #f1f5f9;">
+                <div><strong>تبادلہ گاڑی (Make/Model):</strong> <span style="font-weight: 700;">${inv.tradeInVehicle || ''} ${inv.tradeInModel || ''} (${inv.tradeInYear || ''})</span></div>
                 <div><strong>رجسٹریشن (Reg No):</strong> <span style="font-family: monospace; font-weight: 700;">${inv.tradeInRegNumber || 'Unregistered'}</span></div>
-                <div><strong>چیسس (Chassis No):</strong> <span style="font-family: monospace; font-weight: 700;">${inv.tradeInChassisNumber || 'N/A'}</span></div>
+                <div><strong>چیسس نمبر (Chassis):</strong> <span style="font-family: monospace; font-weight: 700;">${inv.tradeInChassisNumber || 'N/A'}</span></div>
+                <div><strong>رنگ (Color):</strong> <span style="font-weight: 700;">${inv.tradeInColor || 'N/A'}</span></div>
               </div>
-              <div style="padding: 4px 8px; display: flex; justify-content: space-between; font-size: 9px; background: #ffffff;">
-                <div><strong>پرانی گاڑی کی طے شدہ قیمت (Trade Valuation):</strong> <span style="font-family: monospace; font-weight: 800; color: #d97706;">Rs. ${parsePakistaniPrice(inv.tradeInValuation || 0).toLocaleString()}</span></div>
-                ${parsePakistaniPrice(inv.tradeInCashAdvance || 0) > 0 ? `<div><strong>اضافی نقد بیعانہ (Extra Cash Paid):</strong> <span style="font-family: monospace; font-weight: 800; color: #16a34a;">Rs. ${parsePakistaniPrice(inv.tradeInCashAdvance).toLocaleString()}</span></div>` : ''}
+              <div style="padding: 5px 10px; display: flex; justify-content: space-between; font-size: 9px; background: #f8fafc;">
+                <div><strong>پرانی گاڑی کی طے شدہ قیمت (Valuation Credit):</strong> <span style="font-family: monospace; font-weight: 800; color: #d97706;">Rs. ${parsePakistaniPrice(inv.tradeInValuation || 0).toLocaleString()}</span></div>
+                <div><strong>اضافی نقد بیعانہ (Extra Cash Paid):</strong> <span style="font-family: monospace; font-weight: 800; color: #16a34a;">Rs. ${parsePakistaniPrice(inv.tradeInCashAdvance || 0).toLocaleString()}</span></div>
+                <div><strong>کل ایڈوانس بیعانہ (Total Advance):</strong> <span style="font-family: monospace; font-weight: 800; color: #0284c7;">Rs. ${numericAdvance.toLocaleString()}</span></div>
               </div>
             </div>
           ` : ''}
@@ -1404,21 +1411,27 @@ export default function Invoices({ onNavigate }) {
 
           ${inv.isTradeIn ? `
             <!-- Vehicle Trade-In / Car Exchange Details in Sales Receipt -->
-            <div style="border: 1.5px solid #d97706; border-radius: 5px; margin-bottom: 6px; overflow: hidden; background: #ffffff;">
-              <div style="background: #d97706; color: #ffffff; padding: 3.5px 8px; font-size: 9.5px; font-weight: 800; display: flex; justify-content: space-between; align-items: center;">
-                <span>🔄 گاڑی کا تبادلہ (VEHICLE TRADE-IN / EXCHANGE AS ADVANCE)</span>
-                <span>بطور پیشگی بیعانہ ایڈجسٹمنٹ</span>
+            <div style="border: 2px solid #d97706; border-radius: 6px; margin-bottom: 6px; overflow: hidden; background: #ffffff;">
+              <div style="background: #d97706; color: #ffffff; padding: 4px 10px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center;">
+                <span>🔄 گاڑی کا باہمی تبادلہ و خریداری معاہدہ (CUSTOMER VEHICLE TRADE-IN / EXCHANGE CONTRACT)</span>
+                <span>پرانی گاڑی بطور جزوی قیمت ایڈجسٹمنٹ</span>
               </div>
-              <div style="padding: 5px 8px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 9px; background: #fffbeb; border-bottom: 1px solid #fde68a;">
-                <div><strong>تبادلہ گاڑی (Maker/Model):</strong> <span style="font-weight: 700;">${inv.tradeInVehicle || ''} ${inv.tradeInModel || ''} (${inv.tradeInYear || ''})</span></div>
+              <div style="padding: 6px 10px; background: #fffbeb; border-bottom: 1px solid #fde68a; font-size: 9.5px; color: #92400e; font-weight: 600; line-height: 1.4;">
+                خریدار <strong>${buyer}</strong> نے اپنی پرانی گاڑی <strong>${inv.tradeInVehicle || ''} ${inv.tradeInModel || ''} (${inv.tradeInYear || ''})</strong> مالیت <strong>Rs. ${parsePakistaniPrice(inv.tradeInValuation || 0).toLocaleString()}</strong> شوروم کے سپرد کر کے یہ نئی گاڑی <strong>${vehicle} (رجسٹریشن: ${regNo || 'Unregistered'})</strong> خریدی ہے۔
+                <br/>
+                <span style="font-size: 8.5px; color: #78350f; font-style: italic;">(Customer traded in vehicle ${inv.tradeInVehicle || ''} ${inv.tradeInModel || ''} valued at PKR ${parsePakistaniPrice(inv.tradeInValuation || 0).toLocaleString()} in exchange against the purchase of this new vehicle).</span>
+              </div>
+              <div style="padding: 5px 10px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 9px; background: #ffffff; border-bottom: 1px solid #f1f5f9;">
+                <div><strong>تبادلہ گاڑی (Make/Model):</strong> <span style="font-weight: 700;">${inv.tradeInVehicle || ''} ${inv.tradeInModel || ''} (${inv.tradeInYear || ''})</span></div>
                 <div><strong>رجسٹریشن نمبر (Reg No):</strong> <span style="font-family: monospace; font-weight: 700;">${inv.tradeInRegNumber || 'Unregistered'}</span></div>
                 <div><strong>چیسس نمبر (Chassis No):</strong> <span style="font-family: monospace; font-weight: 700;">${inv.tradeInChassisNumber || 'N/A'}</span></div>
                 <div><strong>رنگ (Color):</strong> <span style="font-weight: 700;">${inv.tradeInColor || 'N/A'}</span></div>
               </div>
-              <div style="padding: 4px 8px; display: flex; justify-content: space-between; font-size: 9px; background: #ffffff;">
-                <div><strong>پرانی گاڑی کی طے شدہ مالیت (Valuation Credit):</strong> <span style="font-family: monospace; font-weight: 800; color: #d97706;">Rs. ${parsePakistaniPrice(inv.tradeInValuation || 0).toLocaleString()}</span></div>
+              <div style="padding: 5px 10px; display: flex; justify-content: space-between; font-size: 9px; background: #f8fafc;">
+                <div><strong>پرانی گاڑی کی مالیت (Trade Valuation Credit):</strong> <span style="font-family: monospace; font-weight: 800; color: #d97706;">Rs. ${parsePakistaniPrice(inv.tradeInValuation || 0).toLocaleString()}</span></div>
                 ${parsePakistaniPrice(inv.tradeInCashAdvance || 0) > 0 ? `<div><strong>اضافی نقد بیعانہ (Extra Cash Paid):</strong> <span style="font-family: monospace; font-weight: 800; color: #16a34a;">Rs. ${parsePakistaniPrice(inv.tradeInCashAdvance).toLocaleString()}</span></div>` : ''}
                 <div><strong>کل ایڈوانس بیعانہ (Total Advance):</strong> <span style="font-family: monospace; font-weight: 800; color: #0284c7;">Rs. ${numericAdvance.toLocaleString()}</span></div>
+                <div><strong>بقایا واجب الادا رقم (Remaining Cash/Bank):</strong> <span style="font-family: monospace; font-weight: 800; color: #dc2626;">Rs. ${numericRemaining.toLocaleString()}</span></div>
               </div>
             </div>
           ` : ''}
@@ -2090,6 +2103,11 @@ export default function Invoices({ onNavigate }) {
                           ) : (
                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-white/10 font-sans font-bold">
                               💵 Cash
+                            </span>
+                          )}
+                          {inv.isTradeIn && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-sans font-bold">
+                              🔄 Trade-In: Rs. {parsePakistaniPrice(inv.tradeInValuation || 0).toLocaleString()}
                             </span>
                           )}
                           {inv.isInstallmentSale && (
@@ -2901,6 +2919,33 @@ export default function Invoices({ onNavigate }) {
                   <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-white/10">
                     <h5 className="text-xs font-bold text-emerald-400 uppercase tracking-wider border-b border-white/10 pb-2">4. Money Receiving Mode & Bank Details</h5>
                     
+                    {formData.isTradeIn && (
+                      <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/30 text-xs space-y-1.5">
+                        <div className="flex items-center justify-between font-bold">
+                          <span className="text-amber-300">🔄 Vehicle Trade-In Payment Flow Breakdown:</span>
+                          <span className="font-mono text-amber-400">Total Adv: PKR {parsePakistaniPrice(formData.advanceAmount || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
+                          <div className="p-2 bg-slate-950/80 rounded border border-white/10">
+                            <span className="text-slate-400 block font-medium">🚗 Traded-In Vehicle Asset:</span>
+                            <span className="text-amber-400 font-bold font-mono">PKR {parsePakistaniPrice(formData.tradeInValuation || 0).toLocaleString()}</span>
+                            <span className="text-[10px] text-slate-400 block">Enters Accounts Current Stock & Debits Inventory (1100)</span>
+                          </div>
+                          <div className="p-2 bg-slate-950/80 rounded border border-white/10">
+                            <span className="text-slate-400 block font-medium">💵 Extra Liquid Cash Advance:</span>
+                            <span className="text-emerald-400 font-bold font-mono">
+                              PKR {parsePakistaniPrice(formData.tradeInCashAdvance || 0).toLocaleString()}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block">
+                              {parsePakistaniPrice(formData.tradeInCashAdvance || 0) > 0 
+                                ? `Deposits to ${formData.paymentMethod === 'BANK' ? 'Bank Account' : formData.paymentMethod === 'SPLIT' ? 'Split Cash & Bank' : 'Cash Safe'}`
+                                : 'Rs. 0 (Safe & Bank remain unchanged)'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 bg-emerald-500/5 rounded-xl border border-emerald-500/20">
                       <div>
                         <label className="block text-xs font-semibold text-slate-300 mb-1">Payment Method</label>
@@ -3561,21 +3606,46 @@ export default function Invoices({ onNavigate }) {
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-300 mb-1">
-                            Payment Method <span className="text-rose-400">*</span>
-                          </label>
-                          <select
-                            value={formData.paymentMethod || 'CASH'}
-                            onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
-                            className="w-full px-3 py-2.5 rounded-lg bg-slate-950 border border-cyan-500/40 text-white text-xs font-bold focus:border-cyan-400 font-mono"
-                          >
-                            <option value="CASH">💵 100% Cash in Hand (Showroom Safe)</option>
-                            <option value="BANK">🏦 100% Bank Account Transfer</option>
-                            <option value="SPLIT">🔀 Split Payment (Cash + Bank)</option>
-                          </select>
+                    {formData.isTradeIn && (
+                      <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/30 text-xs space-y-1.5">
+                        <div className="flex items-center justify-between font-bold">
+                          <span className="text-amber-300">🔄 Vehicle Trade-In Payment Flow Breakdown:</span>
+                          <span className="font-mono text-amber-400">Total Price: PKR {parsePakistaniPrice(formData.totalPrice || 0).toLocaleString()}</span>
                         </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
+                          <div className="p-2 bg-slate-950/80 rounded border border-white/10">
+                            <span className="text-slate-400 block font-medium">🚗 Traded-In Vehicle Asset:</span>
+                            <span className="text-amber-400 font-bold font-mono">PKR {parsePakistaniPrice(formData.tradeInValuation || 0).toLocaleString()}</span>
+                            <span className="text-[10px] text-slate-400 block">Enters Accounts Current Stock & Debits Inventory (1100)</span>
+                          </div>
+                          <div className="p-2 bg-slate-950/80 rounded border border-white/10">
+                            <span className="text-slate-400 block font-medium">💵 Net Liquid Amount to Collect:</span>
+                            <span className="text-emerald-400 font-bold font-mono">
+                              PKR {Math.max(0, parsePakistaniPrice(formData.totalPrice || 0) - parsePakistaniPrice(formData.tradeInValuation || 0)).toLocaleString()}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block">
+                              Deposits into {formData.paymentMethod === 'BANK' ? 'Bank Account' : formData.paymentMethod === 'SPLIT' ? 'Split Cash & Bank' : 'Cash Safe'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Payment Method <span className="text-rose-400">*</span>
+                        </label>
+                        <select
+                          value={formData.paymentMethod || 'CASH'}
+                          onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
+                          className="w-full px-3 py-2.5 rounded-lg bg-slate-950 border border-cyan-500/40 text-white text-xs font-bold focus:border-cyan-400 font-mono"
+                        >
+                          <option value="CASH">💵 100% Cash in Hand (Showroom Safe)</option>
+                          <option value="BANK">🏦 100% Bank Account Transfer</option>
+                          <option value="SPLIT">🔀 Split Payment (Cash + Bank)</option>
+                        </select>
+                      </div>
 
                         {(formData.paymentMethod === 'BANK' || formData.paymentMethod === 'SPLIT') && (
                           <div className="sm:col-span-2">
