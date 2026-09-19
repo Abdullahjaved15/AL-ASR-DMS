@@ -232,27 +232,27 @@ export default function AccountsStock({ onNavigate }) {
           <title>AL ASR MOTORS - Accounts Current Stock (${todayStr})</title>
           <style>
             @media print {
-              @page { size: landscape; margin: 4mm 6mm; }
+              @page { size: portrait; margin: 4mm 6mm; }
               body { padding: 0 !important; background: #ffffff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
               .no-print { display: none !important; }
               .sheet { page-break-after: always; break-after: page; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; padding: 2px; }
               .sheet:last-child { page-break-after: auto; break-after: auto; }
             }
             * { box-sizing: border-box; }
-            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 10px; margin: 0; color: #0f172a; background: #f8fafc; font-size: 8.5px; line-height: 1.15; font-weight: 800; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 10px; margin: 0; color: #0f172a; background: #f8fafc; font-size: 8px; line-height: 1.15; font-weight: 800; }
             .sheet {
               background: #ffffff;
               border: 1px solid #e2e8f0;
               border-radius: 6px;
               margin: 0 auto 16px auto;
-              max-width: 297mm;
+              max-width: 210mm;
               padding: 12px;
               box-shadow: 0 4px 15px rgba(0,0,0,0.06);
               box-sizing: border-box;
               display: flex;
               flex-direction: column;
               justify-content: space-between;
-              min-height: 195mm;
+              min-height: 275mm;
             }
             @media print {
               .sheet { border: none; border-radius: 0; margin: 0; max-width: none; padding: 0; box-shadow: none; min-height: 0; }
@@ -265,7 +265,7 @@ export default function AccountsStock({ onNavigate }) {
               color: white;
               padding: 8px 16px;
               border-radius: 8px;
-              max-width: 297mm;
+              max-width: 210mm;
               margin: 0 auto 12px auto;
               display: flex;
               flex-wrap: wrap;
@@ -313,13 +313,13 @@ export default function AccountsStock({ onNavigate }) {
             .logo-box { display: flex; align-items: center; gap: 8px; }
             .title { font-size: 13px; font-weight: 800; color: #0f172a; letter-spacing: 0.3px; }
             .subtitle { font-size: 8px; color: #64748b; font-family: monospace; font-weight: 800; }
-            .stats-inline { display: flex; gap: 10px; font-size: 8px; background: #f8fafc; padding: 3px 8px; border-radius: 4px; border: 1px solid #e2e8f0; }
+            .stats-inline { display: flex; gap: 8px; font-size: 7.5px; background: #f8fafc; padding: 3px 6px; border-radius: 4px; border: 1px solid #e2e8f0; }
             .stat-item { font-weight: 800; color: #334155; }
             .stat-item strong { color: #0284c7; font-weight: 900; }
-            table { width: 100%; border-collapse: collapse; margin-top: 2px; border: 1.5px solid #0f172a; font-size: 8.5px; font-weight: 800; }
-            th { background: #0f172a; color: #ffffff; text-align: left; padding: 4px 5px; font-size: 8.5px; font-weight: 800; text-transform: uppercase; border: 1px solid #334155; }
-            td { padding: 3.5px 5px; border: 1px solid #64748b; font-size: 8.5px; font-weight: 800; vertical-align: middle; color: #0f172a; }
-            td * { font-size: 8.5px !important; font-weight: 800 !important; color: #0f172a !important; }
+            table { width: 100%; border-collapse: collapse; margin-top: 2px; border: 1.5px solid #0f172a; font-size: 8px; font-weight: 800; }
+            th { background: #0f172a; color: #ffffff; text-align: left; padding: 3.5px 3px; font-size: 7.8px; font-weight: 800; text-transform: uppercase; border: 1px solid #334155; }
+            td { padding: 3px 3px; border: 1px solid #64748b; font-size: 8px; font-weight: 800; vertical-align: middle; color: #0f172a; }
+            td * { font-size: 8px !important; font-weight: 800 !important; color: #0f172a !important; }
             tr:nth-child(even) { background: #f8fafc; }
             .footer { margin-top: 6px; text-align: center; font-size: 8px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 3px; font-weight: 800; }
           </style>
@@ -412,17 +412,17 @@ export default function AccountsStock({ onNavigate }) {
                       <table>
                         <thead>
                           <tr>
-                            <th style="width: 25px;">#</th>
+                            <th style="width: 18px;">#</th>
                             <th>Vehicle & Model Specs</th>
-                            <th style="width: 45px;">Year</th>
-                            <th style="width: 55px;">Color</th>
-                            <th style="width: 65px;">Mileage</th>
-                            <th style="width: 85px;">Reg / Plate #</th>
-                            <th style="width: 105px;">Purchase Cost (PKR)</th>
-                            <th style="width: 105px;">Asking Demand (PKR)</th>
-                            <th style="width: 95px;">Projected Margin</th>
-                            <th style="width: 65px;">Care Of</th>
-                            <th style="width: 70px;">Status</th>
+                            <th style="width: 28px;">Year</th>
+                            <th style="width: 38px;">Color</th>
+                            <th style="width: 48px;">Mileage</th>
+                            <th style="width: 60px;">Reg #</th>
+                            <th style="width: 68px;">Cost (PKR)</th>
+                            <th style="width: 68px;">Demand (PKR)</th>
+                            <th style="width: 60px;">Margin</th>
+                            <th style="width: 42px;">Care Of</th>
+                            <th style="width: 52px;">Status</th>
                           </tr>
                         </thead>
                         <tbody>
