@@ -123,20 +123,22 @@ const createAccount = async (req, res) => {
       return res.status(400).json({ message: 'Account name / title is required.' });
     }
 
-    // Determine normalized classification type
+    // Determine normalized classification type and subtype
     let finalType = type || 'LIABILITY';
     let finalSubType = subType || 'OTHER';
 
-    if (classificationType === 'BANK_ACCOUNT' || subType === 'BANK' || type === 'BANK') {
+    if (subType === 'BANK' || type === 'BANK' || classificationType === 'BANK_ACCOUNT') {
       finalType = 'ASSET';
       finalSubType = 'BANK';
-    } else if (classificationType === 'CASH_ACCOUNT' || subType === 'CASH' || type === 'CASH') {
+    } else if (subType === 'CASH' || type === 'CASH' || classificationType === 'CASH_ACCOUNT') {
       finalType = 'ASSET';
       finalSubType = 'CASH';
+    } else if (type && ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'].includes(type)) {
+      finalType = type;
+      finalSubType = subType || (type === 'EXPENSE' ? 'EXPENSE' : 'OTHER');
     } else {
-      // Classification is OTHER (Vendors, Parties, Sellers, Salaries, Expenses, Customers, etc.)
-      finalType = type && ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'].includes(type) ? type : 'LIABILITY';
-      finalSubType = 'OTHER';
+      finalType = 'LIABILITY';
+      finalSubType = subType || 'OTHER';
     }
 
     // Auto-generate code if not provided
@@ -145,6 +147,11 @@ const createAccount = async (req, res) => {
       let prefix = '3';
       if (finalSubType === 'CASH') prefix = '1';
       else if (finalSubType === 'BANK') prefix = '2';
+      else if (finalType === 'ASSET') prefix = '1';
+      else if (finalType === 'LIABILITY') prefix = '2';
+      else if (finalType === 'EQUITY') prefix = '3';
+      else if (finalType === 'REVENUE') prefix = '4';
+      else if (finalType === 'EXPENSE') prefix = '5';
       else prefix = '3';
       
       const existingAccounts = await prisma.account.findMany({
@@ -280,32 +287,68 @@ const updateAccount = async (req, res) => {
   }
 };
 
-// 5. Delete Account (Only if no transactions linked)
+// 5. Delete Account (Accounts Head / Super Admin: Deletes ledger and its transaction history cleanly)
 const deleteAccount = async (req, res) => {
   try {
     const { id } = req.params;
 
     const account = await prisma.account.findUnique({
       where: { id },
-      include: { _count: { select: { entries: true } } }
+      include: {
+        _count: { select: { entries: true, securityCheques: true } }
+      }
     });
 
     if (!account) {
-      return res.status(404).json({ message: 'Account not found' });
+      return res.status(404).json({ message: 'Account / Ledger not found' });
     }
 
-    if (account.isSystem) {
-      return res.status(400).json({ message: 'System accounts cannot be deleted' });
-    }
+    const totalEntries = account._count?.entries || 0;
 
-    if (account._count.entries > 0) {
-      return res.status(400).json({
-        message: `Cannot delete account "${account.name}". It contains ${account._count.entries} transaction entries. You can deactivate it instead.`
-      });
-    }
+    // 1. Unlink from Security Cheques
+    await prisma.securityCheque.updateMany({
+      where: { bankAccountId: id },
+      data: { bankAccountId: null }
+    });
 
+    // 2. Unlink from Invoices / Receipts
+    await prisma.invoice.updateMany({
+      where: { bankAccountId: id },
+      data: { bankAccountId: null }
+    });
+
+    // 3. Unlink from Installment items
+    await prisma.installmentItem.updateMany({
+      where: { bankAccountId: id },
+      data: { bankAccountId: null }
+    });
+
+    // 4. Unlink from Accounts Stock
+    await prisma.accountsStock.updateMany({
+      where: { ledgerAccountId: id },
+      data: { ledgerAccountId: null, ledgerAccountName: null }
+    });
+
+    // 5. Delete all transaction entries for this account
+    await prisma.transactionEntry.deleteMany({
+      where: { accountId: id }
+    });
+
+    // 6. Delete the Account / Ledger
     await prisma.account.delete({ where: { id } });
-    return res.json({ message: 'Account deleted successfully' });
+
+    // 7. Log activity
+    await prisma.activityLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'DELETE_ACCOUNT_LEDGER',
+        details: `Accounts Head deleted ledger account "${account.name}" (${account.code})${totalEntries > 0 ? ` and cleaned up its ${totalEntries} transaction entries` : ''}.`
+      }
+    });
+
+    return res.json({
+      message: `Account "${account.name}" (${account.code}) and all its associated ledger entries have been deleted successfully.`
+    });
   } catch (error) {
     console.error('deleteAccount error:', error);
     return res.status(500).json({ message: 'Failed to delete account', error: error.message });

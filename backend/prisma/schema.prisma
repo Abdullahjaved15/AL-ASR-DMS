@@ -717,7 +717,7 @@ model TransactionEntry {
   transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
   
   accountId     String
-  account       Account     @relation(fields: [accountId], references: [id])
+  account       Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
   
   type          String      // DEBIT, CREDIT
   amount        Float
@@ -736,7 +736,7 @@ model SecurityCheque {
   type          String    @default("ISSUED") // ISSUED (Given by Al-Asr), RECEIVED (Taken from customer)
   
   bankAccountId String?
-  bankAccount   Account?  @relation(fields: [bankAccountId], references: [id])
+  bankAccount   Account?  @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
   
   bankName      String    // Name of the bank (e.g. Meezan Bank)
   partyName     String    // Payee / Party / Supplier / Customer

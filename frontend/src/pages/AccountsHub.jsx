@@ -436,11 +436,16 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
     await handleFilterLedger(null, emptyFilter);
   };
 
-  const generateNextAccountCode = (classificationType = 'OTHER', existingAccounts = []) => {
+  const generateNextAccountCode = (accType = 'EXPENSE', accSubType = 'EXPENSE', existingAccounts = []) => {
     const existingCodes = new Set(existingAccounts.map(a => String(a.code || '').trim()));
-    let prefix = '3';
-    if (classificationType === 'CASH_ACCOUNT') prefix = '1';
-    else if (classificationType === 'BANK_ACCOUNT') prefix = '2';
+    let prefix = '5';
+    if (accSubType === 'CASH') prefix = '1';
+    else if (accSubType === 'BANK') prefix = '2';
+    else if (accType === 'ASSET') prefix = '1';
+    else if (accType === 'LIABILITY') prefix = '2';
+    else if (accType === 'EQUITY') prefix = '3';
+    else if (accType === 'REVENUE') prefix = '4';
+    else if (accType === 'EXPENSE') prefix = '5';
     else prefix = '3';
     
     let candidate = parseInt(`${prefix}001`, 10);
@@ -450,14 +455,13 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
     return String(candidate);
   };
 
-  const openAddAccountModal = (defaultClassification = 'OTHER') => {
-    const autoCode = generateNextAccountCode(defaultClassification, accounts);
+  const openAddAccountModal = (defaultType = 'EXPENSE', defaultSubType = 'EXPENSE') => {
+    const autoCode = generateNextAccountCode(defaultType, defaultSubType, accounts);
     setAccountFormData({
       code: autoCode,
       name: '',
-      classificationType: defaultClassification,
-      type: defaultClassification === 'OTHER' ? 'LIABILITY' : 'ASSET',
-      subType: defaultClassification === 'BANK_ACCOUNT' ? 'BANK' : defaultClassification === 'CASH_ACCOUNT' ? 'CASH' : 'OTHER',
+      type: defaultType,
+      subType: defaultSubType,
       bankName: '',
       accountNumber: '',
       branch: '',
@@ -467,13 +471,38 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
     setIsAddAccountModalOpen(true);
   };
 
-  const handleClassificationTypeChange = (newClassification) => {
-    const newCode = generateNextAccountCode(newClassification, accounts);
+  const handleTypeChange = (newType) => {
+    let newSubType = accountFormData.subType;
+    if (newType === 'EXPENSE' && newSubType !== 'EXPENSE') newSubType = 'EXPENSE';
+    else if (newType === 'LIABILITY' && (newSubType === 'BANK' || newSubType === 'CASH')) newSubType = 'VENDOR';
+    else if (newType === 'EQUITY' && (newSubType === 'BANK' || newSubType === 'CASH')) newSubType = 'CAPITAL';
+    else if (newType === 'ASSET' && (newSubType === 'EXPENSE' || newSubType === 'VENDOR' || newSubType === 'CAPITAL')) newSubType = 'CUSTOMER';
+    
+    const newCode = generateNextAccountCode(newType, newSubType, accounts);
     setAccountFormData(prev => ({
       ...prev,
-      classificationType: newClassification,
-      type: newClassification === 'OTHER' ? 'LIABILITY' : 'ASSET',
-      subType: newClassification === 'BANK_ACCOUNT' ? 'BANK' : newClassification === 'CASH_ACCOUNT' ? 'CASH' : 'OTHER',
+      type: newType,
+      subType: newSubType,
+      code: newCode
+    }));
+  };
+
+  const handleSubTypeChange = (newSubType) => {
+    let newType = accountFormData.type;
+    if (newSubType === 'BANK' || newSubType === 'CASH' || newSubType === 'CUSTOMER') {
+      newType = 'ASSET';
+    } else if (newSubType === 'VENDOR') {
+      newType = 'LIABILITY';
+    } else if (newSubType === 'CAPITAL') {
+      newType = 'EQUITY';
+    } else if (newSubType === 'EXPENSE') {
+      newType = 'EXPENSE';
+    }
+    const newCode = generateNextAccountCode(newType, newSubType, accounts);
+    setAccountFormData(prev => ({
+      ...prev,
+      type: newType,
+      subType: newSubType,
       code: newCode
     }));
   };
@@ -489,9 +518,8 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
       setAccountFormData({
         code: '',
         name: '',
-        classificationType: 'OTHER',
-        type: 'LIABILITY',
-        subType: 'OTHER',
+        type: 'EXPENSE',
+        subType: 'EXPENSE',
         bankName: '',
         accountNumber: '',
         branch: '',
@@ -758,15 +786,15 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
   const handleDeleteAccount = async (acc) => {
     const isBank = acc.subType === 'BANK';
     const confirmPrompt = window.confirm(
-      `Are you sure you want to delete ${isBank ? 'bank account' : 'account'} "${acc.name}" (${acc.code})?\n\nThis will remove it from the Chart of Accounts and safely clean up unposted associations.`
+      `Are you sure you want to delete ${isBank ? 'bank account' : 'ledger account'} "${acc.name}" (${acc.code})?\n\nThis will permanently delete this ledger and all its transaction history from the Chart of Accounts.`
     );
     if (!confirmPrompt) return;
 
     try {
-      await api.deleteAccount(acc.id);
+      const res = await api.deleteAccount(acc.id);
       fetchAccountsData();
       fetchBankCashAccounts();
-      alert(`${isBank ? 'Bank account' : 'Account'} deleted successfully!`);
+      alert(res?.message || `${isBank ? 'Bank account' : 'Account'} and its ledger history deleted successfully!`);
     } catch (err) {
       alert(err.message || 'Failed to delete account');
     }
@@ -3182,7 +3210,7 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                     <input
                       type="text"
                       required
-                      placeholder="e.g. 1001"
+                      placeholder="e.g. 5001"
                       value={accountFormData.code}
                       onChange={(e) => setAccountFormData({ ...accountFormData, code: e.target.value })}
                       className="w-full bg-slate-900 border border-cyan-500/30 rounded-xl pl-3 pr-8 py-2 text-sm text-cyan-300 font-bold focus:outline-none focus:border-cyan-400 font-mono shadow-sm"
@@ -3190,7 +3218,7 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                     <button
                       type="button"
                       onClick={() => {
-                        const regenerated = generateNextAccountCode(accountFormData.classificationType, accounts);
+                        const regenerated = generateNextAccountCode(accountFormData.type, accountFormData.subType, accounts);
                         setAccountFormData(prev => ({ ...prev, code: regenerated }));
                       }}
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-cyan-400 p-1 transition-colors"
@@ -3207,22 +3235,34 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                 <div>
                   <label className="block text-xs font-mono text-slate-400 mb-1">Classification Type *</label>
                   <select
-                    value={accountFormData.classificationType}
-                    onChange={(e) => handleClassificationTypeChange(e.target.value)}
+                    value={accountFormData.type}
+                    onChange={(e) => handleTypeChange(e.target.value)}
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono font-bold"
                   >
-                    <option value="BANK_ACCOUNT">🏦 Bank Account</option>
-                    <option value="CASH_ACCOUNT">💵 Cash Account</option>
-                    <option value="OTHER">📁 Other (Vendors, Salaries, Parties, etc.)</option>
+                    <option value="ASSET">ASSET (Assets / Cash / Bank)</option>
+                    <option value="LIABILITY">LIABILITY (Liabilities / Payables)</option>
+                    <option value="EQUITY">EQUITY (Capital & Equity)</option>
+                    <option value="REVENUE">REVENUE (Sales & Income)</option>
+                    <option value="EXPENSE">EXPENSE (Operating Expenses)</option>
                   </select>
-                  <p className="text-[10px] text-slate-500 font-mono mt-1">
-                    {accountFormData.classificationType === 'BANK_ACCOUNT' 
-                      ? 'Bank accounts with IBAN/branch tracking' 
-                      : accountFormData.classificationType === 'CASH_ACCOUNT' 
-                      ? 'Cash in hand / Showroom safe ledger' 
-                      : 'Vendors, sellers, expenses, salaries, parties'}
-                  </p>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-400 mb-1">Sub-Type *</label>
+                <select
+                  value={accountFormData.subType}
+                  onChange={(e) => handleSubTypeChange(e.target.value)}
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono font-bold"
+                >
+                  <option value="EXPENSE">Expense Account (Salaries, Rent, Utilities, Tea, etc.)</option>
+                  <option value="BANK">Bank Account (IBAN & Branch Tracking)</option>
+                  <option value="CASH">Cash Account (Showroom Safe / Petty Cash)</option>
+                  <option value="CUSTOMER">Customer Receivable (Party / Buyer Ledger)</option>
+                  <option value="VENDOR">Vendor / Seller Payable (Supplier Ledger)</option>
+                  <option value="CAPITAL">Capital / Equity (Partner Investment)</option>
+                  <option value="OTHER">Other / General Ledger</option>
+                </select>
               </div>
 
               <div>
@@ -3231,11 +3271,13 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                   type="text"
                   required
                   placeholder={
-                    accountFormData.classificationType === 'BANK_ACCOUNT'
+                    accountFormData.subType === 'BANK'
                       ? 'e.g. Meezan Bank Showroom Account'
-                      : accountFormData.classificationType === 'CASH_ACCOUNT'
+                      : accountFormData.subType === 'CASH'
                       ? 'e.g. Main Showroom Cash Safe'
-                      : 'e.g. Haji Ahmad Sab (Seller), Staff Salaries, or Showroom Rent'
+                      : accountFormData.subType === 'EXPENSE'
+                      ? 'e.g. Staff Salaries, Showroom Rent, Utilities, or Tea & Refreshment'
+                      : 'e.g. Haji Ahmad Sab (Seller), Muhammad Ali (Customer), or Showroom Capital'
                   }
                   value={accountFormData.name}
                   onChange={(e) => setAccountFormData({ ...accountFormData, name: e.target.value })}
@@ -3243,7 +3285,7 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                 />
               </div>
 
-              {accountFormData.classificationType === 'BANK_ACCOUNT' && (
+              {accountFormData.subType === 'BANK' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-cyan-500/5 rounded-2xl border border-cyan-500/20">
                   <div>
                     <label className="block text-xs font-mono text-slate-400 mb-1">Bank Name *</label>
