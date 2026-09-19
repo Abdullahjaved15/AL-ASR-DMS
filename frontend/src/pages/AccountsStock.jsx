@@ -24,6 +24,7 @@ import {
   RefreshCw,
   Sparkles,
   Info,
+  Printer,
   X
 } from 'lucide-react';
 import { api } from '../services/api';
@@ -211,131 +212,139 @@ export default function AccountsStock({ onNavigate }) {
     });
   };
 
-  // Printable Financial Stock PDF Exporter with AL ASR Logo & Fit to Page Engine
+  // Daily Printable PDF Exporter with AL ASR Logo & Smart Fit-To-Page Engine (Showroom Stock Style, All Bold)
   const exportAccountsStockPDF = () => {
     const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow popups in your browser to print.');
+      return;
+    }
     const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+    const totalCount = stockList.length;
 
-    // Fit to page: if total items <= 35, default to fitting on 1 single page!
-    const defaultPageSize = stockList.length <= 35 ? Math.max(1, stockList.length) : 30;
+    // Smart default: If total <= 35, fit all on 1 page! Otherwise default to 30
+    const defaultPageSize = totalCount <= 35 ? Math.max(1, totalCount) : 30;
 
     const htmlContent = `
       <!DOCTYPE html>
       <html>
         <head>
-          <title>AL ASR MOTORS - Accounts Current Stock & Financial Valuation (${todayStr})</title>
+          <title>AL ASR MOTORS - Accounts Current Stock (${todayStr})</title>
           <style>
-            @page { size: landscape; margin: 4mm 6mm; }
+            @media print {
+              @page { size: landscape; margin: 4mm 6mm; }
+              body { padding: 0 !important; background: #ffffff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              .no-print { display: none !important; }
+              .sheet { page-break-after: always; break-after: page; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; padding: 2px; }
+              .sheet:last-child { page-break-after: auto; break-after: auto; }
+            }
             * { box-sizing: border-box; }
-            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 0; margin: 0; color: #0f172a; background: #ffffff; font-size: 8.5px; line-height: 1.15; }
-            
-            /* Print Layout Bar (Hidden when printing) */
-            .no-print {
-              background: #0f172a;
-              color: #f8fafc;
-              padding: 10px 18px;
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              gap: 12px;
-              font-family: system-ui, -apple-system, sans-serif;
-              font-size: 13px;
-              border-bottom: 2px solid #0284c7;
-              position: sticky;
-              top: 0;
-              z-index: 9999;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            }
-            .no-print-btn {
-              background: #0284c7;
-              color: white;
-              border: none;
-              padding: 6px 14px;
-              border-radius: 6px;
-              font-weight: 700;
-              font-size: 12px;
-              cursor: pointer;
-              transition: all 0.2s ease;
-              display: inline-flex;
-              align-items: center;
-              gap: 6px;
-            }
-            .no-print-btn:hover { background: #0369a1; }
-            .no-print-btn.secondary {
-              background: #334155;
-            }
-            .no-print-btn.secondary:hover { background: #475569; }
-            .no-print-btn.active {
-              background: #38bdf8;
-              color: #0f172a;
-            }
-
+            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 10px; margin: 0; color: #0f172a; background: #f8fafc; font-size: 8.5px; line-height: 1.15; font-weight: 800; }
             .sheet {
-              page-break-after: always;
-              break-after: page;
+              background: #ffffff;
+              border: 1px solid #e2e8f0;
+              border-radius: 6px;
+              margin: 0 auto 16px auto;
+              max-width: 297mm;
+              padding: 12px;
+              box-shadow: 0 4px 15px rgba(0,0,0,0.06);
               box-sizing: border-box;
               display: flex;
               flex-direction: column;
               justify-content: space-between;
-              padding: 4px;
-              min-height: 100vh;
+              min-height: 195mm;
             }
-            .sheet:last-child {
-              page-break-after: auto;
-              break-after: auto;
-            }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0284c7; padding-bottom: 5px; margin-bottom: 5px; }
-            .logo-box { display: flex; align-items: center; gap: 10px; }
-            .title { font-size: 14px; font-weight: 800; color: #0f172a; letter-spacing: 0.3px; }
-            .subtitle { font-size: 8.5px; color: #64748b; font-family: monospace; }
-            .stats-inline { display: flex; gap: 10px; font-size: 8px; background: #f8fafc; padding: 4px 10px; border-radius: 4px; border: 1px solid #e2e8f0; }
-            .stat-item { font-weight: 600; color: #334155; }
-            .stat-item strong { color: #0284c7; font-weight: 800; }
-            table { width: 100%; border-collapse: collapse; margin-top: 3px; border: 1.5px solid #0f172a; font-size: 8.5px; font-weight: bold; }
-            th { background: #0f172a; color: #ffffff; text-align: left; padding: 4px 6px; font-size: 8.5px; font-weight: 800; text-transform: uppercase; border: 1px solid #334155; }
-            td { padding: 3px 6px; border: 1px solid #64748b; font-size: 8.5px; font-weight: 700; vertical-align: middle; color: #0f172a; }
-            td * { font-size: 8.5px !important; font-weight: 700 !important; }
-            tr:nth-child(even) { background: #f8fafc; }
-            .badge { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 8.5px; font-weight: 800; }
-            .badge-available { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; font-weight: 800; }
-            .badge-reserved { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-weight: 800; }
-            .badge-customer { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-weight: 800; }
-            .badge-sold { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; font-weight: 800; }
-            .badge-care { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-weight: 800; }
-            .cost-text { color: #b45309; font-weight: 800; font-family: monospace; font-size: 8.5px; }
-            .asking-text { color: #15803d; font-weight: 800; font-family: monospace; font-size: 8.5px; }
-            .margin-text { color: #0369a1; font-weight: 800; font-family: monospace; font-size: 8.5px; }
-            .footer { margin-top: 6px; text-align: center; font-size: 8px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 3px; font-weight: bold; }
-            
             @media print {
-              .no-print { display: none !important; }
-              .sheet { min-height: auto; }
+              .sheet { border: none; border-radius: 0; margin: 0; max-width: none; padding: 0; box-shadow: none; min-height: 0; }
             }
+            .no-print-bar {
+              position: sticky;
+              top: 0;
+              z-index: 1000;
+              background: #0f172a;
+              color: white;
+              padding: 8px 16px;
+              border-radius: 8px;
+              max-width: 297mm;
+              margin: 0 auto 12px auto;
+              display: flex;
+              flex-wrap: wrap;
+              align-items: center;
+              justify-content: space-between;
+              gap: 8px;
+              box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+              font-family: 'Segoe UI', Arial, sans-serif;
+              font-size: 12px;
+            }
+            .btn-action {
+              background: #1e293b;
+              color: #38bdf8;
+              border: 1px solid #38bdf8;
+              padding: 5px 12px;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: bold;
+              font-size: 11px;
+              display: inline-flex;
+              align-items: center;
+              gap: 4px;
+              transition: all 0.2s;
+            }
+            .btn-action:hover, .btn-action.active {
+              background: #0284c7;
+              color: white;
+              border-color: #0284c7;
+            }
+            .btn-print {
+              background: #0284c7;
+              color: white;
+              border: none;
+              padding: 6px 18px;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: 800;
+              font-size: 12px;
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+            }
+            .btn-print:hover { background: #0369a1; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #0284c7; padding-bottom: 4px; margin-bottom: 4px; }
+            .logo-box { display: flex; align-items: center; gap: 8px; }
+            .title { font-size: 13px; font-weight: 800; color: #0f172a; letter-spacing: 0.3px; }
+            .subtitle { font-size: 8px; color: #64748b; font-family: monospace; font-weight: 800; }
+            .stats-inline { display: flex; gap: 10px; font-size: 8px; background: #f8fafc; padding: 3px 8px; border-radius: 4px; border: 1px solid #e2e8f0; }
+            .stat-item { font-weight: 800; color: #334155; }
+            .stat-item strong { color: #0284c7; font-weight: 900; }
+            table { width: 100%; border-collapse: collapse; margin-top: 2px; border: 1.5px solid #0f172a; font-size: 8.5px; font-weight: 800; }
+            th { background: #0f172a; color: #ffffff; text-align: left; padding: 4px 5px; font-size: 8.5px; font-weight: 800; text-transform: uppercase; border: 1px solid #334155; }
+            td { padding: 3.5px 5px; border: 1px solid #64748b; font-size: 8.5px; font-weight: 800; vertical-align: middle; color: #0f172a; }
+            td * { font-size: 8.5px !important; font-weight: 800 !important; color: #0f172a !important; }
+            tr:nth-child(even) { background: #f8fafc; }
+            .footer { margin-top: 6px; text-align: center; font-size: 8px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 3px; font-weight: 800; }
           </style>
         </head>
         <body>
-          <div class="no-print">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-weight: 800; letter-spacing: 0.5px; color: #38bdf8;">AL ASR MOTORS</span>
-              <span style="color: #64748b;">|</span>
-              <span>Financial Stock (<strong>${stockList.length}</strong> items)</span>
+          <div class="no-print no-print-bar">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-weight: 900; color: #38bdf8;">AL ASR MOTORS</span>
+              <span style="color: #94a3b8;">• Layout Controls (${totalCount} Units)</span>
             </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 11px; color: #94a3b8;">Page Layout:</span>
-              <button class="no-print-btn secondary ${stockList.length <= 35 ? 'active' : ''}" onclick="applyPageSize(${stockList.length || 1}, this)">📄 Fit to 1 Page</button>
-              <button class="no-print-btn secondary ${stockList.length > 35 && defaultPageSize === 25 ? 'active' : ''}" onclick="applyPageSize(25, this)">📑 25 / Page</button>
-              <button class="no-print-btn secondary ${stockList.length > 35 && defaultPageSize === 35 ? 'active' : ''}" onclick="applyPageSize(35, this)">📑 35 / Page</button>
-              <button class="no-print-btn" onclick="window.print()">🖨️ Print Document</button>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <button class="btn-action ${defaultPageSize >= totalCount ? 'active' : ''}" onclick="applyPageSize(${Math.max(1, totalCount)})">📄 Fit to 1 Page (${totalCount} rows)</button>
+              <button class="btn-action ${defaultPageSize === 25 ? 'active' : ''}" onclick="applyPageSize(25)">📑 25 / Page</button>
+              <button class="btn-action ${defaultPageSize === 35 ? 'active' : ''}" onclick="applyPageSize(35)">📑 35 / Page</button>
+              <button class="btn-print" onclick="window.print()">🖨️ Print Document</button>
             </div>
           </div>
 
-          <div id="print-root"></div>
+          <div id="sheets-container"></div>
 
           <script>
             const stockData = ${JSON.stringify(stockList)};
-            const logoData = "${logoBase64}";
+            const statsData = ${JSON.stringify(stats)};
             const todayStr = "${todayStr}";
-            const stats = ${JSON.stringify(stats)};
+            const logoBase64 = "${logoBase64}";
 
             function parsePrice(val) {
               if (!val) return 0;
@@ -352,34 +361,50 @@ export default function AccountsStock({ onNavigate }) {
               return isNaN(num) ? 0 : Math.round(num);
             }
 
-            function renderSheets(pageSize) {
-              const root = document.getElementById('print-root');
-              const chunks = [];
-              for (let i = 0; i < stockData.length; i += pageSize) {
-                chunks.push(stockData.slice(i, i + pageSize));
-              }
-              if (chunks.length === 0) chunks.push([]);
-              const totalPages = chunks.length;
+            function formatPKR(val) {
+              if (val === null || val === undefined || val === '') return 'Rs. 0';
+              const num = typeof val === 'number' ? val : parseFloat(val);
+              if (isNaN(num)) return String(val);
+              return 'Rs. ' + num.toLocaleString();
+            }
 
-              let html = '';
-              chunks.forEach((chunk, pageIdx) => {
-                const startIdx = pageIdx * pageSize;
-                html += \`
+            function applyPageSize(size) {
+              const container = document.getElementById('sheets-container');
+              const pageChunks = [];
+              for (let i = 0; i < stockData.length; i += size) {
+                pageChunks.push(stockData.slice(i, i + size));
+              }
+              if (pageChunks.length === 0) pageChunks.push([]);
+              const totalPages = pageChunks.length;
+
+              // Update active button styling in toolbar
+              document.querySelectorAll('.btn-action').forEach(b => b.classList.remove('active'));
+              if (size >= stockData.length) {
+                document.querySelectorAll('.btn-action')[0]?.classList.add('active');
+              } else if (size === 25) {
+                document.querySelectorAll('.btn-action')[1]?.classList.add('active');
+              } else if (size === 35) {
+                document.querySelectorAll('.btn-action')[2]?.classList.add('active');
+              }
+
+              container.innerHTML = pageChunks.map((chunk, pageIdx) => {
+                const startIdx = pageIdx * size;
+                return \`
                   <div class="sheet">
                     <div>
                       <div class="header">
                         <div class="logo-box">
-                          <img src="\${logoData}" alt="AL ASR MOTORS" style="height: 38px; width: auto; object-fit: contain;" />
+                          <img src="\${logoBase64}" alt="AL ASR MOTORS" style="height: 36px; width: auto; object-fit: contain;" />
                           <div>
                             <div class="title">AL ASR MOTORS — ACCOUNTS CURRENT STOCK & VALUATION</div>
                             <div class="subtitle">Official Accounts & Financial Inventory Ledger • Generated: \${todayStr} • Sahiwal, Pakistan</div>
                           </div>
                         </div>
                         <div class="stats-inline">
-                          <div class="stat-item">Total Units: <strong>\${stats.totalUnits || stockData.length}</strong></div>
-                          <div class="stat-item">Cost Value: <strong style="color: #b45309;">Rs. \${(stats.totalPurchaseValuation || 0).toLocaleString()}</strong></div>
-                          <div class="stat-item">Asking Valuation: <strong style="color: #15803d;">Rs. \${(stats.totalValuation || 0).toLocaleString()}</strong></div>
-                          <div class="stat-item">Projected Profit: <strong style="color: #0284c7;">Rs. \${(stats.projectedProfit || 0).toLocaleString()}</strong></div>
+                          <div class="stat-item">Total Units: <strong>\${statsData.totalUnits || stockData.length}</strong></div>
+                          <div class="stat-item">Cost Value: <strong>Rs. \${(statsData.totalPurchaseValuation || 0).toLocaleString()}</strong></div>
+                          <div class="stat-item">Asking Valuation: <strong>Rs. \${(statsData.totalValuation || 0).toLocaleString()}</strong></div>
+                          <div class="stat-item">Projected Margin: <strong>Rs. \${(statsData.projectedProfit || 0).toLocaleString()}</strong></div>
                           <div class="stat-item" style="color: #0284c7;">Sheet <strong>\${pageIdx + 1} of \${totalPages}</strong></div>
                         </div>
                       </div>
@@ -389,47 +414,40 @@ export default function AccountsStock({ onNavigate }) {
                           <tr>
                             <th style="width: 25px;">#</th>
                             <th>Vehicle & Model Specs</th>
-                            <th style="width: 50px;">Year</th>
-                            <th style="width: 60px;">Color</th>
+                            <th style="width: 45px;">Year</th>
+                            <th style="width: 55px;">Color</th>
                             <th style="width: 65px;">Mileage</th>
-                            <th style="width: 90px;">Reg / Plate #</th>
-                            <th style="width: 100px;">Purchase Cost (PKR)</th>
-                            <th style="width: 100px;">Asking Demand (PKR)</th>
+                            <th style="width: 85px;">Reg / Plate #</th>
+                            <th style="width: 105px;">Purchase Cost (PKR)</th>
+                            <th style="width: 105px;">Asking Demand (PKR)</th>
                             <th style="width: 95px;">Projected Margin</th>
-                            <th style="width: 75px;">Care Of</th>
-                            <th style="width: 75px;">Status</th>
+                            <th style="width: 65px;">Care Of</th>
+                            <th style="width: 70px;">Status</th>
                           </tr>
                         </thead>
                         <tbody>
                           \${chunk.length === 0 ? \`
                             <tr>
-                              <td colspan="11" style="text-align: center; padding: 20px; color: #64748b;">No accounts stock records found.</td>
+                              <td colspan="11" style="text-align: center; padding: 20px; color: #64748b; font-weight: 800;">No accounts stock records found.</td>
                             </tr>
                           \` : chunk.map((item, idx) => {
                             const globalIdx = startIdx + idx + 1;
                             const cost = parsePrice(item.purchasePrice);
                             const asking = parsePrice(item.askingPrice);
-                            const margin = asking > 0 && cost > 0 ? (asking - cost) : 0;
-                            const badgeClass = item.status === 'AVAILABLE'
-                              ? 'badge-available'
-                              : (item.status === 'At Customer' || item.status === 'AT_CUSTOMER')
-                              ? 'badge-customer'
-                              : item.status === 'RESERVED'
-                              ? 'badge-reserved'
-                              : 'badge-sold';
+                            const margin = (asking > 0 && cost > 0) ? (asking - cost) : 0;
                             return \`
                             <tr>
                               <td><strong>\${globalIdx}</strong></td>
                               <td><strong>\${item.vehicle || ''} \${item.model || ''}</strong></td>
-                              <td>\${item.year || 'N/A'}</td>
-                              <td>\${item.color || 'N/A'}</td>
-                              <td>\${item.mileage ? item.mileage.toLocaleString() + ' km' : '0 km'}</td>
-                              <td><strong style="color: #0284c7; font-family: monospace;">\${item.regNumber || 'UNREGISTERED'}</strong></td>
-                              <td><span class="cost-text">\${cost > 0 ? 'Rs. ' + cost.toLocaleString() : 'N/A'}</span></td>
-                              <td><span class="asking-text">\${asking > 0 ? 'Rs. ' + asking.toLocaleString() : 'N/A'}</span></td>
-                              <td><span class="margin-text">\${margin !== 0 ? (margin > 0 ? '+Rs. ' + margin.toLocaleString() : '-Rs. ' + Math.abs(margin).toLocaleString()) : '-'}</span></td>
-                              <td><span class="badge badge-care">\${item.careOf || 'AL Asr'}</span></td>
-                              <td><span class="badge \${badgeClass}">\${item.status}</span></td>
+                              <td><strong>\${item.year || 'N/A'}</strong></td>
+                              <td><strong>\${item.color || 'N/A'}</strong></td>
+                              <td><strong>\${item.mileage ? item.mileage.toLocaleString() + ' km' : '0 km'}</strong></td>
+                              <td><strong>\${item.regNumber || 'UNREGISTERED'}</strong></td>
+                              <td><strong>\${cost > 0 ? formatPKR(cost) : 'N/A'}</strong></td>
+                              <td><strong>\${asking > 0 ? formatPKR(asking) : 'N/A'}</strong></td>
+                              <td><strong>\${margin !== 0 ? (margin > 0 ? '+' + formatPKR(margin) : '-' + formatPKR(Math.abs(margin))) : '-'}</strong></td>
+                              <td><strong>\${item.careOf || 'AL Asr'}</strong></td>
+                              <td><strong>\${item.status || 'AVAILABLE'}</strong></td>
                             </tr>
                             \`;
                           }).join('')}
@@ -438,31 +456,28 @@ export default function AccountsStock({ onNavigate }) {
                     </div>
 
                     <div class="footer">
-                      AL ASR MOTORS Executive Accounts & Dealership Management System • Sheet \${pageIdx + 1} of \${totalPages} • Showing records \${chunk.length > 0 ? startIdx + 1 : 0} to \${startIdx + chunk.length} of \${stockData.length}
+                      AL ASR MOTORS Dealership Executive System • Sheet \${pageIdx + 1} of \${totalPages} • Showing records \${chunk.length > 0 ? startIdx + 1 : 0} to \${startIdx + chunk.length} of \${stockData.length}
                     </div>
                   </div>
                 \`;
-              });
-              root.innerHTML = html;
+              }).join('');
             }
 
-            function applyPageSize(size, btn) {
-              if (btn) {
-                document.querySelectorAll('.no-print-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-              }
-              renderSheets(size);
-            }
+            // Initial Render
+            applyPageSize(${defaultPageSize});
 
+            // Automatically trigger system print dialog
             window.onload = function() {
-              renderSheets(${defaultPageSize});
-              setTimeout(() => { window.print(); }, 400);
+              setTimeout(function() {
+                window.print();
+              }, 300);
             };
           </script>
         </body>
       </html>
     `;
 
+    printWindow.document.open();
     printWindow.document.write(htmlContent);
     printWindow.document.close();
   };
@@ -504,9 +519,10 @@ export default function AccountsStock({ onNavigate }) {
           <button
             onClick={exportAccountsStockPDF}
             className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-cyan-500/30 text-cyan-400 font-bold font-mono text-xs rounded-xl flex items-center space-x-2 transition-all shadow-sm"
+            title="Print or Export Accounts Current Stock Document"
           >
-            <Download className="w-4 h-4" />
-            <span>📄 Export Accounts Stock PDF</span>
+            <Printer className="w-4 h-4" />
+            <span>🖨️ Print Accounts Stock</span>
           </button>
 
           {stockList.length > 0 && canManageAccounts && (
