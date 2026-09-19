@@ -39,6 +39,7 @@ model User {
   createdTransactions    Transaction[]
   createdCheques         SecurityCheque[]
   createdInstallmentPlans InstallmentPlan[]
+  approvedInvoices       Invoice[]     @relation("InvoiceApprover")
 }
 
 model Seller {
@@ -307,6 +308,13 @@ model Invoice {
 
   images           InvoiceImage[]
 
+  // Accounts Head Approval Workflow
+  approvalStatus       String   @default("APPROVED") // PENDING, APPROVED, REJECTED
+  approvedById         String?
+  approvedByUser       User?    @relation("InvoiceApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt           DateTime?
+  approvalNotes        String?
+
   createdBy        String
   createdByUser    User     @relation(fields: [createdBy], references: [id])
   createdAt        DateTime @default(now())
@@ -322,6 +330,8 @@ model Invoice {
   @@index([isCustomerVehicle])
   @@index([isDeleted])
   @@index([salesmanName])
+  @@index([approvalStatus])
+  @@index([approvedById])
 }
 
 model InvoiceImage {

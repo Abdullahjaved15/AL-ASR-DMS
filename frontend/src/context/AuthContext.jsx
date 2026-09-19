@@ -45,8 +45,8 @@ export const AuthProvider = ({ children }) => {
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
   const isAccountsHead = user?.role === 'ACCOUNTS_HEAD';
   const isAccountant = user?.role === 'ACCOUNTANT';
-  const isAccountsStaff = ['ACCOUNTS_HEAD', 'ACCOUNTANT'].includes(user?.role);
-  const canAccessAccounts = ['ACCOUNTS_HEAD', 'ACCOUNTANT'].includes(user?.role);
+  const isAccountsStaff = ['ACCOUNTS_HEAD', 'ACCOUNTANT', 'SUPER_ADMIN'].includes(user?.role);
+  const canAccessAccounts = ['ACCOUNTS_HEAD', 'ACCOUNTANT', 'SUPER_ADMIN'].includes(user?.role);
   const canManageAccounts = ['ACCOUNTS_HEAD'].includes(user?.role);
   const isSalesman = user?.role === 'SALESMAN';
 

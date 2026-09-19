@@ -430,6 +430,24 @@ export const api = {
     return handleResponse(res);
   },
 
+  approveInvoice: async (id, data = {}) => {
+    const res = await fetch(`${API_BASE}/invoices/${id}/approve`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  rejectInvoice: async (id, data = {}) => {
+    const res = await fetch(`${API_BASE}/invoices/${id}/reject`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
   // Receiving Letters API (Accessible by ALL staff)
   getReceivingLetters: async (params = {}) => {
     const query = cleanParams(params);

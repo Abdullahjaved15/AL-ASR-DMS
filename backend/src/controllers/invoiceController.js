@@ -28,7 +28,7 @@ const handleCloudinaryUpload = async (photoStr, folderName) => {
 
 const getInvoices = async (req, res) => {
   try {
-    const { page = 1, limit = 20, search = '', category = '' } = req.query;
+    const { page = 1, limit = 20, search = '', category = '', approvalStatus = '' } = req.query;
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
@@ -44,9 +44,14 @@ const getInvoices = async (req, res) => {
       }
     }
 
+    if (approvalStatus && approvalStatus !== 'ALL') {
+      whereClause.approvalStatus = approvalStatus;
+    }
+
     if (search) {
       whereClause.AND = [
         category && category !== 'ALL' ? { category } : {},
+        approvalStatus && approvalStatus !== 'ALL' ? { approvalStatus } : {},
         {
           OR: [
             { invoiceNumber: { contains: search, mode: 'insensitive' } },
@@ -68,45 +73,68 @@ const getInvoices = async (req, res) => {
       ];
     }
 
-    const [invoices, totalCount, statsRaw] = await Promise.all([
+    const [invoices, totalCount, statsRaw, pendingCount, approvedCount, rejectedCount] = await Promise.all([
       prisma.invoice.findMany({
         where: whereClause,
         orderBy: { createdAt: 'desc' },
         skip,
         take: limitNum,
         include: {
-          createdByUser: { select: { id: true, name: true, email: true } },
+          createdByUser: { select: { id: true, name: true, email: true, role: true } },
+          approvedByUser: { select: { id: true, name: true, email: true, role: true } },
           images: { orderBy: { uploadedAt: 'desc' } }
         }
       }),
       prisma.invoice.count({ where: whereClause }),
       prisma.invoice.findMany({
-        where: whereClause,
+        where: { isDeleted: false },
         select: {
           totalPrice: true,
           saleAmount: true,
           commissionAmount: true,
-          totalAmount: true
+          totalAmount: true,
+          approvalStatus: true
         }
-      })
+      }),
+      prisma.invoice.count({ where: { isDeleted: false, approvalStatus: 'PENDING' } }),
+      prisma.invoice.count({ where: { isDeleted: false, approvalStatus: 'APPROVED' } }),
+      prisma.invoice.count({ where: { isDeleted: false, approvalStatus: 'REJECTED' } })
     ]);
 
     const totalSalesVolume = statsRaw.reduce((sum, inv) => sum + parsePakistaniPrice(inv.totalPrice || inv.saleAmount), 0);
     const totalCommissionEarned = statsRaw.reduce((sum, inv) => sum + parsePakistaniPrice(inv.commissionAmount), 0);
     const grandTotalValue = statsRaw.reduce((sum, inv) => sum + parsePakistaniPrice(inv.totalAmount), 0) || (totalSalesVolume + totalCommissionEarned);
 
+    const approvedSalesVolume = statsRaw
+      .filter(inv => inv.approvalStatus === 'APPROVED')
+      .reduce((sum, inv) => sum + parsePakistaniPrice(inv.totalPrice || inv.saleAmount), 0);
+    const pendingSalesVolume = statsRaw
+      .filter(inv => inv.approvalStatus === 'PENDING')
+      .reduce((sum, inv) => sum + parsePakistaniPrice(inv.totalPrice || inv.saleAmount), 0);
+
     return res.json({
       invoices,
       meta: {
         totalCount,
         page: pageNum,
-        totalPages: Math.ceil(totalCount / limitNum)
+        totalPages: Math.ceil(totalCount / limitNum),
+        counts: {
+          pending: pendingCount,
+          approved: approvedCount,
+          rejected: rejectedCount,
+          total: statsRaw.length
+        }
       },
       stats: {
         totalInvoices: totalCount,
         totalSalesVolume,
         totalCommissionEarned,
-        grandTotalValue
+        grandTotalValue,
+        approvedSalesVolume,
+        pendingSalesVolume,
+        pendingApprovalsCount: pendingCount,
+        approvedCount,
+        rejectedCount
       }
     });
   } catch (error) {
@@ -120,7 +148,8 @@ const getInvoiceById = async (req, res) => {
     const invoice = await prisma.invoice.findUnique({
       where: { id },
       include: {
-        createdByUser: { select: { id: true, name: true, email: true } },
+        createdByUser: { select: { id: true, name: true, email: true, role: true } },
+        approvedByUser: { select: { id: true, name: true, email: true, role: true } },
         images: { orderBy: { uploadedAt: 'desc' } }
       }
     });
@@ -259,7 +288,12 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
     await prisma.transaction.delete({ where: { id: txn.id } });
   }
 
-  // 2. Post fresh double-entry transactions
+  // 2. Gatekeeper: Only post double-entry ledger transactions to Bank / Cash accounts if approved by Accounts Head!
+  if (inv.approvalStatus !== 'APPROVED') {
+    return null;
+  }
+
+  // 3. Post fresh double-entry transactions
   const todayDate = inv.date || new Date();
   const countTxn = await prisma.transaction.count();
   const txnSeq = String(countTxn + 1).padStart(4, '0');
@@ -1140,10 +1174,17 @@ const createInvoice = async (req, res) => {
         witness2Name: witness2Name || null,
         witness2Cnic: witness2Cnic || null,
 
+        // Accounts Head Approval Workflow
+        approvalStatus: (req.user.role === 'ACCOUNTS_HEAD') ? 'APPROVED' : 'PENDING',
+        approvedById: (req.user.role === 'ACCOUNTS_HEAD') ? req.user.id : null,
+        approvedAt: (req.user.role === 'ACCOUNTS_HEAD') ? new Date() : null,
+        approvalNotes: (req.user.role === 'ACCOUNTS_HEAD') ? 'Auto-approved upon creation by Accounts Head' : null,
+
         createdBy: req.user.id
       },
       include: {
-        createdByUser: { select: { id: true, name: true, email: true } }
+        createdByUser: { select: { id: true, name: true, email: true, role: true } },
+        approvedByUser: { select: { id: true, name: true, email: true, role: true } }
       }
     });
 
@@ -1171,41 +1212,68 @@ const createInvoice = async (req, res) => {
     // AUTOMATED FINANCIAL LEDGER POSTINGS (DOUBLE ENTRY)
     // ----------------------------------------------------
     try {
-      await syncInvoiceLedgerTransactions(newInvoice.id, req.user.id);
+      const isApprovedOnCreation = newInvoice.approvalStatus === 'APPROVED';
+
+      if (isApprovedOnCreation) {
+        await syncInvoiceLedgerTransactions(newInvoice.id, req.user.id);
+      }
 
       // Notification Dispatch
       const paymentAmt = parsePakistaniPrice(cashAmount || totalPrice || agreedAmount || saleAmount);
-      if (category === 'PAYMENT_VOUCHER' && paymentAmt > 0) {
-        await prisma.notification.create({
-          data: {
-            targetRole: 'ACCOUNTS_HEAD',
-            title: `💵 Payment Voucher Outflow: Rs. ${paymentAmt.toLocaleString()}`,
-            message: `Payment Voucher #${invoiceNumber} issued to ${payeeName || finalBuyerName} for Head [${headOfAccount || 'Showroom Payment'}] via [${paymentMethod || 'CASH'}] - Rs. ${paymentAmt.toLocaleString()}`,
-            type: 'PAYMENT_VOUCHER',
-            category: paymentMethod || 'CASH',
-            amount: paymentAmt,
-            referenceId: newInvoice.id
-          }
-        });
-      } else if (category !== 'PAYMENT_VOUCHER') {
+      
+      if (!isApprovedOnCreation) {
+        // High-priority approval request notification sent to Accounts Head
         const isBooking = category === 'BOOKING_RECEIPT';
         const totalReceived = isBooking 
           ? (numericAdvance > 0 ? numericAdvance : numericTotalPrice)
           : (numericAdvance > 0 ? numericRemaining : numericTotalPrice);
+        const typeLabel = isBooking ? 'Booking Receipt' : (category === 'PAYMENT_VOUCHER' ? 'Payment Voucher' : 'Sales Receipt');
 
-        if (totalReceived > 0) {
-          const typeLabel = isBooking ? 'Booking Receipt' : 'Sales Receipt';
+        await prisma.notification.create({
+          data: {
+            targetRole: 'ACCOUNTS_HEAD',
+            title: `⏳ Pending Approval: ${typeLabel} #${invoiceNumber} (Rs. ${totalReceived.toLocaleString()})`,
+            message: `${typeLabel} #${invoiceNumber} for ${finalVehicleMaker} ${finalVehicleModel} generated by ${req.user.name || 'Super Admin'}. Amount: Rs. ${totalReceived.toLocaleString()} (${paymentMethod || 'CASH'}). Accounts Head approval required before posting funds into accounts.`,
+            type: 'APPROVAL_REQUEST',
+            category: paymentMethod || 'CASH',
+            amount: totalReceived,
+            referenceId: newInvoice.id
+          }
+        });
+      } else {
+        // Notification for direct approved creation by Accounts Head
+        if (category === 'PAYMENT_VOUCHER' && paymentAmt > 0) {
           await prisma.notification.create({
             data: {
-              targetRole: 'ACCOUNTS_HEAD',
-              title: isBooking ? `📅 New Booking Inflow: Rs. ${totalReceived.toLocaleString()}` : `💰 New Sales Inflow: Rs. ${totalReceived.toLocaleString()}`,
-              message: `${typeLabel} #${invoiceNumber} generated for ${finalVehicleMaker} ${finalVehicleModel} (Chassis: ${chassisNumber || 'N/A'}). Received Rs. ${totalReceived.toLocaleString()} from Customer ${finalBuyerName} by ${req.user.name || 'Sales Officer'}.${finalLinkedBookingNumber ? ' (Adjusted Booking: #' + finalLinkedBookingNumber + ')' : ''}`,
-              type: category || 'FINANCIAL_INFLOW',
+              targetRole: 'SUPER_ADMIN',
+              title: `💵 Payment Voucher Outflow: Rs. ${paymentAmt.toLocaleString()}`,
+              message: `Payment Voucher #${invoiceNumber} issued to ${payeeName || finalBuyerName} for Head [${headOfAccount || 'Showroom Payment'}] via [${paymentMethod || 'CASH'}] - Rs. ${paymentAmt.toLocaleString()}`,
+              type: 'PAYMENT_VOUCHER',
               category: paymentMethod || 'CASH',
-              amount: totalReceived,
+              amount: paymentAmt,
               referenceId: newInvoice.id
             }
           });
+        } else if (category !== 'PAYMENT_VOUCHER') {
+          const isBooking = category === 'BOOKING_RECEIPT';
+          const totalReceived = isBooking 
+            ? (numericAdvance > 0 ? numericAdvance : numericTotalPrice)
+            : (numericAdvance > 0 ? numericRemaining : numericTotalPrice);
+
+          if (totalReceived > 0) {
+            const typeLabel = isBooking ? 'Booking Receipt' : 'Sales Receipt';
+            await prisma.notification.create({
+              data: {
+                targetRole: 'SUPER_ADMIN',
+                title: isBooking ? `📅 New Booking Inflow: Rs. ${totalReceived.toLocaleString()}` : `💰 New Sales Inflow: Rs. ${totalReceived.toLocaleString()}`,
+                message: `${typeLabel} #${invoiceNumber} generated for ${finalVehicleMaker} ${finalVehicleModel} (Chassis: ${chassisNumber || 'N/A'}). Received Rs. ${totalReceived.toLocaleString()} from Customer ${finalBuyerName} by ${req.user.name || 'Accounts Head'}.${finalLinkedBookingNumber ? ' (Adjusted Booking: #' + finalLinkedBookingNumber + ')' : ''}`,
+                type: category || 'FINANCIAL_INFLOW',
+                category: paymentMethod || 'CASH',
+                amount: totalReceived,
+                referenceId: newInvoice.id
+              }
+            });
+          }
         }
       }
     } catch (accountError) {
@@ -1834,6 +1902,19 @@ const updateInvoice = async (req, res) => {
       }
     }
 
+    // Reset approval status to PENDING if edited by someone other than Accounts Head
+    if (req.user.role !== 'ACCOUNTS_HEAD' && existing.approvalStatus === 'APPROVED') {
+      await prisma.invoice.update({
+        where: { id },
+        data: {
+          approvalStatus: 'PENDING',
+          approvedById: null,
+          approvedAt: null,
+          approvalNotes: `Pending re-approval after edit by ${req.user.name || 'Super Admin'}`
+        }
+      });
+    }
+
     try {
       await syncInvoiceLedgerTransactions(id, req.user.id);
     } catch (syncErr) {
@@ -1848,7 +1929,16 @@ const updateInvoice = async (req, res) => {
       }
     });
 
-    return res.json(updatedInvoice);
+    const finalUpdatedResult = await prisma.invoice.findUnique({
+      where: { id },
+      include: {
+        createdByUser: { select: { id: true, name: true, email: true, role: true } },
+        approvedByUser: { select: { id: true, name: true, email: true, role: true } },
+        images: { orderBy: { uploadedAt: 'desc' } }
+      }
+    });
+
+    return res.json(finalUpdatedResult);
   } catch (error) {
     return res.status(500).json({ message: 'Failed to update sales receipt', error: error.message });
   }
@@ -2597,6 +2687,151 @@ const getCustomerTradeHistory = async (req, res) => {
   }
 };
 
+// Accounts Head Sales / Voucher Approval Handler
+const approveInvoice = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { approvalNotes } = req.body || {};
+
+    const invoice = await prisma.invoice.findUnique({
+      where: { id },
+      include: { createdByUser: true }
+    });
+
+    if (!invoice) {
+      return res.status(404).json({ message: 'Invoice / Receipt not found' });
+    }
+
+    if (invoice.approvalStatus === 'APPROVED') {
+      return res.status(400).json({ message: 'Invoice is already approved and posted to accounts.' });
+    }
+
+    // 1. Update invoice approval status
+    const updatedInvoice = await prisma.invoice.update({
+      where: { id },
+      data: {
+        approvalStatus: 'APPROVED',
+        approvedById: req.user.id,
+        approvedAt: new Date(),
+        approvalNotes: approvalNotes || 'Approved by Accounts Head'
+      },
+      include: {
+        createdByUser: { select: { id: true, name: true, email: true, role: true } },
+        approvedByUser: { select: { id: true, name: true, email: true, role: true } },
+        images: { orderBy: { uploadedAt: 'desc' } }
+      }
+    });
+
+    // 2. Synchronize double-entry ledger transactions and credit Bank / Cash in Hand accounts
+    await syncInvoiceLedgerTransactions(id, req.user.id);
+
+    // 3. Activity Log
+    await prisma.activityLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'APPROVE_INVOICE_SALES',
+        details: `Accounts Head approved ${invoice.category} #${invoice.invoiceNumber} (${invoice.vehicleMaker || ''} ${invoice.vehicleModel || ''}). Amounts successfully posted into Cash in Hand / Bank accounts.`
+      }
+    });
+
+    // 4. Notification to Super Admin and Creator
+    try {
+      const isPV = invoice.category === 'PAYMENT_VOUCHER';
+      const amountVal = parsePakistaniPrice(invoice.cashAmount || invoice.totalPrice || invoice.agreedAmount || invoice.saleAmount || 0);
+      await prisma.notification.create({
+        data: {
+          targetRole: 'SUPER_ADMIN',
+          title: `✅ ${isPV ? 'Payment Voucher' : 'Sales Receipt'} Approved: #${invoice.invoiceNumber}`,
+          message: `Accounts Head (${req.user.name}) has approved #${invoice.invoiceNumber} for Rs. ${amountVal.toLocaleString()}. Funds have been credited to ${invoice.paymentMethod || 'CASH'} accounts.`,
+          type: invoice.category || 'FINANCIAL_INFLOW',
+          category: invoice.paymentMethod || 'CASH',
+          amount: amountVal,
+          referenceId: invoice.id
+        }
+      });
+    } catch (notifErr) {
+      console.warn('Failed to send notification on invoice approval:', notifErr.message);
+    }
+
+    return res.json({
+      message: `Invoice #${invoice.invoiceNumber} successfully approved. Amount posted to accounts!`,
+      invoice: updatedInvoice
+    });
+  } catch (error) {
+    console.error('approveInvoice error:', error);
+    return res.status(500).json({ message: 'Failed to approve invoice', error: error.message });
+  }
+};
+
+// Accounts Head Sales / Voucher Rejection Handler
+const rejectInvoice = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { approvalNotes } = req.body || {};
+
+    const invoice = await prisma.invoice.findUnique({
+      where: { id },
+      include: { createdByUser: true }
+    });
+
+    if (!invoice) {
+      return res.status(404).json({ message: 'Invoice / Receipt not found' });
+    }
+
+    // 1. Update invoice status to REJECTED
+    const updatedInvoice = await prisma.invoice.update({
+      where: { id },
+      data: {
+        approvalStatus: 'REJECTED',
+        approvedById: req.user.id,
+        approvedAt: new Date(),
+        approvalNotes: approvalNotes || 'Rejected by Accounts Head'
+      },
+      include: {
+        createdByUser: { select: { id: true, name: true, email: true, role: true } },
+        approvedByUser: { select: { id: true, name: true, email: true, role: true } },
+        images: { orderBy: { uploadedAt: 'desc' } }
+      }
+    });
+
+    // 2. Revert any ledger transactions (if previously approved/posted)
+    await syncInvoiceLedgerTransactions(id, req.user.id);
+
+    // 3. Activity Log
+    await prisma.activityLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'REJECT_INVOICE_SALES',
+        details: `Accounts Head rejected ${invoice.category} #${invoice.invoiceNumber} (${invoice.vehicleMaker || ''} ${invoice.vehicleModel || ''}). Reason: ${approvalNotes || 'No remarks provided'}`
+      }
+    });
+
+    // 4. Notification to Super Admin and Creator
+    try {
+      await prisma.notification.create({
+        data: {
+          targetRole: 'SUPER_ADMIN',
+          title: `❌ ${invoice.category} Rejected: #${invoice.invoiceNumber}`,
+          message: `Accounts Head (${req.user.name}) rejected #${invoice.invoiceNumber}. Note: ${approvalNotes || 'Please check and resubmit.'}`,
+          type: 'APPROVAL_REQUEST',
+          category: invoice.paymentMethod || 'CASH',
+          referenceId: invoice.id
+        }
+      });
+    } catch (notifErr) {
+      console.warn('Failed to send notification on invoice rejection:', notifErr.message);
+    }
+
+    return res.json({
+      message: `Invoice #${invoice.invoiceNumber} rejected. No amounts posted to accounts.`,
+      invoice: updatedInvoice
+    });
+  } catch (error) {
+    console.error('rejectInvoice error:', error);
+    return res.status(500).json({ message: 'Failed to reject invoice', error: error.message });
+  }
+};
+
 module.exports = {
   getInvoices,
   getInvoiceById,
@@ -2609,6 +2844,8 @@ module.exports = {
   deleteInvoiceImage,
   syncInvoiceLedgerTransactions,
   getSalesmanIncentives,
-  getCustomerTradeHistory
+  getCustomerTradeHistory,
+  approveInvoice,
+  rejectInvoice
 };
 

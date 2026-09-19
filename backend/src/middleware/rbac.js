@@ -54,8 +54,24 @@ const requireAccountsAccess = (req, res, next) => {
   });
 };
 
+// Strictly Accounts Head only (for approving sales receipts/vouchers to post to bank/cash accounts)
+const requireAccountsHeadOnly = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Authentication required' });
+  }
+
+  if (req.user.role === 'ACCOUNTS_HEAD') {
+    return next();
+  }
+
+  return res.status(403).json({ 
+    message: 'Forbidden: Only the Accounts Head (اکاؤنٹ ہیڈ) has authority to approve sales and credit bank or cash in hand accounts.' 
+  });
+};
+
 module.exports = { 
   requireRole, 
   requireAccountsHeadOrSuperAdmin, 
-  requireAccountsAccess 
+  requireAccountsAccess,
+  requireAccountsHeadOnly
 };

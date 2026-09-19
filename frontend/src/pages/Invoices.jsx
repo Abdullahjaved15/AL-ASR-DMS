@@ -225,6 +225,14 @@ export default function Invoices({ onNavigate }) {
   });
   const [cancellingBooking, setCancellingBooking] = useState(false);
 
+  // Accounts Head Approval Modal States
+  const [selectedApprovalStatus, setSelectedApprovalStatus] = useState('ALL');
+  const [approvalModalOpen, setApprovalModalOpen] = useState(false);
+  const [invoiceToApprove, setInvoiceToApprove] = useState(null);
+  const [approvalNotes, setApprovalNotes] = useState('');
+  const [approvalActionType, setApprovalActionType] = useState('APPROVE'); // 'APPROVE' or 'REJECT'
+  const [processingApproval, setProcessingApproval] = useState(false);
+
   const [formData, setFormData] = useState({
     category: 'SALES_RECEIPT',
     registrationNo: '',
@@ -335,7 +343,7 @@ export default function Invoices({ onNavigate }) {
     api.getAccounts().then(data => setAllLedgers(data?.accounts || [])).catch(() => {});
     api.getUsers().then(data => setStaffUsers(data || [])).catch(() => {});
     api.getAccountsStock().then(data => setAccountsStockList(data?.stock || [])).catch(() => {});
-  }, [search, selectedCategory]);
+  }, [search, selectedCategory, selectedApprovalStatus]);
 
   const checkBookingByPhone = async (phone) => {
     if (!phone || String(phone).replace(/\D/g, '').length < 5) {
@@ -459,7 +467,7 @@ export default function Invoices({ onNavigate }) {
   const fetchInvoices = async () => {
     setLoading(true);
     try {
-      const data = await api.getInvoices({ search, category: selectedCategory });
+      const data = await api.getInvoices({ search, category: selectedCategory, approvalStatus: selectedApprovalStatus });
       if (data) {
         setInvoices(data.invoices || []);
         setStats(data.stats || {});
@@ -468,6 +476,35 @@ export default function Invoices({ onNavigate }) {
       console.error('Failed to fetch invoices:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openApprovalModal = (invoice, actionType = 'APPROVE') => {
+    setInvoiceToApprove(invoice);
+    setApprovalActionType(actionType);
+    setApprovalNotes(actionType === 'APPROVE' ? 'Approved & confirmed by Accounts Head' : '');
+    setApprovalModalOpen(true);
+  };
+
+  const handleConfirmApprovalAction = async (e) => {
+    if (e) e.preventDefault();
+    if (!invoiceToApprove) return;
+    setProcessingApproval(true);
+    try {
+      if (approvalActionType === 'APPROVE') {
+        const res = await api.approveInvoice(invoiceToApprove.id, { approvalNotes });
+        alert(res.message || 'Invoice successfully approved and funds credited into accounts!');
+      } else {
+        const res = await api.rejectInvoice(invoiceToApprove.id, { approvalNotes });
+        alert(res.message || 'Invoice rejected.');
+      }
+      setApprovalModalOpen(false);
+      setInvoiceToApprove(null);
+      fetchInvoices();
+    } catch (err) {
+      alert(err.message || 'Approval action failed');
+    } finally {
+      setProcessingApproval(false);
     }
   };
 
@@ -1999,6 +2036,41 @@ export default function Invoices({ onNavigate }) {
           ))}
         </div>
 
+        {/* Secondary Approval Status Filter Pills */}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <span className="text-[11px] font-mono text-slate-400 mr-1 flex items-center gap-1">
+            <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Accounts Approval:</span>
+          </span>
+          {[
+            { id: 'ALL', label: 'All Statuses', count: stats.totalInvoices || invoices.length },
+            { id: 'PENDING', label: '⏳ Pending Accounts Approval (منظوری کا منتظر)', count: stats.pendingApprovalsCount || 0, badgeColor: 'bg-amber-500 text-slate-950' },
+            { id: 'APPROVED', label: '✅ Approved & Posted (منظور شدہ)', count: stats.approvedCount || 0, badgeColor: 'bg-emerald-500 text-slate-950' },
+            { id: 'REJECTED', label: '❌ Rejected (مسترد شدہ)', count: stats.rejectedCount || 0, badgeColor: 'bg-rose-500 text-white' }
+          ].map(statusTab => (
+            <button
+              key={statusTab.id}
+              onClick={() => setSelectedApprovalStatus(statusTab.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border ${
+                selectedApprovalStatus === statusTab.id
+                  ? 'bg-slate-800 text-white border-cyan-500/60 shadow-sm'
+                  : 'bg-slate-900/40 text-slate-400 hover:text-slate-200 border-white/5 hover:border-white/10'
+              }`}
+            >
+              <span>{statusTab.label}</span>
+              {statusTab.count !== undefined && (
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold font-mono ${
+                  selectedApprovalStatus === statusTab.id && statusTab.badgeColor
+                    ? statusTab.badgeColor
+                    : 'bg-slate-800 text-slate-300'
+                }`}>
+                  {statusTab.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="relative w-full sm:w-80">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -2040,6 +2112,7 @@ export default function Invoices({ onNavigate }) {
                   <th className="p-3.5">Seller (فروخت کنندہ)</th>
                   <th className="p-3.5">Vehicle Details / Head</th>
                   <th className="p-3.5">Total Amount</th>
+                  <th className="p-3.5">Accounts Approval</th>
                   <th className="p-3.5">Signed Receipt</th>
                   <th className="p-3.5">Actions</th>
                 </tr>
@@ -2136,6 +2209,42 @@ export default function Invoices({ onNavigate }) {
                           )}
                         </div>
                       </td>
+                      <td className="p-3.5">
+                        {inv.approvalStatus === 'APPROVED' ? (
+                          <div className="space-y-1">
+                            <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                              <span>Approved & Posted</span>
+                            </span>
+                            <div className="text-[9px] text-slate-400">
+                              Posted by {inv.approvedByUser?.name || 'Accounts Head'}
+                            </div>
+                          </div>
+                        ) : inv.approvalStatus === 'REJECTED' ? (
+                          <div className="space-y-1">
+                            <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30">
+                              <X className="w-3 h-3 text-rose-400" />
+                              <span>Rejected</span>
+                            </span>
+                            {inv.approvalNotes && (
+                              <div className="text-[9px] text-rose-300/80 truncate max-w-[130px]" title={inv.approvalNotes}>
+                                {inv.approvalNotes}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 animate-pulse">
+                              <AlertCircle className="w-3 h-3 text-amber-400" />
+                              <span>Pending Approval</span>
+                            </span>
+                            <div className="text-[9px] text-amber-400/80">
+                              Not in Cash/Bank yet
+                            </div>
+                          </div>
+                        )}
+                      </td>
+
                       <td className="p-3.5 font-mono text-xs">
                         <button
                           onClick={() => openImageGalleryModal(inv)}
@@ -2155,7 +2264,30 @@ export default function Invoices({ onNavigate }) {
                         </button>
                       </td>
                       <td className="p-3.5">
-                        <div className="flex items-center space-x-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {/* Accounts Head Direct Approval / Rejection Buttons */}
+                          {isAccountsHead && inv.approvalStatus !== 'APPROVED' && (
+                            <button
+                              onClick={() => openApprovalModal(inv, 'APPROVE')}
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40 font-bold text-[11px] flex items-center space-x-1 cursor-pointer transition-all shadow-sm"
+                              title="Approve sale and post funds to Cash in Hand or Bank accounts"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>Approve & Post</span>
+                            </button>
+                          )}
+
+                          {isAccountsHead && inv.approvalStatus === 'PENDING' && (
+                            <button
+                              onClick={() => openApprovalModal(inv, 'REJECT')}
+                              className="px-2 py-1.5 rounded-lg bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 border border-rose-500/40 font-medium text-[11px] flex items-center space-x-1 cursor-pointer transition-all"
+                              title="Reject invoice"
+                            >
+                              <X className="w-3.5 h-3.5 text-rose-400" />
+                              <span>Reject</span>
+                            </button>
+                          )}
+
                           {/* Cancel & Refund Booking Button */}
                           {cat === 'BOOKING_RECEIPT' && inv.bookingStatus === 'ACTIVE' && (
                             <button
@@ -5173,6 +5305,141 @@ export default function Invoices({ onNavigate }) {
           </div>
         </div>
       )}
+
+      {/* ACCOUNTS HEAD APPROVAL / REJECTION MODAL */}
+      {approvalModalOpen && invoiceToApprove && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#0b192c] border border-cyan-500/30 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center space-x-2.5">
+                <div className={`p-2.5 rounded-xl ${
+                  approvalActionType === 'APPROVE'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                }`}>
+                  {approvalActionType === 'APPROVE' ? <CheckCircle2 className="w-5 h-5" /> : <X className="w-5 h-5" />}
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base">
+                    {approvalActionType === 'APPROVE' ? 'Approve Sales & Post to Accounts' : 'Reject Invoice'}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {approvalActionType === 'APPROVE' ? 'اکاؤنٹ ہیڈ کی منظوری اور کھاتہ جات میں اندراج' : 'انوائس کی منسوخی / مستردگی'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setApprovalModalOpen(false);
+                  setInvoiceToApprove(null);
+                }}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-slate-900/80 rounded-xl p-4 border border-white/5 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Invoice / Voucher #:</span>
+                <span className="font-mono text-cyan-400 font-bold">{invoiceToApprove.invoiceNumber}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Category:</span>
+                <span className="text-white font-semibold">{invoiceToApprove.category?.replace('_', ' ')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Vehicle / Details:</span>
+                <span className="text-white font-semibold">
+                  {invoiceToApprove.vehicleMaker} {invoiceToApprove.vehicleModel} ({invoiceToApprove.registrationNo || invoiceToApprove.chassisNumber || 'N/A'})
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Customer / Payee:</span>
+                <span className="text-white font-semibold">{invoiceToApprove.buyerName || invoiceToApprove.payeeName || 'N/A'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Total Price / Value:</span>
+                <span className="font-mono text-emerald-400 font-bold">
+                  {formatPKR(invoiceToApprove.totalPrice || invoiceToApprove.agreedAmount || invoiceToApprove.saleAmount)}
+                </span>
+              </div>
+              <div className="flex justify-between border-t border-white/10 pt-2">
+                <span className="text-slate-400">Payment Method:</span>
+                <span className="font-bold text-amber-300">
+                  {invoiceToApprove.paymentMethod === 'BANK' ? '🏦 Bank Account Transfer' : invoiceToApprove.paymentMethod === 'SPLIT' ? '🔀 Cash + Bank Split' : '💵 Cash in Hand Safe'}
+                </span>
+              </div>
+            </div>
+
+            {approvalActionType === 'APPROVE' ? (
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <strong>Financial Posting Confirmation:</strong> Upon confirming, the double-entry transaction will be created and funds will immediately reflect in the {invoiceToApprove.paymentMethod === 'BANK' ? 'selected Bank Account' : 'Cash in Hand Safe'}.
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                <div>
+                  <strong>Rejection Notice:</strong> No funds will be added or deducted from accounts. The creator will be notified with your remarks.
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                {approvalActionType === 'APPROVE' ? 'Approval Notes / Verification Remarks (اختیاری)' : 'Rejection Reason (وجہ تحریر کریں) *'}
+              </label>
+              <textarea
+                rows={2}
+                value={approvalNotes}
+                onChange={(e) => setApprovalNotes(e.target.value)}
+                placeholder={approvalActionType === 'APPROVE' ? 'e.g. Verified with bank statement / cash counter safe receipt...' : 'e.g. Price discrepancy, missing bank slip...'}
+                className="w-full bg-slate-900 border border-white/10 rounded-xl px-3.5 py-2 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-3 border-t border-white/10">
+              <button
+                type="button"
+                disabled={processingApproval}
+                onClick={() => {
+                  setApprovalModalOpen(false);
+                  setInvoiceToApprove(null);
+                }}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={processingApproval}
+                onClick={handleConfirmApprovalAction}
+                className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-lg flex items-center space-x-2 transition-all disabled:opacity-50 ${
+                  approvalActionType === 'APPROVE'
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-600/30'
+                    : 'bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white shadow-rose-600/30'
+                }`}
+              >
+                {processingApproval ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    {approvalActionType === 'APPROVE' ? <CheckCircle2 className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                    <span>{approvalActionType === 'APPROVE' ? 'Confirm Approval & Post Amount' : 'Confirm Rejection'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
