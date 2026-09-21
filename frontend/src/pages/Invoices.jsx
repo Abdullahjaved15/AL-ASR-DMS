@@ -579,14 +579,35 @@ export default function Invoices({ onNavigate }) {
         }
       } else if (field === 'tradeInValuation' || field === 'tradeInCashAdvance' || (field === 'isTradeIn' && value === true)) {
         const val = parsePakistaniPrice(field === 'tradeInValuation' ? value : updated.tradeInValuation);
-        const cash = parsePakistaniPrice(field === 'tradeInCashAdvance' ? value : updated.tradeInCashAdvance);
-        const combinedAdv = val + cash;
+        const monetaryAdv = parsePakistaniPrice(field === 'tradeInCashAdvance' ? value : updated.tradeInCashAdvance);
+        const combinedAdv = val + monetaryAdv;
         if (combinedAdv > 0 || updated.isTradeIn) {
           updated.advanceAmount = combinedAdv > 0 ? combinedAdv.toString() : '0';
           const total = parsePakistaniPrice(updated.totalPrice || updated.agreedAmount);
           if (total > 0) {
             updated.remainingAmount = total >= combinedAdv ? (total - combinedAdv).toString() : '0';
           }
+        }
+        if (field === 'tradeInCashAdvance') {
+          if (updated.paymentMethod === 'BANK') {
+            updated.bankAmountReceived = value ? String(value) : '';
+            updated.cashAmountReceived = '0';
+          } else if (updated.paymentMethod === 'CASH') {
+            updated.cashAmountReceived = value ? String(value) : '';
+            updated.bankAmountReceived = '0';
+          }
+        }
+      } else if (field === 'paymentMethod') {
+        updated.paymentMethod = value;
+        const currentMonetaryAdv = updated.isTradeIn 
+          ? parsePakistaniPrice(updated.tradeInCashAdvance) 
+          : parsePakistaniPrice(updated.advanceAmount || updated.totalPrice);
+        if (value === 'BANK') {
+          updated.bankAmountReceived = currentMonetaryAdv > 0 ? currentMonetaryAdv.toString() : '';
+          updated.cashAmountReceived = '0';
+        } else if (value === 'CASH') {
+          updated.cashAmountReceived = currentMonetaryAdv > 0 ? currentMonetaryAdv.toString() : '';
+          updated.bankAmountReceived = '0';
         }
       } else if (field === 'isTradeIn' && value === false) {
         // If turned off, keep existing advance or allow manual editing
@@ -3036,22 +3057,88 @@ export default function Invoices({ onNavigate }) {
                                 </div>
                               )}
                             </div>
-                            <div className="sm:col-span-2">
-                              <label className="block text-xs font-semibold text-emerald-300 mb-1">
-                                Additional Cash Advance (اضافی نقد بیعانہ اگر دیا ہو)
-                              </label>
+                            <div className="sm:col-span-2 space-y-3 p-3.5 bg-emerald-950/40 rounded-xl border border-emerald-500/40">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                                <label className="block text-xs font-bold text-emerald-300">
+                                  💵 Additional Advance (اضافی مالی بیعانہ - نقد / بینک ٹرانسفر)
+                                </label>
+                                <span className="text-[10px] font-mono text-emerald-400 font-semibold">Cash / Bank / Split Transfer</span>
+                              </div>
                               <input
                                 type="text"
-                                placeholder="e.g. 3 lac, 300000 (optional)"
+                                placeholder="e.g. 5 lac, 500000 (optional)"
                                 value={formData.tradeInCashAdvance || ''}
                                 onChange={(e) => handleInputChange('tradeInCashAdvance', e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-emerald-500/40 text-emerald-300 text-xs font-bold focus:border-emerald-400 font-mono"
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-emerald-500/50 text-emerald-300 text-xs font-bold focus:border-emerald-400 font-mono shadow-inner"
                               />
                               {Boolean(formData.tradeInCashAdvance) && Boolean(getPriceHint(formData.tradeInCashAdvance)) && (
                                 <div className="mt-1 px-2 py-0.5 bg-emerald-950/70 border border-emerald-500/30 rounded text-[10px] font-mono text-emerald-300">
                                   {getPriceHint(formData.tradeInCashAdvance)}
                                 </div>
                               )}
+
+                              {/* Advance Payment Method & Bank Selector */}
+                              <div className="pt-2 border-t border-emerald-500/20 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                                    Advance Receiving Mode (بیعانہ کی وصولی)
+                                  </label>
+                                  <select
+                                    value={formData.paymentMethod || 'CASH'}
+                                    onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
+                                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-emerald-500/40 text-white text-xs font-mono focus:border-emerald-400"
+                                  >
+                                    <option value="CASH">💵 100% Cash in Hand (Safe)</option>
+                                    <option value="BANK">🏦 100% Bank Account Transfer</option>
+                                    <option value="SPLIT">🔀 Split Payment (Cash + Bank)</option>
+                                  </select>
+                                </div>
+
+                                {(formData.paymentMethod === 'BANK' || formData.paymentMethod === 'SPLIT') && (
+                                  <div>
+                                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                                      Receiving Bank Account (بینک اکاؤنٹ) <span className="text-rose-400">*</span>
+                                    </label>
+                                    <select
+                                      value={formData.bankAccountId || ''}
+                                      onChange={(e) => handleInputChange('bankAccountId', e.target.value)}
+                                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-emerald-500/40 text-white text-xs font-mono focus:border-emerald-400"
+                                    >
+                                      <option value="">-- Select Bank Account --</option>
+                                      {bankAccounts.filter(a => a.subType === 'BANK' || (a.type === 'ASSET' && (a.bankName || a.accountNumber || a.code === '1002' || a.code === '1003'))).map(bank => (
+                                        <option key={bank.id} value={bank.id}>
+                                          {bank.bankName || bank.name} ({bank.accountNumber || bank.code}) - Rs. {(bank.currentBalance || 0).toLocaleString()}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                )}
+
+                                {formData.paymentMethod === 'SPLIT' && (
+                                  <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 bg-slate-950/60 p-2.5 rounded-lg border border-emerald-500/20">
+                                    <div>
+                                      <label className="block text-[10px] font-semibold text-emerald-400 mb-0.5">Cash Amount (نقد رقم)</label>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. 200000"
+                                        value={formData.cashAmountReceived || ''}
+                                        onChange={(e) => handleInputChange('cashAmountReceived', e.target.value)}
+                                        className="w-full px-2 py-1 rounded bg-slate-900 border border-white/10 text-xs text-white font-mono"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-semibold text-cyan-400 mb-0.5">Bank Amount (بینک ٹرانسفر)</label>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. 300000"
+                                        value={formData.bankAmountReceived || ''}
+                                        onChange={(e) => handleInputChange('bankAmountReceived', e.target.value)}
+                                        className="w-full px-2 py-1 rounded bg-slate-900 border border-white/10 text-xs text-white font-mono"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -3059,7 +3146,7 @@ export default function Invoices({ onNavigate }) {
                         <div className="p-3 bg-slate-900/60 rounded-lg border border-white/5 text-[11px] text-slate-300 flex items-start gap-2">
                           <span className="text-amber-400 text-sm">💡</span>
                           <div>
-                            <strong>Accounting Note:</strong> When saving, the traded vehicle is automatically added into <strong>Accounts Current Stock</strong> as available inventory. The trade-in valuation (PKR {parsePakistaniPrice(formData.tradeInValuation || 0).toLocaleString()}) debits Stock Inventory (1100). Only additional cash (PKR {parsePakistaniPrice(formData.tradeInCashAdvance || 0).toLocaleString()}) is deposited to Cash Safe / Bank.
+                            <strong>Accounting Note:</strong> When saving, the traded vehicle is automatically added into <strong>Accounts Current Stock</strong> as available inventory. The trade-in valuation (PKR {parsePakistaniPrice(formData.tradeInValuation || 0).toLocaleString()}) debits Stock Inventory (1100). The additional advance (PKR {parsePakistaniPrice(formData.tradeInCashAdvance || 0).toLocaleString()}) is automatically deposited into your selected <strong>{formData.paymentMethod === 'BANK' ? 'Bank Account' : formData.paymentMethod === 'SPLIT' ? 'Split Cash & Bank' : 'Cash Safe'}</strong>.
                           </div>
                         </div>
                       </div>
@@ -3083,13 +3170,13 @@ export default function Invoices({ onNavigate }) {
                             <span className="text-[10px] text-slate-400 block">Enters Accounts Current Stock & Debits Inventory (1100)</span>
                           </div>
                           <div className="p-2 bg-slate-950/80 rounded border border-white/10">
-                            <span className="text-slate-400 block font-medium">💵 Extra Liquid Cash Advance:</span>
+                            <span className="text-slate-400 block font-medium">💵 Extra Monetary Advance:</span>
                             <span className="text-emerald-400 font-bold font-mono">
                               PKR {parsePakistaniPrice(formData.tradeInCashAdvance || 0).toLocaleString()}
                             </span>
                             <span className="text-[10px] text-slate-400 block">
                               {parsePakistaniPrice(formData.tradeInCashAdvance || 0) > 0 
-                                ? `Deposits to ${formData.paymentMethod === 'BANK' ? 'Bank Account' : formData.paymentMethod === 'SPLIT' ? 'Split Cash & Bank' : 'Cash Safe'}`
+                                ? `Deposits into ${formData.paymentMethod === 'BANK' ? 'Selected Bank Account' : formData.paymentMethod === 'SPLIT' ? 'Split Cash & Bank' : 'Cash Safe'}`
                                 : 'Rs. 0 (Safe & Bank remain unchanged)'}
                             </span>
                           </div>
@@ -4651,22 +4738,88 @@ export default function Invoices({ onNavigate }) {
                                   </div>
                                 )}
                               </div>
-                              <div className="sm:col-span-2">
-                                <label className="block text-xs font-semibold text-emerald-300 mb-1">
-                                  Additional Cash Advance (اضافی نقد بیعانہ اگر دیا ہو)
-                                </label>
+                              <div className="sm:col-span-2 space-y-3 p-3.5 bg-emerald-950/40 rounded-xl border border-emerald-500/40">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                                  <label className="block text-xs font-bold text-emerald-300">
+                                    💵 Additional Monetary Advance (اضافی مالی بیعانہ - نقد / بینک ٹرانسفر)
+                                  </label>
+                                  <span className="text-[10px] font-mono text-emerald-400 font-semibold">Cash / Bank / Split Transfer</span>
+                                </div>
                                 <input
                                   type="text"
-                                  placeholder="e.g. 3 lac, 300000 (optional)"
+                                  placeholder="e.g. 5 lac, 500000 (optional)"
                                   value={formData.tradeInCashAdvance || ''}
                                   onChange={(e) => handleInputChange('tradeInCashAdvance', e.target.value)}
-                                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-emerald-500/40 text-emerald-300 text-xs font-bold focus:border-emerald-400 font-mono"
+                                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-emerald-500/50 text-emerald-300 text-xs font-bold focus:border-emerald-400 font-mono shadow-inner"
                                 />
                                 {Boolean(formData.tradeInCashAdvance) && Boolean(getPriceHint(formData.tradeInCashAdvance)) && (
                                   <div className="mt-1 px-2 py-0.5 bg-emerald-950/70 border border-emerald-500/30 rounded text-[10px] font-mono text-emerald-300">
                                     {getPriceHint(formData.tradeInCashAdvance)}
                                   </div>
                                 )}
+
+                                {/* Advance Payment Method & Bank Selector */}
+                                <div className="pt-2 border-t border-emerald-500/20 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                                      Advance Receiving Mode (بیعانہ کی وصولی)
+                                    </label>
+                                    <select
+                                      value={formData.paymentMethod || 'CASH'}
+                                      onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
+                                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-emerald-500/40 text-white text-xs font-mono focus:border-emerald-400"
+                                    >
+                                      <option value="CASH">💵 100% Cash in Hand (Safe)</option>
+                                      <option value="BANK">🏦 100% Bank Account Transfer</option>
+                                      <option value="SPLIT">🔀 Split Payment (Cash + Bank)</option>
+                                    </select>
+                                  </div>
+
+                                  {(formData.paymentMethod === 'BANK' || formData.paymentMethod === 'SPLIT') && (
+                                    <div>
+                                      <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                                        Receiving Bank Account (بینک اکاؤنٹ) <span className="text-rose-400">*</span>
+                                      </label>
+                                      <select
+                                        value={formData.bankAccountId || ''}
+                                        onChange={(e) => handleInputChange('bankAccountId', e.target.value)}
+                                        className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-emerald-500/40 text-white text-xs font-mono focus:border-emerald-400"
+                                      >
+                                        <option value="">-- Select Bank Account --</option>
+                                        {bankAccounts.filter(a => a.subType === 'BANK' || (a.type === 'ASSET' && (a.bankName || a.accountNumber || a.code === '1002' || a.code === '1003'))).map(bank => (
+                                          <option key={bank.id} value={bank.id}>
+                                            {bank.bankName || bank.name} ({bank.accountNumber || bank.code}) - Rs. {(bank.currentBalance || 0).toLocaleString()}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  )}
+
+                                  {formData.paymentMethod === 'SPLIT' && (
+                                    <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 bg-slate-950/60 p-2.5 rounded-lg border border-emerald-500/20">
+                                      <div>
+                                        <label className="block text-[10px] font-semibold text-emerald-400 mb-0.5">Cash Amount (نقد رقم)</label>
+                                        <input
+                                          type="text"
+                                          placeholder="e.g. 200000"
+                                          value={formData.cashAmountReceived || ''}
+                                          onChange={(e) => handleInputChange('cashAmountReceived', e.target.value)}
+                                          className="w-full px-2 py-1 rounded bg-slate-900 border border-white/10 text-xs text-white font-mono"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-[10px] font-semibold text-cyan-400 mb-0.5">Bank Amount (بینک ٹرانسفر)</label>
+                                        <input
+                                          type="text"
+                                          placeholder="e.g. 300000"
+                                          value={formData.bankAmountReceived || ''}
+                                          onChange={(e) => handleInputChange('bankAmountReceived', e.target.value)}
+                                          className="w-full px-2 py-1 rounded bg-slate-900 border border-white/10 text-xs text-white font-mono"
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -4674,7 +4827,7 @@ export default function Invoices({ onNavigate }) {
                           <div className="p-3 bg-slate-900/60 rounded-lg border border-white/5 text-[11px] text-slate-300 flex items-start gap-2">
                             <span className="text-amber-400 text-sm">💡</span>
                             <div>
-                              <strong>Double-Entry Accounting Note:</strong> The trade-in vehicle is automatically created in <strong>Accounts Current Stock</strong> with purchase price PKR {parsePakistaniPrice(formData.tradeInValuation || 0).toLocaleString()}, debiting Vehicle Stock Inventory (1100). Only extra cash (PKR {parsePakistaniPrice(formData.tradeInCashAdvance || 0).toLocaleString()}) enters Cash Safe / Bank.
+                              <strong>Double-Entry Accounting Note:</strong> The trade-in vehicle is automatically created in <strong>Accounts Current Stock</strong> with purchase price PKR {parsePakistaniPrice(formData.tradeInValuation || 0).toLocaleString()}, debiting Vehicle Stock Inventory (1100). The additional advance (PKR {parsePakistaniPrice(formData.tradeInCashAdvance || 0).toLocaleString()}) is automatically deposited into your selected <strong>{formData.paymentMethod === 'BANK' ? 'Bank Account' : formData.paymentMethod === 'SPLIT' ? 'Split Cash & Bank' : 'Cash Safe'}</strong>.
                             </div>
                           </div>
                         </div>

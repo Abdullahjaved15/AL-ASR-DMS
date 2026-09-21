@@ -616,8 +616,10 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
     } else if (inv.category === 'BOOKING_RECEIPT') {
       if (isTradeIn) {
         // For Booking Receipt with Trade-in / Car Exchange:
-        // Cash/Bank inflow is ONLY the extra cash advance portion (if any)
-        effectiveTotalReceived = numericTradeInCash;
+        // Monetary inflow is the extra monetary advance portion (if any)
+        const explicitCashAdv = parsePakistaniPrice(inv.tradeInCashAdvance || 0);
+        const computedMonetaryAdv = Math.max(0, numericAdvance - numericTradeInValuation);
+        effectiveTotalReceived = explicitCashAdv > 0 ? explicitCashAdv : computedMonetaryAdv;
       } else {
         effectiveTotalReceived = numericAdvance > 0 ? numericAdvance : numericTotalPrice;
       }
@@ -629,7 +631,9 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
       } else if (isTradeIn) {
         // Direct Sales Receipt with Trade-In:
         // Liquid inflow into Cash/Bank is total price minus trade-in car value
-        effectiveTotalReceived = Math.max(0, numericTotalPrice - numericTradeInValuation);
+        const explicitCashAdv = parsePakistaniPrice(inv.tradeInCashAdvance || 0);
+        const computedMonetaryAdv = Math.max(0, numericTotalPrice - numericTradeInValuation);
+        effectiveTotalReceived = explicitCashAdv > 0 ? explicitCashAdv : computedMonetaryAdv;
       } else {
         effectiveTotalReceived = numericAdvance > 0 ? numericRemaining : numericTotalPrice;
       }
@@ -1174,11 +1178,11 @@ const createInvoice = async (req, res) => {
         witness2Name: witness2Name || null,
         witness2Cnic: witness2Cnic || null,
 
-        // Accounts Head Approval Workflow
-        approvalStatus: (req.user.role === 'ACCOUNTS_HEAD') ? 'APPROVED' : 'PENDING',
-        approvedById: (req.user.role === 'ACCOUNTS_HEAD') ? req.user.id : null,
-        approvedAt: (req.user.role === 'ACCOUNTS_HEAD') ? new Date() : null,
-        approvalNotes: (req.user.role === 'ACCOUNTS_HEAD') ? 'Auto-approved upon creation by Accounts Head' : null,
+        // Accounts Head & Admins Approval Workflow
+        approvalStatus: (['ACCOUNTS_HEAD', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role)) ? 'APPROVED' : 'PENDING',
+        approvedById: (['ACCOUNTS_HEAD', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role)) ? req.user.id : null,
+        approvedAt: (['ACCOUNTS_HEAD', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role)) ? new Date() : null,
+        approvalNotes: (['ACCOUNTS_HEAD', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role)) ? `Auto-approved upon creation by ${req.user.role}` : null,
 
         createdBy: req.user.id
       },
@@ -1902,15 +1906,15 @@ const updateInvoice = async (req, res) => {
       }
     }
 
-    // Reset approval status to PENDING if edited by someone other than Accounts Head
-    if (req.user.role !== 'ACCOUNTS_HEAD' && existing.approvalStatus === 'APPROVED') {
+    // Reset approval status to PENDING if edited by someone other than Accounts Head / Super Admin / Admin
+    if (!['ACCOUNTS_HEAD', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role) && existing.approvalStatus === 'APPROVED') {
       await prisma.invoice.update({
         where: { id },
         data: {
           approvalStatus: 'PENDING',
           approvedById: null,
           approvedAt: null,
-          approvalNotes: `Pending re-approval after edit by ${req.user.name || 'Super Admin'}`
+          approvalNotes: `Pending re-approval after edit by ${req.user.name || 'Salesman'}`
         }
       });
     }
