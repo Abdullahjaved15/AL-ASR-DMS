@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useAutoRefresh } from '../context/AutoRefreshContext';
 import { logoBase64 } from '../utils/logoBase64';
 import { 
   formatPKR, 
@@ -325,6 +326,12 @@ export default function Invoices({ onNavigate }) {
     tradeInValuation: '',
     tradeInCashAdvance: '',
     tradeInStockId: '',
+    // Bank Financing Case & Processing Fee Fields
+    isBankCase: false,
+    bankName: '',
+    processingFees: '',
+    processingFeePaymentMethod: 'CASH',
+    processingFeeBankAccountId: '',
     // Witnesses
     witness1Name: '',
     witness1Cnic: '',
@@ -464,8 +471,10 @@ export default function Invoices({ onNavigate }) {
     }
   };
 
-  const fetchInvoices = async () => {
-    setLoading(true);
+  const fetchInvoices = async (isInitial = false) => {
+    if (isInitial || !invoices.length) {
+      setLoading(true);
+    }
     try {
       const data = await api.getInvoices({ search, category: selectedCategory, approvalStatus: selectedApprovalStatus });
       if (data) {
@@ -478,6 +487,8 @@ export default function Invoices({ onNavigate }) {
       setLoading(false);
     }
   };
+
+  useAutoRefresh(fetchInvoices);
 
   const openApprovalModal = (invoice, actionType = 'APPROVE') => {
     setInvoiceToApprove(invoice);
@@ -754,6 +765,12 @@ export default function Invoices({ onNavigate }) {
       tradeInValuation: formatPKRShort(inv.tradeInValuation) || '',
       tradeInCashAdvance: formatPKRShort(inv.tradeInCashAdvance) || '',
       tradeInStockId: inv.tradeInStockId || '',
+      // Bank Financing Case & Processing Fee Fields
+      isBankCase: Boolean(inv.isBankCase),
+      bankName: inv.bankName || '',
+      processingFees: formatPKRShort(inv.processingFees) || '',
+      processingFeePaymentMethod: inv.processingFeePaymentMethod || 'CASH',
+      processingFeeBankAccountId: inv.processingFeeBankAccountId || '',
       witness1Name: inv.witness1Name || '',
       witness1Cnic: inv.witness1Cnic || '',
       witness2Name: inv.witness2Name || '',
@@ -854,6 +871,12 @@ export default function Invoices({ onNavigate }) {
       tradeInValuation: '',
       tradeInCashAdvance: '',
       tradeInStockId: '',
+      // Bank Financing Case & Processing Fee Fields
+      isBankCase: false,
+      bankName: '',
+      processingFees: '',
+      processingFeePaymentMethod: 'CASH',
+      processingFeeBankAccountId: '',
       witness1Name: '',
       witness1Cnic: '',
       witness2Name: '',
@@ -1298,6 +1321,26 @@ export default function Invoices({ onNavigate }) {
                 <div><strong>پرانی گاڑی کی طے شدہ قیمت (Valuation Credit):</strong> <span style="font-family: monospace; font-weight: 800; color: #d97706;">Rs. ${parsePakistaniPrice(inv.tradeInValuation || 0).toLocaleString()}</span></div>
                 <div><strong>اضافی نقد بیعانہ (Extra Cash Paid):</strong> <span style="font-family: monospace; font-weight: 800; color: #16a34a;">Rs. ${parsePakistaniPrice(inv.tradeInCashAdvance || 0).toLocaleString()}</span></div>
                 <div><strong>کل ایڈوانس بیعانہ (Total Advance):</strong> <span style="font-family: monospace; font-weight: 800; color: #0284c7;">Rs. ${numericAdvance.toLocaleString()}</span></div>
+              </div>
+            </div>
+          ` : ''}
+
+          ${inv.isBankCase ? `
+            <!-- Bank Financing Case & Separate Processing Fee Section -->
+            <div style="margin-top: 10px; border: 2px solid #0284c7; border-radius: 6px; overflow: hidden; background: #ffffff;">
+              <div style="background: #0284c7; color: #ffffff; padding: 4px 10px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center;">
+                <span>🏦 گاڑی کی بینک فنانسنگ / لیز کیس (BANK FINANCING / LEASE CASE)</span>
+                <span>علیحدہ بینک پروسیسنگ فیس</span>
+              </div>
+              <div style="padding: 6px 10px; background: #f0f9ff; border-bottom: 1px solid #bae6fd; font-size: 9.5px; color: #0369a1; font-weight: 600; line-height: 1.4;">
+                یہ گاڑی بینک لیز / فنانس کے ذریعے بک کی جا رہی ہے۔ بینک پروسیسنگ فیس <strong>PKR ${parsePakistaniPrice(inv.processingFees || 0).toLocaleString()}</strong> گاڑی کی کل طے شدہ قیمت سے بالکل علیحدہ ہے اور گاڑی کے کل حساب میں شامل نہیں ہے۔
+                <br/>
+                <span style="font-size: 8.5px; color: #0c4a6e; font-style: italic;">(Financed through: <strong>${inv.bankName || 'Bank Financing'}</strong>. Non-refundable processing fee of <strong>PKR ${parsePakistaniPrice(inv.processingFees || 0).toLocaleString()}</strong> paid via <strong>${inv.processingFeePaymentMethod === 'BANK' ? 'Bank Transfer' : 'Cash in Hand'}</strong> - Excluded from vehicle total deal).</span>
+              </div>
+              <div style="padding: 5px 10px; display: flex; justify-content: space-between; font-size: 9px; background: #f8fafc;">
+                <div><strong>بینک ادارہ (Bank Name):</strong> <span style="font-weight: 800; color: #002b66;">${inv.bankName || 'N/A'}</span></div>
+                <div><strong>علیحدہ پروسیسنگ فیس (Processing Fee):</strong> <span style="font-family: monospace; font-weight: 800; color: #0284c7;">PKR ${parsePakistaniPrice(inv.processingFees || 0).toLocaleString()}</span></div>
+                <div><strong>وصولی ذریعہ (Fee Mode):</strong> <span style="font-weight: 700; color: #16a34a;">${inv.processingFeePaymentMethod === 'BANK' ? '🏦 Bank Transfer' : '💵 Cash in Hand'}</span></div>
               </div>
             </div>
           ` : ''}
@@ -2181,6 +2224,11 @@ export default function Invoices({ onNavigate }) {
                           {cat === 'SALES_RECEIPT' && inv.linkedBookingNumber && (
                             <span className="inline-block text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
                               🔗 BK: {inv.linkedBookingNumber}
+                            </span>
+                          )}
+                          {inv.isBankCase && (
+                            <span className="inline-block text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold" title={`Bank: ${inv.bankName || 'Bank Case'} • Processing Fee: PKR ${parsePakistaniPrice(inv.processingFees || 0).toLocaleString()}`}>
+                              🏦 {inv.bankName ? inv.bankName.split('-')[0].trim() : 'Bank Case'}{parsePakistaniPrice(inv.processingFees || 0) > 0 ? ` • Fee: Rs. ${parsePakistaniPrice(inv.processingFees).toLocaleString()}` : ''}
                             </span>
                           )}
                         </div>
@@ -3147,6 +3195,170 @@ export default function Invoices({ onNavigate }) {
                           <span className="text-amber-400 text-sm">💡</span>
                           <div>
                             <strong>Accounting Note:</strong> When saving, the traded vehicle is automatically added into <strong>Accounts Current Stock</strong> as available inventory. The trade-in valuation (PKR {parsePakistaniPrice(formData.tradeInValuation || 0).toLocaleString()}) debits Stock Inventory (1100). The additional advance (PKR {parsePakistaniPrice(formData.tradeInCashAdvance || 0).toLocaleString()}) is automatically deposited into your selected <strong>{formData.paymentMethod === 'BANK' ? 'Bank Account' : formData.paymentMethod === 'SPLIT' ? 'Split Cash & Bank' : 'Cash Safe'}</strong>.
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* BANK FINANCING / LEASE CASE (بینک فنانس / لیز کیس) & SEPARATE PROCESSING FEES */}
+                  <div className={`p-4 rounded-xl border-2 transition-all space-y-3 ${
+                    formData.isBankCase 
+                      ? 'bg-gradient-to-br from-cyan-950/50 via-slate-950 to-blue-950/30 border-cyan-500/60 shadow-xl' 
+                      : 'bg-slate-950/60 border-white/10'
+                  }`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+                      <label className="flex items-center space-x-3 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(formData.isBankCase)}
+                          onChange={(e) => handleInputChange('isBankCase', e.target.checked)}
+                          className="w-5 h-5 text-cyan-500 rounded bg-slate-950 border-cyan-400/40 focus:ring-cyan-500 cursor-pointer"
+                        />
+                        <div>
+                          <span className="text-xs font-bold text-white flex items-center gap-2">
+                            <span>🏦 Bank Financing / Lease Case (بینک فنانسنگ / لیز کیس)</span>
+                          </span>
+                          <p className="text-[11px] text-cyan-300/80 font-mono mt-0.5">
+                            Vehicle is booked through a Bank Lease/Finance case with a separate, non-included processing fee.
+                          </p>
+                        </div>
+                      </label>
+
+                      {formData.isBankCase && (
+                        <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold whitespace-nowrap self-start sm:self-center">
+                          ⚡ Dedicated Ledger (4003)
+                        </span>
+                      )}
+                    </div>
+
+                    {formData.isBankCase && (
+                      <div className="space-y-4 pt-1">
+                        <div className="p-3 bg-cyan-950/60 rounded-xl border border-cyan-500/30 text-xs flex items-start gap-2.5">
+                          <span className="text-cyan-400 text-base">⚠️</span>
+                          <div>
+                            <strong className="text-cyan-300">Important Financial Separation Rule:</strong>
+                            <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                              The Bank Case Processing Fee is an <strong>independent revenue charge</strong>. It is <strong>NOT</strong> added or included in the car total deal price (PKR {parsePakistaniPrice(formData.totalPrice || 0).toLocaleString()}). It is separately credited into the dedicated <strong>4003 - Bank Case Processing Fees Revenue</strong> ledger and deposited into your selected Cash Safe or Bank Account.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Bank Details & Processing Fee Inputs */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-900/90 p-4 rounded-xl border border-cyan-500/30">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">
+                              Bank / Leasing Company Name (بینک کا نام) <span className="text-rose-400">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              list="bankNameOptions"
+                              placeholder="e.g. Meezan Bank / Bank Alfalah"
+                              value={formData.bankName || ''}
+                              onChange={(e) => handleInputChange('bankName', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-400 font-medium"
+                              required={formData.isBankCase}
+                            />
+                            <datalist id="bankNameOptions">
+                              <option value="Meezan Bank - Auto Ijarah" />
+                              <option value="Bank Alfalah - Car Finance" />
+                              <option value="Dubai Islamic Bank - Auto Finance" />
+                              <option value="Habib Metropolitan Bank" />
+                              <option value="Habib Bank Limited (HBL)" />
+                              <option value="Allied Bank Limited (ABL)" />
+                              <option value="Faysal Bank - Islami Auto Finance" />
+                              <option value="Bank of Punjab (BOP)" />
+                              <option value="Askari Bank Limited" />
+                              <option value="MCB Bank Limited" />
+                              <option value="Standard Chartered Bank" />
+                              <option value="BankIslami Pakistan" />
+                            </datalist>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-cyan-300 mb-1">
+                              Separate Processing Fee (علیحدہ پروسیسنگ فیس) <span className="text-rose-400">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 50,000, 1 lac"
+                              value={formData.processingFees || ''}
+                              onChange={(e) => handleInputChange('processingFees', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-cyan-500/50 text-cyan-300 text-xs font-bold focus:border-cyan-400 font-mono shadow-inner"
+                              required={formData.isBankCase}
+                            />
+                            {Boolean(formData.processingFees) && Boolean(getPriceHint(formData.processingFees)) && (
+                              <div className="mt-1 px-2 py-0.5 bg-cyan-950/70 border border-cyan-500/30 rounded text-[10px] font-mono text-cyan-300">
+                                {getPriceHint(formData.processingFees)}
+                              </div>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1">
+                              Fee Receiving Mode (فیس وصولی کا ذریعہ)
+                            </label>
+                            <select
+                              value={formData.processingFeePaymentMethod || 'CASH'}
+                              onChange={(e) => handleInputChange('processingFeePaymentMethod', e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white text-xs focus:border-cyan-400 font-mono"
+                            >
+                              <option value="CASH">💵 Cash in Hand (Safe Account 1001)</option>
+                              <option value="BANK">🏦 Bank Account Transfer</option>
+                            </select>
+                          </div>
+
+                          {formData.processingFeePaymentMethod === 'BANK' && (
+                            <div className="sm:col-span-3 pt-2">
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                Receiving Bank Account for Processing Fee (بینک اکاؤنٹ) <span className="text-rose-400">*</span>
+                              </label>
+                              <select
+                                value={formData.processingFeeBankAccountId || ''}
+                                onChange={(e) => handleInputChange('processingFeeBankAccountId', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-cyan-500/40 text-white text-xs font-mono focus:border-cyan-400"
+                                required={formData.processingFeePaymentMethod === 'BANK'}
+                              >
+                                <option value="">-- Select Receiving Bank Account --</option>
+                                {bankAccounts.filter(a => a.subType === 'BANK' || (a.type === 'ASSET' && (a.bankName || a.accountNumber || a.code === '1002' || a.code === '1003'))).map(bank => (
+                                  <option key={bank.id} value={bank.id}>
+                                    {bank.bankName || bank.name} ({bank.accountNumber || bank.code}) - Balance: Rs. {(bank.currentBalance || 0).toLocaleString()}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Live Financial Breakdown Summary Card */}
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 p-3 bg-slate-950/80 rounded-xl border border-white/10 text-xs">
+                          <div className="p-2 bg-slate-900/80 rounded border border-white/5">
+                            <span className="text-[10px] text-slate-400 block">🚗 Vehicle Total Deal:</span>
+                            <span className="font-mono font-bold text-white text-xs mt-0.5">
+                              PKR {parsePakistaniPrice(formData.totalPrice || 0).toLocaleString()}
+                            </span>
+                            <span className="text-[9px] text-slate-400 block mt-0.5">Vehicle Price (Excluded from fee)</span>
+                          </div>
+                          <div className="p-2 bg-slate-900/80 rounded border border-white/5">
+                            <span className="text-[10px] text-slate-400 block">💵 Car Advance Received:</span>
+                            <span className="font-mono font-bold text-emerald-400 text-xs mt-0.5">
+                              PKR {parsePakistaniPrice(formData.advanceAmount || 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="p-2 bg-slate-900/80 rounded border border-white/5">
+                            <span className="text-[10px] text-slate-400 block">🔴 Car Remaining Balance:</span>
+                            <span className="font-mono font-bold text-rose-400 text-xs mt-0.5">
+                              PKR {Math.max(0, parsePakistaniPrice(formData.totalPrice || 0) - parsePakistaniPrice(formData.advanceAmount || 0)).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="p-2 bg-cyan-500/10 rounded border border-cyan-500/30">
+                            <span className="text-[10px] text-cyan-300 font-bold block">🏦 Bank Processing Fee:</span>
+                            <span className="font-mono font-bold text-cyan-400 text-xs mt-0.5">
+                              PKR {parsePakistaniPrice(formData.processingFees || 0).toLocaleString()}
+                            </span>
+                            <span className="text-[9px] text-cyan-300/70 block mt-0.5">
+                              {formData.processingFeePaymentMethod === 'BANK' ? 'Deposits to Selected Bank' : 'Deposits to Cash Safe'}
+                            </span>
                           </div>
                         </div>
                       </div>

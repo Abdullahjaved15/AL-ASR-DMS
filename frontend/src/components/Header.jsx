@@ -21,16 +21,20 @@ import {
   ShieldCheck,
   Sun,
   Moon,
-  Palette
+  Palette,
+  RefreshCw,
+  Zap
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useAutoRefreshContext, useAutoRefresh } from '../context/AutoRefreshContext';
 import { api } from '../services/api';
 import { formatPKR } from '../utils/priceFormatter';
 
 export default function Header({ currentTab, search, setSearch, onOpenModal, onToggleMobileMenu, onNavigate }) {
   const { user, isAdmin, isAccountsHead, isSuperAdmin, canAccessAccounts, logout } = useAuth();
   const { themeId, isLightMode, changeTheme } = useTheme();
+  const { isSyncing, triggerRefresh } = useAutoRefreshContext();
   const [localSearch, setLocalSearch] = useState(search);
 
   // Notification States
@@ -40,6 +44,11 @@ export default function Header({ currentTab, search, setSearch, onOpenModal, onT
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [loadingNotifs, setLoadingNotifs] = useState(false);
   const notificationDropdownRef = useRef(null);
+
+  // Auto-refresh notifications and approvals whenever any action or heartbeat occurs
+  useAutoRefresh(() => {
+    fetchNotifications();
+  });
 
   useEffect(() => {
     setLocalSearch(search);
@@ -403,6 +412,23 @@ export default function Header({ currentTab, search, setSearch, onOpenModal, onT
             )}
           </div>
         )}
+
+        {/* Real-time Auto-Refresher Sync Status & Manual Sync Button */}
+        <button
+          onClick={() => triggerRefresh({ source: 'header_manual_sync' })}
+          className={`px-2.5 py-2 rounded-xl border transition-all flex items-center space-x-1.5 text-xs font-mono font-medium shadow-sm ${
+            isSyncing
+              ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-glow'
+              : 'bg-slate-900/90 border-white/10 hover:border-cyan-500/40 text-slate-300 hover:text-cyan-300 hover:bg-slate-800'
+          }`}
+          title="AL ASR Auto-Refresher is Active: Automatically refreshes after any action. Click to sync all data immediately."
+        >
+          <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${isSyncing ? 'animate-spin text-cyan-300' : ''}`} />
+          <span className="hidden sm:inline text-[11px] font-bold">
+            {isSyncing ? 'Syncing...' : 'Live Sync'}
+          </span>
+          <span className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-cyan-400 animate-ping' : 'bg-emerald-400 animate-pulse'}`}></span>
+        </button>
 
         {/* Quick Theme Switcher Button */}
         <button

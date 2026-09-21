@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { DataCacheProvider } from './context/DataCacheContext';
+import { AutoRefreshProvider } from './context/AutoRefreshContext';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 
@@ -256,7 +257,9 @@ export default function App() {
     <AuthProvider>
       <ThemeProvider>
         <DataCacheProvider>
-          <MainLayout />
+          <AutoRefreshProvider>
+            <MainLayout />
+          </AutoRefreshProvider>
         </DataCacheProvider>
       </ThemeProvider>
     </AuthProvider>

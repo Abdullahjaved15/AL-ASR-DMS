@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FileCheck, Plus, Search, Printer, Edit, Trash2, Car, User, Calendar, Clock, FileText, CheckCircle2, Camera, Image as ImageIcon, Upload, Eye, X, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useAutoRefresh } from '../context/AutoRefreshContext';
 import { logoBase64 } from '../utils/logoBase64';
 import { formatPKR, parsePakistaniPrice, getPriceHint, normalizePriceInput, formatPKRShort } from '../utils/priceFormatter';
 
@@ -48,13 +49,10 @@ export default function ReceivingLetterPage() {
     notes: ''
   });
 
-  useEffect(() => {
-    fetchLetters();
-    fetchSellersList();
-  }, [search]);
-
-  const fetchLetters = async () => {
-    setLoading(true);
+  const fetchLetters = async (isInitial = false) => {
+    if (isInitial || !letters.length) {
+      setLoading(true);
+    }
     try {
       const data = await api.getReceivingLetters({ search });
       setLetters(data || []);
@@ -64,6 +62,16 @@ export default function ReceivingLetterPage() {
       setLoading(false);
     }
   };
+
+  useAutoRefresh(() => {
+    fetchLetters(false);
+    fetchSellersList();
+  });
+
+  useEffect(() => {
+    fetchLetters(true);
+    fetchSellersList();
+  }, [search]);
 
   const fetchSellersList = async () => {
     try {

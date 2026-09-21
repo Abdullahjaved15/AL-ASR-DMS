@@ -871,6 +871,102 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
       }
     }
   }
+
+  // 4. BANK FINANCING / LEASE CASE PROCESSING FEES (علیحدہ پروسیسنگ فیس)
+  // Processing fees are separate revenue and NOT included in the vehicle total deal.
+  const numericProcessingFee = parsePakistaniPrice(inv.processingFees || 0);
+  if (inv.isBankCase && numericProcessingFee > 0) {
+    let processingFeeRevenueAccount = await prisma.account.findFirst({ where: { code: '4003' } })
+      || await prisma.account.findFirst({ where: { name: { contains: 'Processing Fee', mode: 'insensitive' } } });
+    if (!processingFeeRevenueAccount) {
+      processingFeeRevenueAccount = await prisma.account.create({
+        data: {
+          code: '4003',
+          name: 'Bank Case Processing Fees Revenue',
+          type: 'REVENUE',
+          subType: 'OTHER',
+          currentBalance: 0,
+          description: 'Processing fees collected from customers for bank financing and lease vehicle bookings',
+          isSystem: true
+        }
+      });
+    }
+
+    let feeDepositAccount = null;
+    const feeMethod = inv.processingFeePaymentMethod || 'CASH';
+    if (feeMethod === 'BANK' && inv.processingFeeBankAccountId) {
+      feeDepositAccount = await prisma.account.findUnique({ where: { id: inv.processingFeeBankAccountId } });
+    }
+    if (!feeDepositAccount && feeMethod === 'BANK') {
+      feeDepositAccount = await prisma.account.findFirst({ where: { subType: 'BANK', isActive: true } })
+        || await prisma.account.findFirst({ where: { subType: 'BANK' } });
+    }
+    if (!feeDepositAccount) {
+      feeDepositAccount = await prisma.account.findFirst({ where: { subType: 'CASH', isActive: true } })
+        || await prisma.account.findFirst({ where: { subType: 'CASH' } });
+    }
+    if (!feeDepositAccount) {
+      feeDepositAccount = await prisma.account.create({
+        data: {
+          code: '1001',
+          name: 'Cash in Hand Safe',
+          type: 'ASSET',
+          subType: 'CASH',
+          currentBalance: 0,
+          description: 'Physical showroom safe cash',
+          isSystem: true
+        }
+      });
+    }
+
+    const carSummary = `${inv.vehicleMaker || ''} ${inv.vehicleModel || ''} ${inv.registrationNo ? `(Reg: ${inv.registrationNo})` : (inv.chassisNumber ? `(Chassis: ${inv.chassisNumber})` : '')}`.trim();
+    const bankSummary = inv.bankName ? ` - Bank: ${inv.bankName}` : '';
+    const feeDesc = `Bank Case Processing Fee for [${carSummary || 'Vehicle'}] from [${inv.buyerName || 'Customer'}]${bankSummary} via [${feeDepositAccount.name}]`;
+
+    await prisma.transaction.create({
+      data: {
+        transactionNumber: `FEE-${dateCode}-${txnSeq}`,
+        date: todayDate,
+        type: 'RECEIPT_VOUCHER',
+        amount: numericProcessingFee,
+        description: feeDesc,
+        referenceType: 'INVOICE',
+        referenceId: inv.id,
+        referenceNumber: inv.invoiceNumber,
+        chassisNumber: inv.chassisNumber || null,
+        createdById: finalUserId,
+        entries: {
+          create: [
+            {
+              accountId: feeDepositAccount.id,
+              type: 'DEBIT',
+              amount: numericProcessingFee,
+              description: `Processing fee inflow for [${carSummary || 'Vehicle'}] - Customer: [${inv.buyerName || 'Customer'}]${bankSummary}`
+            },
+            {
+              accountId: processingFeeRevenueAccount.id,
+              type: 'CREDIT',
+              amount: numericProcessingFee,
+              description: `Bank Case Processing Fee Revenue for [${carSummary || 'Vehicle'}] - Customer: [${inv.buyerName || 'Customer'}]${bankSummary}`
+            }
+          ]
+        }
+      }
+    });
+
+    if (feeDepositAccount) {
+      await prisma.account.update({
+        where: { id: feeDepositAccount.id },
+        data: { currentBalance: { increment: numericProcessingFee } }
+      });
+    }
+    if (processingFeeRevenueAccount) {
+      await prisma.account.update({
+        where: { id: processingFeeRevenueAccount.id },
+        data: { currentBalance: { increment: numericProcessingFee } }
+      });
+    }
+  }
 };
 
 const createInvoice = async (req, res) => {
@@ -981,7 +1077,13 @@ const createInvoice = async (req, res) => {
       tradeInChassisNumber,
       tradeInEngineNumber,
       tradeInValuation,
-      tradeInCashAdvance
+      tradeInCashAdvance,
+      // Bank Financing Case & Processing Fee Fields
+      isBankCase,
+      bankName,
+      processingFees,
+      processingFeePaymentMethod,
+      processingFeeBankAccountId
     } = req.body;
 
     const finalSellerPhoto = sellerPhoto ? await handleCloudinaryUpload(sellerPhoto, 'sellers') : null;
@@ -1177,6 +1279,13 @@ const createInvoice = async (req, res) => {
         witness1Cnic: witness1Cnic || null,
         witness2Name: witness2Name || null,
         witness2Cnic: witness2Cnic || null,
+
+        // Bank Financing Case & Processing Fee Fields
+        isBankCase: Boolean(isBankCase),
+        bankName: isBankCase ? (bankName || null) : null,
+        processingFees: isBankCase && processingFees ? String(parsePakistaniPrice(processingFees)) : '',
+        processingFeePaymentMethod: isBankCase ? (processingFeePaymentMethod || 'CASH') : 'CASH',
+        processingFeeBankAccountId: isBankCase && processingFeePaymentMethod === 'BANK' ? (processingFeeBankAccountId || null) : null,
 
         // Accounts Head & Admins Approval Workflow
         approvalStatus: (['ACCOUNTS_HEAD', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role)) ? 'APPROVED' : 'PENDING',
@@ -1553,7 +1662,13 @@ const updateInvoice = async (req, res) => {
       tradeInChassisNumber,
       tradeInEngineNumber,
       tradeInValuation,
-      tradeInCashAdvance
+      tradeInCashAdvance,
+      // Bank Financing Case & Processing Fee Fields
+      isBankCase,
+      bankName,
+      processingFees,
+      processingFeePaymentMethod,
+      processingFeeBankAccountId
     } = req.body;
 
     const finalSellerPhoto = sellerPhoto ? await handleCloudinaryUpload(sellerPhoto, 'sellers') : existing.sellerPhoto;
@@ -1664,6 +1779,15 @@ const updateInvoice = async (req, res) => {
         linkedBookingId: linkedBookingId !== undefined ? linkedBookingId : existing.linkedBookingId,
         linkedBookingNumber: linkedBookingNumber !== undefined ? linkedBookingNumber : existing.linkedBookingNumber,
         bookingStatus: bookingStatus !== undefined ? bookingStatus : existing.bookingStatus,
+
+        // Bank Financing Case & Processing Fee Fields
+        isBankCase: isBankCase !== undefined ? Boolean(isBankCase) : existing.isBankCase,
+        bankName: isBankCase !== undefined ? (isBankCase ? (bankName || null) : null) : existing.bankName,
+        processingFees: isBankCase !== undefined 
+          ? (isBankCase && processingFees ? String(parsePakistaniPrice(processingFees)) : '')
+          : (existing.isBankCase && processingFees !== undefined ? String(parsePakistaniPrice(processingFees)) : existing.processingFees),
+        processingFeePaymentMethod: processingFeePaymentMethod !== undefined ? processingFeePaymentMethod : existing.processingFeePaymentMethod,
+        processingFeeBankAccountId: processingFeeBankAccountId !== undefined ? processingFeeBankAccountId : existing.processingFeeBankAccountId,
 
         witness1Name: witness1Name !== undefined ? witness1Name : existing.witness1Name,
         witness1Cnic: witness1Cnic !== undefined ? witness1Cnic : existing.witness1Cnic,

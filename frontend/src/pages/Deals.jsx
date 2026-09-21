@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Handshake, Plus, DollarSign, TrendingUp, Calendar, UserCheck, CheckCircle, Image as ImageIcon } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useAutoRefresh } from '../context/AutoRefreshContext';
 import ImageViewerModal from '../components/ImageViewerModal';
 import { formatPKR, parsePakistaniPrice, getPriceHint, normalizePriceInput } from '../utils/priceFormatter';
 
@@ -21,16 +22,13 @@ export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
   const [dealPrice, setDealPrice] = useState('');
   const [remarks, setRemarks] = useState('');
 
-  useEffect(() => {
-    fetchDeals();
-    fetchOptions();
-  }, [search]);
-
-  const fetchDeals = async () => {
-    setLoading(true);
+  const fetchDeals = async (isInitial = false) => {
+    if (isInitial || !deals.length) {
+      setLoading(true);
+    }
     try {
       const data = await api.getDeals({ search });
-      setDeals(data);
+      setDeals(data || []);
     } catch (err) {
       console.error('Failed to fetch deals:', err);
     } finally {
@@ -44,12 +42,22 @@ export default function Deals({ search, isAddModalOpen, setIsAddModalOpen }) {
         api.getBuyers(),
         api.getSellers()
       ]);
-      setBuyersList(buyersData.filter(b => b.leadStatus !== 'Deal Closed'));
-      setSellersList(sellersData.filter(s => s.leadStatus !== 'Deal Closed'));
+      setBuyersList((buyersData || []).filter(b => b.leadStatus !== 'Deal Closed'));
+      setSellersList((sellersData || []).filter(s => s.leadStatus !== 'Deal Closed'));
     } catch (err) {
       console.error('Failed to fetch options for deal modal:', err);
     }
   };
+
+  useAutoRefresh(() => {
+    fetchDeals(false);
+    fetchOptions();
+  });
+
+  useEffect(() => {
+    fetchDeals(true);
+    fetchOptions();
+  }, [search]);
 
   const handleCloseDeal = async (e) => {
     e.preventDefault();

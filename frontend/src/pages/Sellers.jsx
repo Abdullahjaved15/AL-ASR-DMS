@@ -7,6 +7,7 @@ import SellerDetailModal from '../components/SellerDetailModal';
 import FilterBar from '../components/FilterBar';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useAutoRefresh } from '../context/AutoRefreshContext';
 import { logoBase64 } from '../utils/logoBase64';
 import { formatPKR, parsePakistaniPrice, getPriceHint, normalizePriceInput, formatPKRShort } from '../utils/priceFormatter';
 
@@ -96,13 +97,10 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
     comments: ''
   });
 
-  useEffect(() => {
-    fetchSellers();
-    fetchTeamMembers();
-  }, [search, filters, scope]);
-
-  const fetchSellers = async () => {
-    setLoading(true);
+  const fetchSellers = async (isInitial = false) => {
+    if (isInitial || !sellers.length) {
+      setLoading(true);
+    }
     try {
       const activeFilters = { ...filters };
       if (scope === 'mine' && user?.id) {
@@ -131,13 +129,23 @@ export default function Sellers({ search, isAddModalOpen, setIsAddModalOpen, sco
       if (scope === 'commercial') {
         filteredData = filteredData.filter(s => s.isCommercial || s.vehicleType === 'Commercial');
       }
-      setSellers(filteredData);
+      setSellers(filteredData || []);
     } catch (err) {
       console.error('Failed to fetch sellers:', err);
     } finally {
       setLoading(false);
     }
   };
+
+  useAutoRefresh(() => {
+    fetchSellers(false);
+    fetchTeamMembers();
+  });
+
+  useEffect(() => {
+    fetchSellers(true);
+    fetchTeamMembers();
+  }, [search, filters, scope]);
 
   const fetchTeamMembers = async () => {
     try {

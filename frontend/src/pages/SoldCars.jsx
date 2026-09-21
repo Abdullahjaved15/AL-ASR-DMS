@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useAutoRefresh } from '../context/AutoRefreshContext';
 import { formatPKR, parsePakistaniPrice, getPriceHint } from '../utils/priceFormatter';
 import { logoBase64 } from '../utils/logoBase64';
 
@@ -69,13 +70,10 @@ export default function SoldCars() {
     careOf: ''
   });
 
-  useEffect(() => {
-    fetchSoldCarsData();
-    fetchBankCashAccounts();
-  }, [selectedFilter]);
-
-  const fetchSoldCarsData = async () => {
-    setLoading(true);
+  const fetchSoldCarsData = async (isInitial = false) => {
+    if (isInitial || !soldVehicles.length) {
+      setLoading(true);
+    }
     try {
       const res = await api.getSoldCars({ filter: selectedFilter, search: searchQuery });
       setSoldVehicles(res.soldVehicles || []);
@@ -86,6 +84,16 @@ export default function SoldCars() {
       setLoading(false);
     }
   };
+
+  useAutoRefresh(() => {
+    fetchSoldCarsData(false);
+    fetchBankCashAccounts();
+  });
+
+  useEffect(() => {
+    fetchSoldCarsData(true);
+    fetchBankCashAccounts();
+  }, [selectedFilter]);
 
   const fetchBankCashAccounts = async () => {
     try {

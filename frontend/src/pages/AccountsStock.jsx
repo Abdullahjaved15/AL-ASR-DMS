@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useAutoRefresh } from '../context/AutoRefreshContext';
 import { logoBase64 } from '../utils/logoBase64';
 import { formatPKR, parsePakistaniPrice, getPriceHint, normalizePriceInput, formatPKRShort } from '../utils/priceFormatter';
 
@@ -76,11 +77,6 @@ export default function AccountsStock({ onNavigate }) {
     ledgerAccountId: ''
   });
 
-  useEffect(() => {
-    fetchStock();
-    fetchCoaAccounts();
-  }, [search, statusFilter]);
-
   const fetchCoaAccounts = async () => {
     try {
       const res = await api.getAccounts();
@@ -90,8 +86,10 @@ export default function AccountsStock({ onNavigate }) {
     }
   };
 
-  const fetchStock = async () => {
-    setLoading(true);
+  const fetchStock = async (isInitial = false) => {
+    if (isInitial || !stockList.length) {
+      setLoading(true);
+    }
     try {
       const data = await api.getAccountsStock({ search, status: statusFilter });
       if (data) {
@@ -104,6 +102,16 @@ export default function AccountsStock({ onNavigate }) {
       setLoading(false);
     }
   };
+
+  useAutoRefresh(() => {
+    fetchStock(false);
+    fetchCoaAccounts();
+  });
+
+  useEffect(() => {
+    fetchStock(true);
+    fetchCoaAccounts();
+  }, [search, statusFilter]);
 
   const cleanStockPayload = (data) => ({
     ...data,

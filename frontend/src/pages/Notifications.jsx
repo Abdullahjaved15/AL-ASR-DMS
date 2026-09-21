@@ -21,6 +21,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useAutoRefresh } from '../context/AutoRefreshContext';
 import { api } from '../services/api';
 import { formatPKR } from '../utils/priceFormatter';
 
@@ -32,15 +33,11 @@ export default function Notifications({ onNavigate }) {
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('ALL'); // ALL, UNREAD, SALES, BOOKING
 
-  useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 15000); // 15s poll
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchNotifications = async () => {
+  const fetchNotifications = async (isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial || !notifications.length) {
+        setLoading(true);
+      }
       const res = await api.getNotifications();
       setNotifications(res.notifications || []);
       setUnreadCount(res.unreadCount || 0);
@@ -50,6 +47,12 @@ export default function Notifications({ onNavigate }) {
       setLoading(false);
     }
   };
+
+  useAutoRefresh(fetchNotifications);
+
+  useEffect(() => {
+    fetchNotifications(true);
+  }, []);
 
   const handleMarkAsRead = async (id) => {
     try {

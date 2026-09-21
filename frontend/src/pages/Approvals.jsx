@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useAutoRefresh } from '../context/AutoRefreshContext';
 
 const formatDateStr = (dateVal) => {
   if (!dateVal) return '-';
@@ -57,12 +58,10 @@ export default function Approvals() {
   const [submitting, setSubmitting] = useState(false);
   const [expandedDiffs, setExpandedDiffs] = useState({});
 
-  useEffect(() => {
-    fetchRequests();
-  }, [statusFilter, entityFilter, actionFilter]);
-
-  const fetchRequests = async () => {
-    setLoading(true);
+  const fetchRequests = async (isInitial = false) => {
+    if (isInitial || !requests.length) {
+      setLoading(true);
+    }
     try {
       const data = await api.getApprovals({
         status: statusFilter || undefined,
@@ -79,6 +78,12 @@ export default function Approvals() {
       setLoading(false);
     }
   };
+
+  useAutoRefresh(fetchRequests);
+
+  useEffect(() => {
+    fetchRequests(true);
+  }, [statusFilter, entityFilter, actionFilter]);
 
   const handleApprove = async () => {
     if (!selectedReq) return;

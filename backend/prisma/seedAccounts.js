@@ -101,6 +101,16 @@ async function seedAccounts() {
       currentBalance: 0
     },
     {
+      code: '4003',
+      name: 'Bank Case Processing Fees Revenue',
+      type: 'REVENUE',
+      subType: 'OTHER',
+      description: 'Processing fees collected from customers for bank financing and lease vehicle bookings',
+      isSystem: true,
+      openingBalance: 0,
+      currentBalance: 0
+    },
+    {
       code: '5001',
       name: 'Showroom Rent Expense',
       type: 'EXPENSE',

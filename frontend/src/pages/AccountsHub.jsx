@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useAutoRefresh } from '../context/AutoRefreshContext';
 import { formatPKR, parsePakistaniPrice, getPriceHint, normalizePriceInput, numberToWordsPKR } from '../utils/priceFormatter';
 import { logoBase64 } from '../utils/logoBase64';
 
@@ -126,7 +127,6 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
   };
 
   const handleQuickRefreshAll = async () => {
-    setLoading(true);
     try {
       await Promise.all([
         fetchAccountsData(),
@@ -137,10 +137,10 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
       ]);
     } catch (err) {
       console.error('Quick refresh error:', err);
-    } finally {
-      setLoading(false);
     }
   };
+
+  useAutoRefresh(handleQuickRefreshAll);
 
   // Forms data
   const [accountFormData, setAccountFormData] = useState({

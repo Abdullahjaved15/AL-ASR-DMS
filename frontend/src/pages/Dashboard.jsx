@@ -18,6 +18,7 @@ import PipelineBar from '../components/PipelineBar';
 import StatusBadge from '../components/StatusBadge';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useAutoRefresh } from '../context/AutoRefreshContext';
 import { formatPKR, parsePakistaniPrice } from '../utils/priceFormatter';
 
 export default function Dashboard({ onNavigate, onOpenModal }) {
@@ -25,12 +26,10 @@ export default function Dashboard({ onNavigate, onOpenModal }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
-    setLoading(true);
+  const fetchStats = async (isInitial = false) => {
+    if (isInitial || !stats) {
+      setLoading(true);
+    }
     try {
       const data = await api.getDashboardStats();
       setStats(data);
@@ -40,6 +39,8 @@ export default function Dashboard({ onNavigate, onOpenModal }) {
       setLoading(false);
     }
   };
+
+  useAutoRefresh(fetchStats);
 
   if (loading) {
     return (

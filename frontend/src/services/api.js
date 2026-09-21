@@ -54,7 +54,18 @@ const fetchWithTimeout = async (url, options = {}, timeoutMs = 8000) => {
   }
 };
 
-export const api = {
+export const triggerAutoRefresh = (detail = {}) => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('dms:refresh', {
+      detail: {
+        timestamp: Date.now(),
+        ...detail
+      }
+    }));
+  }
+};
+
+const rawApi = {
   // Auth API
   login: async (email, password) => {
     const res = await fetch(`${API_BASE}/auth/login`, {
@@ -926,5 +937,27 @@ export const api = {
   }
 };
 
+// Automatic Refresher Interceptor:
+// Any mutation method (create, update, delete, approve, reject, mark, add, clock, save, cancel, pay, record, upload, sync, etc.)
+// automatically triggers an auto-refresh event across all active pages and components.
+export const api = new Proxy(rawApi, {
+  get(target, prop) {
+    const orig = target[prop];
+    if (typeof orig !== 'function') return orig;
+    return async (...args) => {
+      const result = await orig(...args);
+      const propLower = String(prop).toLowerCase();
+      const mutationPrefixes = [
+        'create', 'update', 'delete', 'add', 'remove', 'mark', 'approve',
+        'reject', 'upload', 'submit', 'save', 'cancel', 'send', 'toggle',
+        'clock', 'record', 'pay', 'reset', 'change', 'register', 'bulk', 'post', 'transfer'
+      ];
+      const isMutation = mutationPrefixes.some(prefix => propLower.startsWith(prefix));
 
-
+      if (isMutation) {
+        triggerAutoRefresh({ action: prop, timestamp: Date.now() });
+      }
+      return result;
+    };
+  }
+});

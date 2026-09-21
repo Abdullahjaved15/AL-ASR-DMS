@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useAutoRefresh } from '../context/AutoRefreshContext';
 
 const DEFAULT_CHECK_IN = '09:00 AM';
 const DEFAULT_CHECK_OUT = '09:00 PM'; // 09:00 AM – 09:00 PM (12 hrs shift)
@@ -88,6 +89,16 @@ export default function AttendancePage() {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useAutoRefresh(() => {
+    fetchEmployees();
+    fetchSystemUsers();
+    if (activeTab === 'daily') {
+      fetchDailyAttendance();
+    } else if (activeTab === 'reports') {
+      fetchReports();
+    }
+  });
 
   useEffect(() => {
     fetchEmployees();

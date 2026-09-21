@@ -315,6 +315,13 @@ model Invoice {
   approvedAt           DateTime?
   approvalNotes        String?
 
+  // Bank Financing Case & Processing Fee Fields (Booking Receipt)
+  isBankCase                  Boolean   @default(false)
+  bankName                    String?
+  processingFees              String?   @default("")
+  processingFeePaymentMethod  String?   @default("CASH") // CASH, BANK
+  processingFeeBankAccountId  String?
+
   createdBy        String
   createdByUser    User     @relation(fields: [createdBy], references: [id])
   createdAt        DateTime @default(now())
@@ -332,6 +339,7 @@ model Invoice {
   @@index([salesmanName])
   @@index([approvalStatus])
   @@index([approvedById])
+  @@index([isBankCase])
 }
 
 model InvoiceImage {
