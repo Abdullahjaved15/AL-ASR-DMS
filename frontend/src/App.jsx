@@ -40,11 +40,23 @@ function MainLayout() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#051424] flex items-center justify-center text-cyan-400 font-mono">
-        <div className="flex items-center space-x-3">
+      <div className="min-h-screen bg-[#051424] flex flex-col items-center justify-center text-cyan-400 font-mono px-4">
+        <div className="flex items-center space-x-3 mb-3">
           <div className="w-6 h-6 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
-          <span>Initializing AL ASR MOTORS Workspace...</span>
+          <span className="text-base font-medium">Initializing AL ASR MOTORS Workspace...</span>
         </div>
+        <p className="text-xs text-slate-400 max-w-sm text-center mb-4">
+          Connecting to backend services and validating your session.
+        </p>
+        <button
+          onClick={() => {
+            localStorage.removeItem('dms_token');
+            window.location.reload();
+          }}
+          className="text-xs text-cyan-400/80 hover:text-cyan-300 underline underline-offset-4 transition-colors"
+        >
+          Taking too long? Click here to Reset Session & Go to Login
+        </button>
       </div>
     );
   }

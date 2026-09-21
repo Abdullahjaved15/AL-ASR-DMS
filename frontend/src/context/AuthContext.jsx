@@ -8,21 +8,53 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
+    // Safety timeout: ensure loading screen is never stuck indefinitely
+    const safetyTimer = setTimeout(() => {
+      if (isMounted) {
+        setLoading(false);
+      }
+    }, 4000);
+
     const checkAuth = async () => {
       const token = localStorage.getItem('dms_token');
-      if (token) {
-        try {
-          const res = await api.getMe();
+      if (!token) {
+        if (isMounted) setLoading(false);
+        return;
+      }
+
+      try {
+        // Race against a 3.5s timeout to prevent infinite hanging
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Auth request timed out')), 3500)
+        );
+        const res = await Promise.race([api.getMe(), timeoutPromise]);
+        if (isMounted && res && res.user) {
           setUser(res.user);
-        } catch (err) {
-          console.error('Session restoration error:', err);
+        } else if (isMounted) {
           localStorage.removeItem('dms_token');
           setUser(null);
         }
+      } catch (err) {
+        console.warn('Session restoration error or timeout:', err.message || err);
+        localStorage.removeItem('dms_token');
+        if (isMounted) {
+          setUser(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-      setLoading(false);
     };
+
     checkAuth();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(safetyTimer);
+    };
   }, []);
 
   const login = async (email, password) => {

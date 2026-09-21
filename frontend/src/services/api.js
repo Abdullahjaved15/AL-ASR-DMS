@@ -35,6 +35,25 @@ const cleanParams = (params = {}) => {
   return new URLSearchParams(cleaned).toString();
 };
 
+const fetchWithTimeout = async (url, options = {}, timeoutMs = 8000) => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    return response;
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error(`Request timed out after ${timeoutMs / 1000}s`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(id);
+  }
+};
+
 export const api = {
   // Auth API
   login: async (email, password) => {
@@ -56,9 +75,9 @@ export const api = {
   },
 
   getMe: async () => {
-    const res = await fetch(`${API_BASE}/auth/me`, {
+    const res = await fetchWithTimeout(`${API_BASE}/auth/me`, {
       headers: getHeaders()
-    });
+    }, 4000);
     return handleResponse(res);
   },
 
