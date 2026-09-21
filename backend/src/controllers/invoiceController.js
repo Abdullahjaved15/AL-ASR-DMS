@@ -1287,11 +1287,13 @@ const createInvoice = async (req, res) => {
         processingFeePaymentMethod: isBankCase ? (processingFeePaymentMethod || 'CASH') : 'CASH',
         processingFeeBankAccountId: isBankCase && processingFeePaymentMethod === 'BANK' ? (processingFeeBankAccountId || null) : null,
 
-        // Accounts Head & Admins Approval Workflow
-        approvalStatus: (['ACCOUNTS_HEAD', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role)) ? 'APPROVED' : 'PENDING',
-        approvedById: (['ACCOUNTS_HEAD', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role)) ? req.user.id : null,
-        approvedAt: (['ACCOUNTS_HEAD', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role)) ? new Date() : null,
-        approvalNotes: (['ACCOUNTS_HEAD', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role)) ? `Auto-approved upon creation by ${req.user.role}` : null,
+        // Accounts Head & Admins Approval Workflow:
+        // Receipts created by Super Admin, Admin, Salesmen remain PENDING until Accounts Head reviews and approves.
+        // Only direct creation by ACCOUNTS_HEAD is auto-approved.
+        approvalStatus: req.user.role === 'ACCOUNTS_HEAD' ? 'APPROVED' : 'PENDING',
+        approvedById: req.user.role === 'ACCOUNTS_HEAD' ? req.user.id : null,
+        approvedAt: req.user.role === 'ACCOUNTS_HEAD' ? new Date() : null,
+        approvalNotes: req.user.role === 'ACCOUNTS_HEAD' ? 'Created and approved directly by Accounts Head' : null,
 
         createdBy: req.user.id
       },
