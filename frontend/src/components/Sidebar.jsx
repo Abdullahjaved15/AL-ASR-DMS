@@ -77,6 +77,7 @@ export default function Sidebar({ currentTab, setCurrentTab, isMobileOpen, setIs
     { id: 'accounts', label: 'Accounts & Finance Hub', icon: Landmark, role: 'ACCOUNTS' },
     { id: 'accounts_stock', label: 'Accounts Current Stock', icon: Layers, role: 'ACCOUNTS' },
     { id: 'invoices', label: 'Invoices & Payment Vouchers', icon: Receipt, role: 'ACCOUNTS' },
+    { id: 'recovery_cases', label: 'Recovery Cases (ادھار و وصولی)', icon: Wallet, role: 'ACCOUNTS' },
     { id: 'audit_trail', label: 'Audit Trail & Day Book', icon: FileText, role: 'ACCOUNTS' },
     { id: 'salesman_incentives', label: 'Salesman Incentives', icon: Award, role: 'ALL' },
     { id: 'customer_history', label: 'Trade & Customer History', icon: History, role: 'ACCOUNTS' },

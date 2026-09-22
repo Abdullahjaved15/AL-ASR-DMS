@@ -1083,7 +1083,11 @@ const createInvoice = async (req, res) => {
       bankName,
       processingFees,
       processingFeePaymentMethod,
-      processingFeeBankAccountId
+      processingFeeBankAccountId,
+      // Recovery Case Fields
+      isRecoveryCase,
+      recoveryPromiseDate,
+      recoveryNotes
     } = req.body;
 
     const finalSellerPhoto = sellerPhoto ? await handleCloudinaryUpload(sellerPhoto, 'sellers') : null;
@@ -1286,6 +1290,13 @@ const createInvoice = async (req, res) => {
         processingFees: isBankCase && processingFees ? String(parsePakistaniPrice(processingFees)) : '',
         processingFeePaymentMethod: isBankCase ? (processingFeePaymentMethod || 'CASH') : 'CASH',
         processingFeeBankAccountId: isBankCase && processingFeePaymentMethod === 'BANK' ? (processingFeeBankAccountId || null) : null,
+
+        // Recovery Case & Pending Balance Fields
+        isRecoveryCase: Boolean(isRecoveryCase),
+        recoveryStatus: Boolean(isRecoveryCase) ? (numericRemaining > 0 ? 'PENDING' : 'FULLY_RECOVERED') : 'NONE',
+        recoveryPromiseDate: Boolean(isRecoveryCase) && recoveryPromiseDate ? String(recoveryPromiseDate) : null,
+        recoveredAmount: '0',
+        recoveryNotes: Boolean(isRecoveryCase) && recoveryNotes ? String(recoveryNotes) : null,
 
         // Accounts Head & Admins Approval Workflow:
         // Receipts created by Super Admin, Admin, Salesmen remain PENDING until Accounts Head reviews and approves.
@@ -1670,7 +1681,13 @@ const updateInvoice = async (req, res) => {
       bankName,
       processingFees,
       processingFeePaymentMethod,
-      processingFeeBankAccountId
+      processingFeeBankAccountId,
+      // Recovery Case Fields
+      isRecoveryCase,
+      recoveryPromiseDate,
+      recoveryNotes,
+      recoveredAmount,
+      recoveryStatus
     } = req.body;
 
     const finalSellerPhoto = sellerPhoto ? await handleCloudinaryUpload(sellerPhoto, 'sellers') : existing.sellerPhoto;
@@ -1790,6 +1807,13 @@ const updateInvoice = async (req, res) => {
           : (existing.isBankCase && processingFees !== undefined ? String(parsePakistaniPrice(processingFees)) : existing.processingFees),
         processingFeePaymentMethod: processingFeePaymentMethod !== undefined ? processingFeePaymentMethod : existing.processingFeePaymentMethod,
         processingFeeBankAccountId: processingFeeBankAccountId !== undefined ? processingFeeBankAccountId : existing.processingFeeBankAccountId,
+
+        // Recovery Case & Pending Balance Fields
+        isRecoveryCase: isRecoveryCase !== undefined ? Boolean(isRecoveryCase) : existing.isRecoveryCase,
+        recoveryStatus: recoveryStatus !== undefined ? recoveryStatus : (isRecoveryCase !== undefined ? (Boolean(isRecoveryCase) ? (numericRemaining > 0 ? (existing.recoveryStatus === 'PARTIALLY_RECOVERED' ? 'PARTIALLY_RECOVERED' : 'PENDING') : 'FULLY_RECOVERED') : 'NONE') : existing.recoveryStatus),
+        recoveryPromiseDate: recoveryPromiseDate !== undefined ? (recoveryPromiseDate ? String(recoveryPromiseDate) : null) : existing.recoveryPromiseDate,
+        recoveredAmount: recoveredAmount !== undefined ? (recoveredAmount ? String(parsePakistaniPrice(recoveredAmount)) : '0') : existing.recoveredAmount,
+        recoveryNotes: recoveryNotes !== undefined ? (recoveryNotes ? String(recoveryNotes) : null) : existing.recoveryNotes,
 
         witness1Name: witness1Name !== undefined ? witness1Name : existing.witness1Name,
         witness1Cnic: witness1Cnic !== undefined ? witness1Cnic : existing.witness1Cnic,
@@ -2962,6 +2986,377 @@ const rejectInvoice = async (req, res) => {
   }
 };
 
+// 14. Get all Recovery Cases & Statistics
+const getRecoveryCases = async (req, res) => {
+  try {
+    const { status, search, startDate, endDate } = req.query;
+
+    const where = {
+      category: 'SALES_RECEIPT',
+      isDeleted: false,
+      OR: [
+        { isRecoveryCase: true },
+        { recoveryStatus: { not: 'NONE' } }
+      ]
+    };
+
+    if (search && search.trim() !== '') {
+      const q = search.trim();
+      where.AND = [
+        {
+          OR: [
+            { invoiceNumber: { contains: q, mode: 'insensitive' } },
+            { buyerName: { contains: q, mode: 'insensitive' } },
+            { buyerPhone: { contains: q, mode: 'insensitive' } },
+            { vehicleMaker: { contains: q, mode: 'insensitive' } },
+            { vehicleModel: { contains: q, mode: 'insensitive' } },
+            { chassisNumber: { contains: q, mode: 'insensitive' } },
+            { registrationNo: { contains: q, mode: 'insensitive' } }
+          ]
+        }
+      ];
+    }
+
+    if (startDate || endDate) {
+      where.date = {};
+      if (startDate) where.date.gte = new Date(startDate);
+      if (endDate) where.date.lte = new Date(new Date(endDate).setHours(23, 59, 59, 999));
+    }
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    const allMatching = await prisma.invoice.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        recoveryPayments: {
+          orderBy: { paymentDate: 'desc' }
+        },
+        createdByUser: { select: { id: true, name: true, email: true, role: true } },
+        approvedByUser: { select: { id: true, name: true, email: true, role: true } }
+      }
+    });
+
+    let totalPendingRecovery = 0;
+    let totalRecovered = 0;
+    let activeCount = 0;
+    let overdueCount = 0;
+    let completedCount = 0;
+
+    const enrichedCases = allMatching.map(inv => {
+      const total = parsePakistaniPrice(inv.totalPrice || inv.agreedAmount || 0);
+      const adv = parsePakistaniPrice(inv.advanceAmount || 0);
+      const rem = parsePakistaniPrice(inv.remainingAmount || 0);
+      const rec = parsePakistaniPrice(inv.recoveredAmount || 0);
+      
+      const isOverdue = rem > 0 && inv.recoveryPromiseDate && inv.recoveryPromiseDate < todayStr;
+      const isCompleted = rem <= 0;
+
+      if (isCompleted) {
+        completedCount++;
+      } else {
+        activeCount++;
+        totalPendingRecovery += rem;
+        if (isOverdue) overdueCount++;
+      }
+      totalRecovered += rec;
+
+      return {
+        ...inv,
+        numericTotalPrice: total,
+        numericAdvanceAmount: adv,
+        numericRemainingAmount: rem,
+        numericRecoveredAmount: rec,
+        isOverdue,
+        isCompleted
+      };
+    });
+
+    let filteredCases = enrichedCases;
+    if (status === 'PENDING' || status === 'ACTIVE') {
+      filteredCases = enrichedCases.filter(c => c.numericRemainingAmount > 0);
+    } else if (status === 'PARTIALLY_RECOVERED') {
+      filteredCases = enrichedCases.filter(c => c.recoveryStatus === 'PARTIALLY_RECOVERED' && c.numericRemainingAmount > 0);
+    } else if (status === 'FULLY_RECOVERED' || status === 'COMPLETED') {
+      filteredCases = enrichedCases.filter(c => c.numericRemainingAmount <= 0);
+    } else if (status === 'OVERDUE') {
+      filteredCases = enrichedCases.filter(c => c.isOverdue);
+    }
+
+    const summary = {
+      totalPendingRecovery,
+      totalRecovered,
+      activeCount,
+      overdueCount,
+      completedCount,
+      totalDealsCount: allMatching.length
+    };
+
+    return res.json({
+      cases: filteredCases,
+      summary,
+      total: filteredCases.length
+    });
+  } catch (error) {
+    console.error('getRecoveryCases error:', error);
+    return res.status(500).json({ message: 'Failed to fetch recovery cases', error: error.message });
+  }
+};
+
+// 15. Record Partial or Full Recovery Payment for an Invoice
+const recordRecoveryPayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      amount,
+      paymentMethod = 'CASH',
+      bankAccountId,
+      date,
+      referenceNumber,
+      notes,
+      receivedFrom
+    } = req.body;
+
+    const numAmount = parsePakistaniPrice(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return res.status(400).json({ message: 'Please enter a valid positive recovery payment amount.' });
+    }
+
+    const invoice = await prisma.invoice.findUnique({
+      where: { id },
+      include: { recoveryPayments: true }
+    });
+
+    if (!invoice) {
+      return res.status(404).json({ message: 'Sales receipt not found.' });
+    }
+
+    const currRemaining = parsePakistaniPrice(invoice.remainingAmount || 0);
+    if (currRemaining <= 0) {
+      return res.status(400).json({ message: 'This recovery case is already fully recovered (remaining balance is PKR 0).' });
+    }
+
+    if (numAmount > currRemaining) {
+      return res.status(400).json({ 
+        message: `Recovery amount (PKR ${numAmount.toLocaleString()}) cannot exceed remaining balance (PKR ${currRemaining.toLocaleString()}).` 
+      });
+    }
+
+    const currRecovered = parsePakistaniPrice(invoice.recoveredAmount || 0);
+    const newRemaining = Math.max(0, currRemaining - numAmount);
+    const newRecovered = currRecovered + numAmount;
+    
+    // Strict Completion Rule: Only mark as FULLY_RECOVERED and PAID if remaining balance reaches 0!
+    const isFullyPaid = newRemaining === 0;
+    const newRecoveryStatus = isFullyPaid ? 'FULLY_RECOVERED' : 'PARTIALLY_RECOVERED';
+    const newPaymentStatus = isFullyPaid ? 'PAID' : 'PENDING';
+
+    const isBankMethod = paymentMethod === 'BANK' || paymentMethod === 'BANK_TRANSFER';
+    const txnDate = date ? new Date(date) : new Date();
+    const txnNumber = await generateTxnNumber('RCV');
+    const finalReceiptNo = referenceNumber || `RCV-${invoice.invoiceNumber.replace(/[^0-9]/g, '').slice(-4) || '001'}-${Date.now().toString().slice(-4)}`;
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Resolve Deposit Account (Cash Safe 1001 or Bank Account)
+      let depositAccount = null;
+      if (isBankMethod) {
+        if (bankAccountId) {
+          depositAccount = await tx.account.findUnique({ where: { id: bankAccountId } });
+        }
+        if (!depositAccount) {
+          depositAccount = await tx.account.findFirst({ where: { subType: 'BANK', isActive: true } })
+            || await tx.account.findFirst({ where: { subType: 'BANK' } });
+        }
+      } else {
+        depositAccount = await tx.account.findFirst({ where: { subType: 'CASH', isActive: true } })
+          || await tx.account.findFirst({ where: { subType: 'CASH' } });
+        if (!depositAccount) {
+          depositAccount = await tx.account.create({
+            data: {
+              code: '1001',
+              name: 'Cash in Hand Safe',
+              type: 'ASSET',
+              subType: 'CASH',
+              currentBalance: 0,
+              description: 'Physical showroom safe cash'
+            }
+          });
+        }
+      }
+
+      if (!depositAccount) {
+        throw new Error('Deposit Cash or Bank account could not be resolved.');
+      }
+
+      // 2. Offsetting Revenue or Customer Ledger
+      let customerLedger = null;
+      if (invoice.buyerName) {
+        customerLedger = await tx.account.findFirst({
+          where: {
+            OR: [
+              { name: { equals: invoice.buyerName, mode: 'insensitive' } },
+              { name: { contains: invoice.buyerName, mode: 'insensitive' } }
+            ]
+          }
+        });
+      }
+
+      let offsetAccount = customerLedger;
+      if (!offsetAccount) {
+        offsetAccount = await tx.account.findFirst({ where: { code: '4001' } })
+          || await tx.account.findFirst({ where: { type: 'REVENUE' } });
+      }
+
+      // 3. Create Double-Entry Transaction
+      const entriesToCreate = [
+        {
+          accountId: depositAccount.id,
+          type: 'DEBIT',
+          amount: numAmount,
+          description: `Recovery Inflow for #${invoice.invoiceNumber} (${invoice.vehicleMaker || ''} ${invoice.vehicleModel || ''}) from ${receivedFrom || invoice.buyerName || 'Customer'}`
+        }
+      ];
+
+      if (offsetAccount) {
+        entriesToCreate.push({
+          accountId: offsetAccount.id,
+          type: 'CREDIT',
+          amount: numAmount,
+          description: `Recovery Payment received for #${invoice.invoiceNumber} (${invoice.vehicleMaker || ''} ${invoice.vehicleModel || ''})`
+        });
+
+        const offsetDelta = offsetAccount.type === 'ASSET' || offsetAccount.type === 'EXPENSE'
+          ? -numAmount
+          : numAmount;
+
+        await tx.account.update({
+          where: { id: offsetAccount.id },
+          data: { currentBalance: { increment: offsetDelta } }
+        });
+      }
+
+      await tx.account.update({
+        where: { id: depositAccount.id },
+        data: { currentBalance: { increment: numAmount } }
+      });
+
+      const transaction = await tx.transaction.create({
+        data: {
+          transactionNumber: txnNumber,
+          date: txnDate,
+          type: 'RECEIPT_VOUCHER',
+          amount: numAmount,
+          description: `Recovery Payment for #${invoice.invoiceNumber} from ${receivedFrom || invoice.buyerName || 'Customer'} - Received into [${depositAccount.name}]${notes ? ` (${notes})` : ''}`,
+          referenceType: 'INVOICE',
+          referenceId: invoice.id,
+          referenceNumber: finalReceiptNo,
+          chassisNumber: invoice.chassisNumber || null,
+          createdById: req.user.id,
+          entries: {
+            create: entriesToCreate
+          }
+        }
+      });
+
+      // 4. Create RecoveryPayment record
+      const recoveryPayment = await tx.recoveryPayment.create({
+        data: {
+          invoiceId: invoice.id,
+          amount: numAmount,
+          paymentMethod: isBankMethod ? 'BANK' : 'CASH',
+          bankAccountId: isBankMethod ? depositAccount.id : null,
+          receiptNumber: finalReceiptNo,
+          paymentDate: txnDate,
+          receivedFrom: receivedFrom || invoice.buyerName || 'Customer',
+          notes: notes || null,
+          transactionId: transaction.id,
+          createdById: req.user.id
+        }
+      });
+
+      // 5. Update Invoice
+      const updatedCashAmount = isBankMethod
+        ? (invoice.cashAmountReceived || '')
+        : String(parsePakistaniPrice(invoice.cashAmountReceived || 0) + numAmount);
+
+      const updatedBankAmount = isBankMethod
+        ? String(parsePakistaniPrice(invoice.bankAmountReceived || 0) + numAmount)
+        : (invoice.bankAmountReceived || '');
+
+      const updatedInvoice = await tx.invoice.update({
+        where: { id: invoice.id },
+        data: {
+          recoveredAmount: String(newRecovered),
+          remainingAmount: String(newRemaining),
+          recoveryStatus: newRecoveryStatus,
+          paymentStatus: newPaymentStatus,
+          cashAmountReceived: updatedCashAmount,
+          bankAmountReceived: updatedBankAmount
+        },
+        include: {
+          recoveryPayments: { orderBy: { paymentDate: 'desc' } }
+        }
+      });
+
+      return { transaction, recoveryPayment, updatedInvoice, depositAccount };
+    }, { timeout: 25000, maxWait: 15000 });
+
+    // Notifications & Activity Log (outside transaction)
+    try {
+      await prisma.notification.create({
+        data: {
+          title: `💰 Recovery Received: PKR ${numAmount.toLocaleString()}`,
+          message: `PKR ${numAmount.toLocaleString()} recovered for #${invoice.invoiceNumber} (${invoice.buyerName || 'Customer'}) via ${result.depositAccount.name}. Remaining: PKR ${newRemaining.toLocaleString()} (${newRecoveryStatus}).`,
+          type: 'FINANCIAL_INFLOW',
+          category: result.depositAccount.subType === 'BANK' ? 'BANK' : 'CASH',
+          amount: numAmount,
+          targetRole: 'ACCOUNTS_HEAD',
+          referenceId: invoice.id
+        }
+      });
+    } catch (e) {
+      // quiet fail
+    }
+
+    try {
+      await prisma.activityLog.create({
+        data: {
+          userId: req.user.id,
+          action: 'RECOVERY_PAYMENT_COLLECTED',
+          details: `Collected recovery PKR ${numAmount.toLocaleString()} for Invoice #${invoice.invoiceNumber} (${invoice.buyerName || 'Customer'}) via ${result.depositAccount.name}. Remaining Balance: PKR ${newRemaining.toLocaleString()}`
+        }
+      });
+    } catch (e) {
+      // quiet fail
+    }
+
+    return res.status(201).json({
+      message: `Successfully recorded recovery payment of PKR ${numAmount.toLocaleString()} into ${result.depositAccount.name}.${isFullyPaid ? ' This recovery case is now 100% completed!' : ` Remaining balance: PKR ${newRemaining.toLocaleString()}`}`,
+      recoveryPayment: result.recoveryPayment,
+      invoice: result.updatedInvoice,
+      transaction: result.transaction
+    });
+  } catch (error) {
+    console.error('recordRecoveryPayment error:', error);
+    return res.status(500).json({ message: 'Failed to record recovery payment', error: error.message });
+  }
+};
+
+// 16. Get all Recovery Payment History for an Invoice
+const getRecoveryPayments = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const payments = await prisma.recoveryPayment.findMany({
+      where: { invoiceId: id },
+      orderBy: { paymentDate: 'desc' }
+    });
+    return res.json({ success: true, data: payments, payments });
+  } catch (error) {
+    console.error('getRecoveryPayments error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch recovery payment history', error: error.message });
+  }
+};
+
 module.exports = {
   getInvoices,
   getInvoiceById,
@@ -2976,6 +3371,9 @@ module.exports = {
   getSalesmanIncentives,
   getCustomerTradeHistory,
   approveInvoice,
-  rejectInvoice
+  rejectInvoice,
+  getRecoveryCases,
+  recordRecoveryPayment,
+  getRecoveryPayments
 };
 

@@ -478,6 +478,27 @@ const rawApi = {
     return handleResponse(res);
   },
 
+  // Recovery Cases API
+  getRecoveryCases: async (params = {}) => {
+    const query = cleanParams(params);
+    const res = await fetch(`${API_BASE}/invoices/recovery/cases?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  recordRecoveryPayment: async (id, data) => {
+    const res = await fetch(`${API_BASE}/invoices/${id}/recovery-payment`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  getRecoveryPayments: async (id) => {
+    const res = await fetch(`${API_BASE}/invoices/${id}/recovery-payments`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
   // Receiving Letters API (Accessible by ALL staff)
   getReceivingLetters: async (params = {}) => {
     const query = cleanParams(params);

@@ -322,6 +322,14 @@ model Invoice {
   processingFeePaymentMethod  String?   @default("CASH") // CASH, BANK
   processingFeeBankAccountId  String?
 
+  // Recovery & Short-Term Pending Balance Fields (ریکوری و بقایا رقم)
+  isRecoveryCase              Boolean   @default(false)
+  recoveryStatus              String    @default("NONE") // NONE, PENDING, PARTIALLY_RECOVERED, FULLY_RECOVERED
+  recoveryPromiseDate         String?   // Promised Date for Recovery Payment
+  recoveredAmount             String?   @default("0")
+  recoveryNotes               String?
+  recoveryPayments            RecoveryPayment[]
+
   createdBy        String
   createdByUser    User     @relation(fields: [createdBy], references: [id])
   createdAt        DateTime @default(now())
@@ -340,6 +348,29 @@ model Invoice {
   @@index([approvalStatus])
   @@index([approvedById])
   @@index([isBankCase])
+  @@index([isRecoveryCase])
+  @@index([recoveryStatus])
+}
+
+model RecoveryPayment {
+  id              String   @id @default(uuid())
+  invoiceId       String
+  invoice         Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount          Float
+  paymentMethod   String   @default("CASH") // CASH, BANK
+  bankAccountId   String?
+  receiptNumber   String?
+  paymentDate     DateTime @default(now())
+  receivedFrom    String?
+  notes           String?
+  transactionId   String?
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([invoiceId])
+  @@index([paymentDate])
+  @@index([paymentMethod])
 }
 
 model InvoiceImage {

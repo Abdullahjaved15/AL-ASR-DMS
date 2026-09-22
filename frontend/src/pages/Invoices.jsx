@@ -332,6 +332,10 @@ export default function Invoices({ onNavigate }) {
     processingFees: '',
     processingFeePaymentMethod: 'CASH',
     processingFeeBankAccountId: '',
+    // Recovery Case Fields
+    isRecoveryCase: false,
+    recoveryPromiseDate: '',
+    recoveryNotes: '',
     // Witnesses
     witness1Name: '',
     witness1Cnic: '',
@@ -771,6 +775,10 @@ export default function Invoices({ onNavigate }) {
       processingFees: formatPKRShort(inv.processingFees) || '',
       processingFeePaymentMethod: inv.processingFeePaymentMethod || 'CASH',
       processingFeeBankAccountId: inv.processingFeeBankAccountId || '',
+      // Recovery Case Fields
+      isRecoveryCase: Boolean(inv.isRecoveryCase),
+      recoveryPromiseDate: inv.recoveryPromiseDate ? new Date(inv.recoveryPromiseDate).toISOString().slice(0, 10) : '',
+      recoveryNotes: inv.recoveryNotes || '',
       witness1Name: inv.witness1Name || '',
       witness1Cnic: inv.witness1Cnic || '',
       witness2Name: inv.witness2Name || '',
@@ -877,6 +885,10 @@ export default function Invoices({ onNavigate }) {
       processingFees: '',
       processingFeePaymentMethod: 'CASH',
       processingFeeBankAccountId: '',
+      // Recovery Case Fields
+      isRecoveryCase: false,
+      recoveryPromiseDate: '',
+      recoveryNotes: '',
       witness1Name: '',
       witness1Cnic: '',
       witness2Name: '',
@@ -911,7 +923,11 @@ export default function Invoices({ onNavigate }) {
         bankName: formData.isBankCase ? (formData.bankName || '') : '',
         processingFees: formData.isBankCase ? cleanPrice(formData.processingFees) : '',
         processingFeePaymentMethod: formData.isBankCase ? (formData.processingFeePaymentMethod || 'CASH') : 'CASH',
-        processingFeeBankAccountId: formData.isBankCase && formData.processingFeePaymentMethod === 'BANK' ? (formData.processingFeeBankAccountId || '') : ''
+        processingFeeBankAccountId: formData.isBankCase && formData.processingFeePaymentMethod === 'BANK' ? (formData.processingFeeBankAccountId || '') : '',
+        // Recovery Case Fields
+        isRecoveryCase: Boolean(formData.isRecoveryCase),
+        recoveryPromiseDate: formData.isRecoveryCase ? (formData.recoveryPromiseDate || null) : null,
+        recoveryNotes: formData.isRecoveryCase ? (formData.recoveryNotes || '') : ''
       };
 
       let savedResult;
@@ -5442,6 +5458,79 @@ export default function Invoices({ onNavigate }) {
                                 </select>
                               </div>
                             )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* SHORT-TERM RECOVERY / PENDING BALANCE DEAL (ادھار و وصولی کیس) */}
+                    <div className={`p-4 rounded-xl border-2 transition-all space-y-3 ${
+                      formData.isRecoveryCase 
+                        ? 'bg-gradient-to-br from-indigo-950/50 via-slate-950 to-purple-950/30 border-indigo-500/60 shadow-xl' 
+                        : 'bg-slate-950/60 border-white/10'
+                    }`}>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+                        <label className="flex items-center space-x-3 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(formData.isRecoveryCase)}
+                            onChange={(e) => handleInputChange('isRecoveryCase', e.target.checked)}
+                            className="w-5 h-5 text-indigo-500 rounded bg-slate-950 border-indigo-400/40 focus:ring-indigo-500 cursor-pointer"
+                          />
+                          <div>
+                            <span className="text-xs font-bold text-white flex items-center gap-2">
+                              <span>⚡ Short-term Recovery / Pending Balance Deal (ادھار و وصولی کیس)</span>
+                            </span>
+                            <p className="text-[11px] text-indigo-300/80 font-mono mt-0.5">
+                              Check if customer takes delivery with remaining balance due tomorrow/later (auto-tracks in Recovery Cases)
+                            </p>
+                          </div>
+                        </label>
+
+                        {formData.isRecoveryCase && (
+                          <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold whitespace-nowrap self-start sm:self-center">
+                            ⚡ Multi-Tranche Recovery Sync
+                          </span>
+                        )}
+                      </div>
+
+                      {formData.isRecoveryCase && (
+                        <div className="space-y-4 pt-1">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                Promised Recovery Date (رقم ادائیگی کی وعدہ تاریخ)
+                              </label>
+                              <input
+                                type="date"
+                                value={formData.recoveryPromiseDate || ''}
+                                onChange={(e) => handleInputChange('recoveryPromiseDate', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-indigo-500/40 text-white text-xs font-mono focus:border-indigo-400"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                                Recovery Terms / Notes (تفصیل و شرائط)
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Balance to be cleared tomorrow via Bank Transfer"
+                                value={formData.recoveryNotes || ''}
+                                onChange={(e) => handleInputChange('recoveryNotes', e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-indigo-500/40 text-white text-xs focus:border-indigo-400"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-lg text-xs space-y-1">
+                            <div className="font-bold text-indigo-300 flex items-center gap-1.5">
+                              <span>ℹ️</span>
+                              <span>Recovery Tracking Active:</span>
+                            </div>
+                            <p className="text-slate-300 text-[11px] leading-relaxed">
+                              This invoice will be tracked in <strong>Recovery Cases (ادھار و وصولی)</strong>. As partial payments are received (e.g. 10 lac first, 10 lac later), they will be deposited to Cash Safe or Bank, updating this sales receipt automatically until the balance reaches PKR 0.
+                            </p>
                           </div>
                         </div>
                       )}

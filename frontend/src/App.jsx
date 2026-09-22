@@ -27,6 +27,7 @@ import Approvals from './pages/Approvals';
 import Settings from './pages/Settings';
 import SalesmanIncentives from './pages/SalesmanIncentives';
 import CustomerHistory from './pages/CustomerHistory';
+import RecoveryCases from './pages/RecoveryCases';
 
 function MainLayout() {
   const { user, isAdmin, isSuperAdmin, canAccessAccounts, loading } = useAuth();
@@ -217,6 +218,10 @@ function MainLayout() {
 
           <div className={(currentTab === 'invoices' && canAccessAccounts) ? 'block' : 'hidden'}>
             <Invoices onNavigate={(tab) => setCurrentTab(tab)} />
+          </div>
+
+          <div className={(currentTab === 'recovery_cases' && canAccessAccounts) ? 'block' : 'hidden'}>
+            <RecoveryCases onNavigate={(tab) => setCurrentTab(tab)} />
           </div>
 
           <div className={currentTab === 'salesman_incentives' ? 'block' : 'hidden'}>

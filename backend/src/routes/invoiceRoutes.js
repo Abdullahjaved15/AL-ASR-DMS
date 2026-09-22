@@ -15,11 +15,14 @@ router.use(authenticateToken, requireAccountsAccess);
 router.get('/booking-by-phone', invoiceController.findActiveBookingByPhone);
 router.get('/salesman-incentives', invoiceController.getSalesmanIncentives);
 router.get('/customer-history', invoiceController.getCustomerTradeHistory);
+router.get('/recovery/cases', invoiceController.getRecoveryCases);
 router.get('/', invoiceController.getInvoices);
 router.get('/:id', invoiceController.getInvoiceById);
 router.post('/', invoiceController.createInvoice);
 router.put('/:id', invoiceController.updateInvoice);
 router.post('/:id/cancel-booking', invoiceController.cancelBookingAndIssueRefund);
+router.post('/:id/recovery-payment', invoiceController.recordRecoveryPayment);
+router.get('/:id/recovery-payments', invoiceController.getRecoveryPayments);
 
 // Accounts Head Sales / Voucher Approval & Rejection endpoints
 router.post('/:id/approve', requireAccountsHeadOnly, invoiceController.approveInvoice);
