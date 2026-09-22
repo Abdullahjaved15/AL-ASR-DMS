@@ -169,6 +169,7 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
     amount: '',
     receivedFrom: '',
     paymentMethod: 'CASH',
+    bankAccountId: '',
     sourceAccountId: '',
     date: new Date().toISOString().slice(0, 10),
     referenceNumber: '',
@@ -182,6 +183,7 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
     amount: '',
     paidTo: '',
     paymentMethod: 'CASH',
+    bankAccountId: '',
     targetAccountId: '',
     date: new Date().toISOString().slice(0, 10),
     referenceNumber: '',
@@ -558,11 +560,17 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
   };
 
   const openReceiveModal = (preselectedAccountId = null) => {
+    const firstBank = bankAndCashAccounts.find(a => a.subType === 'BANK')?.id || '';
+    const defaultAcc = preselectedAccountId || (bankAndCashAccounts[0]?.id || accounts[0]?.id || '');
+    const accObj = bankAndCashAccounts.find(a => a.id === defaultAcc) || accounts.find(a => a.id === defaultAcc);
+    const isBank = accObj?.subType === 'BANK';
+
     setReceiveFormData({
-      accountId: preselectedAccountId || (bankAndCashAccounts[0]?.id || accounts[0]?.id || ''),
+      accountId: defaultAcc,
       amount: '',
       receivedFrom: '',
-      paymentMethod: 'CASH',
+      paymentMethod: isBank ? 'BANK_TRANSFER' : 'CASH',
+      bankAccountId: isBank ? accObj.id : firstBank,
       sourceAccountId: '',
       date: new Date().toISOString().slice(0, 10),
       referenceNumber: '',
@@ -574,11 +582,17 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
   };
 
   const openPayModal = (preselectedAccountId = null) => {
+    const firstBank = bankAndCashAccounts.find(a => a.subType === 'BANK')?.id || '';
+    const defaultAcc = preselectedAccountId || (bankAndCashAccounts[0]?.id || accounts[0]?.id || '');
+    const accObj = bankAndCashAccounts.find(a => a.id === defaultAcc) || accounts.find(a => a.id === defaultAcc);
+    const isBank = accObj?.subType === 'BANK';
+
     setPayFormData({
-      accountId: preselectedAccountId || (bankAndCashAccounts[0]?.id || accounts[0]?.id || ''),
+      accountId: defaultAcc,
       amount: '',
       paidTo: '',
-      paymentMethod: 'CASH',
+      paymentMethod: isBank ? 'BANK_TRANSFER' : 'CASH',
+      bankAccountId: isBank ? accObj.id : firstBank,
       targetAccountId: '',
       date: new Date().toISOString().slice(0, 10),
       referenceNumber: '',
@@ -5193,6 +5207,27 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                 </div>
               </div>
 
+              {(receiveFormData.paymentMethod === 'BANK_TRANSFER' || receiveFormData.paymentMethod === 'BANK') && (
+                <div>
+                  <label className="block text-xs font-mono text-slate-300 mb-1 font-semibold">
+                    Deposit into Bank Account *
+                  </label>
+                  <select
+                    required
+                    value={receiveFormData.bankAccountId}
+                    onChange={(e) => setReceiveFormData({ ...receiveFormData, bankAccountId: e.target.value })}
+                    className="w-full bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-400 font-mono"
+                  >
+                    <option value="">-- Select Bank Account --</option>
+                    {bankAndCashAccounts.filter(a => a.subType === 'BANK').map(bank => (
+                      <option key={bank.id} value={bank.id}>
+                        {bank.bankName || bank.name} — Balance: Rs. {bank.currentBalance?.toLocaleString()}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-mono text-slate-300 mb-1">
@@ -5426,6 +5461,27 @@ export default function AccountsHub({ onNavigate, initialTab = 'coa' }) {
                   </select>
                 </div>
               </div>
+
+              {(payFormData.paymentMethod === 'BANK_TRANSFER' || payFormData.paymentMethod === 'BANK') && (
+                <div>
+                  <label className="block text-xs font-mono text-slate-300 mb-1 font-semibold">
+                    Disburse from Bank Account *
+                  </label>
+                  <select
+                    required
+                    value={payFormData.bankAccountId}
+                    onChange={(e) => setPayFormData({ ...payFormData, bankAccountId: e.target.value })}
+                    className="w-full bg-slate-900 border border-rose-500/40 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-400 font-mono"
+                  >
+                    <option value="">-- Select Bank Account --</option>
+                    {bankAndCashAccounts.filter(a => a.subType === 'BANK').map(bank => (
+                      <option key={bank.id} value={bank.id}>
+                        {bank.bankName || bank.name} — Balance: Rs. {bank.currentBalance?.toLocaleString()}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>

@@ -628,6 +628,7 @@ const receiveAmountInLedger = async (req, res) => {
       amount,
       receivedFrom,
       paymentMethod = 'CASH',
+      bankAccountId,
       sourceAccountId,
       date,
       referenceNumber,
@@ -655,66 +656,139 @@ const receiveAmountInLedger = async (req, res) => {
       sourceAccount = await prisma.account.findUnique({ where: { id: sourceAccountId } });
     }
 
+    const isTargetCashOrBank = targetAccount.subType === 'CASH' || targetAccount.subType === 'BANK';
+    const isBankMethod = paymentMethod === 'BANK' || paymentMethod === 'BANK_TRANSFER' || (paymentMethod === 'CHEQUE' && !!bankAccountId);
+
     const txnDate = date ? new Date(date) : new Date();
     const txnNumber = await generateTxnNumber('RV');
     const fullDesc = description || `Amount Received into [${targetAccount.name}] from ${receivedFrom || 'Party'}${notes ? ` - ${notes}` : ''}`;
 
-    const isTargetNormalDebit = ['ASSET', 'EXPENSE'].includes(targetAccount.type);
-
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Primary Entry (Inflow into Cash / Bank / Target Asset)
-      const entriesToCreate = [
-        {
-          accountId: targetAccount.id,
-          type: isTargetNormalDebit ? 'DEBIT' : 'CREDIT',
+      let depositAccount = null;
+      let entriesToCreate = [];
+
+      if (isTargetCashOrBank) {
+        // Target is already Cash or Bank
+        depositAccount = targetAccount;
+
+        // 1. Primary Entry (DEBIT into Cash / Bank)
+        entriesToCreate.push({
+          accountId: depositAccount.id,
+          type: 'DEBIT',
           amount: numAmount,
           description: `Received from ${receivedFrom || 'Party'}: ${fullDesc}`
-        }
-      ];
-
-      // 2. Offsetting Double-Entry (Revenue / Income / Offset Account)
-      if (sourceAccount) {
-        const isSourceNormalDebit = ['ASSET', 'EXPENSE'].includes(sourceAccount.type);
-        entriesToCreate.push({
-          accountId: sourceAccount.id,
-          type: isSourceNormalDebit ? 'CREDIT' : 'DEBIT',
-          amount: numAmount,
-          description: `Credit/Settled into [${targetAccount.name}] from ${receivedFrom || 'Party'}`
         });
 
-        const sourceDelta = isSourceNormalDebit ? -numAmount : numAmount;
+        // 2. Offsetting Double-Entry (CREDIT into Source / Revenue)
+        if (sourceAccount) {
+          const isSourceNormalDebit = ['ASSET', 'EXPENSE'].includes(sourceAccount.type);
+          entriesToCreate.push({
+            accountId: sourceAccount.id,
+            type: isSourceNormalDebit ? 'CREDIT' : 'DEBIT',
+            amount: numAmount,
+            description: `Credit/Settled into [${depositAccount.name}] from ${receivedFrom || 'Party'}`
+          });
+
+          const sourceDelta = isSourceNormalDebit ? -numAmount : numAmount;
+          await tx.account.update({
+            where: { id: sourceAccount.id },
+            data: { currentBalance: { increment: sourceDelta } }
+          });
+        } else {
+          // Fallback offset revenue/income ledger if no offset was explicitly selected
+          let defaultIncome = await tx.account.findFirst({ where: { code: '4001' } })
+            || await tx.account.findFirst({ where: { type: 'REVENUE' } });
+          if (!defaultIncome) {
+            defaultIncome = await tx.account.create({
+              data: {
+                code: '4001',
+                name: 'Vehicle Sales & Inflow Revenue',
+                type: 'REVENUE',
+                subType: 'REVENUE',
+                currentBalance: 0,
+                description: 'Primary revenue and customer payment inflows'
+              }
+            });
+          }
+          if (defaultIncome.id !== depositAccount.id) {
+            entriesToCreate.push({
+              accountId: defaultIncome.id,
+              type: 'CREDIT',
+              amount: numAmount,
+              description: `Revenue inflow from ${receivedFrom || 'Party'}`
+            });
+            await tx.account.update({
+              where: { id: defaultIncome.id },
+              data: { currentBalance: { increment: numAmount } }
+            });
+          }
+        }
+
         await tx.account.update({
-          where: { id: sourceAccount.id },
-          data: { currentBalance: { increment: sourceDelta } }
+          where: { id: depositAccount.id },
+          data: { currentBalance: { increment: numAmount } }
         });
       } else {
-        // Fallback offset revenue/income ledger if no offset was explicitly selected
-        let defaultIncome = await tx.account.findFirst({ where: { code: '4001' } })
-          || await tx.account.findFirst({ where: { type: 'REVENUE' } });
-        if (!defaultIncome) {
-          defaultIncome = await tx.account.create({
-            data: {
-              code: '4001',
-              name: 'Vehicle Sales & Inflow Revenue',
-              type: 'REVENUE',
-              subType: 'REVENUE',
-              currentBalance: 0,
-              description: 'Primary revenue and customer payment inflows'
-            }
-          });
+        // Target is a Customer, Supplier, Expense, Liability, Equity, or Revenue Ledger
+        // Resolve Deposit (Inflow) Account: Cash in Hand Safe (1001) or designated Bank Account
+        if (isBankMethod) {
+          if (bankAccountId) {
+            depositAccount = await tx.account.findUnique({ where: { id: bankAccountId } });
+          }
+          if (!depositAccount) {
+            depositAccount = await tx.account.findFirst({ where: { subType: 'BANK', isActive: true } })
+              || await tx.account.findFirst({ where: { subType: 'BANK' } });
+          }
+        } else {
+          depositAccount = await tx.account.findFirst({ where: { subType: 'CASH', isActive: true } })
+            || await tx.account.findFirst({ where: { subType: 'CASH' } });
+          if (!depositAccount) {
+            depositAccount = await tx.account.create({
+              data: {
+                code: '1001',
+                name: 'Cash in Hand Safe',
+                type: 'ASSET',
+                subType: 'CASH',
+                currentBalance: 0,
+                description: 'Physical showroom safe cash'
+              }
+            });
+          }
         }
-        if (defaultIncome.id !== targetAccount.id) {
+
+        const methodLabel = isBankMethod ? `Bank Transfer [${depositAccount?.name || 'Bank'}]` : 'Cash in Hand Safe';
+
+        // 1. DEBIT Deposit Account (Cash / Bank Inflow)
+        if (depositAccount) {
           entriesToCreate.push({
-            accountId: defaultIncome.id,
-            type: 'CREDIT',
+            accountId: depositAccount.id,
+            type: 'DEBIT',
             amount: numAmount,
-            description: `Revenue inflow from ${receivedFrom || 'Party'}`
+            description: `Received via ${methodLabel} from ${receivedFrom || targetAccount.name}: ${fullDesc}`
           });
+
           await tx.account.update({
-            where: { id: defaultIncome.id },
+            where: { id: depositAccount.id },
             data: { currentBalance: { increment: numAmount } }
           });
         }
+
+        // 2. CREDIT Target Ledger Account (reduces receivable for customer, credits liability/equity/revenue)
+        entriesToCreate.push({
+          accountId: targetAccount.id,
+          type: 'CREDIT',
+          amount: numAmount,
+          description: `Payment received via ${methodLabel} from ${receivedFrom || 'Party'}`
+        });
+
+        const targetDelta = targetAccount.type === 'ASSET' || targetAccount.type === 'EXPENSE'
+          ? -numAmount
+          : numAmount;
+
+        await tx.account.update({
+          where: { id: targetAccount.id },
+          data: { currentBalance: { increment: targetDelta } }
+        });
       }
 
       const transaction = await tx.transaction.create({
@@ -734,37 +808,37 @@ const receiveAmountInLedger = async (req, res) => {
         }
       });
 
-      const targetDelta = isTargetNormalDebit ? numAmount : numAmount;
-      const updatedTarget = await tx.account.update({
-        where: { id: targetAccount.id },
-        data: { currentBalance: { increment: targetDelta } }
+      const updatedTarget = await tx.account.findUnique({ where: { id: targetAccount.id } });
+
+      return { transaction, updatedAccount: updatedTarget, depositAccount };
+    }, { timeout: 25000, maxWait: 15000 });
+
+    try {
+      await prisma.notification.create({
+        data: {
+          title: `💰 Amount Received: Rs. ${numAmount.toLocaleString()}`,
+          message: `Rs. ${numAmount.toLocaleString()} received in [${targetAccount.name}] from "${receivedFrom || 'Party'}". Method: ${paymentMethod} (Deposited into ${result.depositAccount ? result.depositAccount.name : 'Safe'}).`,
+          type: 'FINANCIAL_INFLOW',
+          category: result.depositAccount?.subType === 'BANK' ? 'BANK' : 'CASH',
+          amount: numAmount,
+          targetRole: 'ACCOUNTS_HEAD'
+        }
       });
+    } catch (e) {
+      // quiet fail
+    }
 
-      try {
-        await tx.notification.create({
-          data: {
-            title: `💰 Amount Received: Rs. ${numAmount.toLocaleString()}`,
-            message: `Rs. ${numAmount.toLocaleString()} received in [${targetAccount.name}] from "${receivedFrom || 'Party'}". Method: ${paymentMethod}.`,
-            type: 'FINANCIAL_INFLOW',
-            category: targetAccount.subType === 'BANK' ? 'BANK' : 'CASH',
-            amount: numAmount,
-            targetRole: 'ACCOUNTS_HEAD'
-          }
-        });
-      } catch (e) {
-        // quiet fail
-      }
-
-      await tx.activityLog.create({
+    try {
+      await prisma.activityLog.create({
         data: {
           userId: req.user.id,
           action: 'RECEIVE_AMOUNT_LEDGER',
-          details: `Received Rs. ${numAmount.toLocaleString()} in ${targetAccount.name} (${targetAccount.code}) from ${receivedFrom || 'Party'}`
+          details: `Received Rs. ${numAmount.toLocaleString()} in ${targetAccount.name} (${targetAccount.code}) via ${result.depositAccount ? result.depositAccount.name : paymentMethod} from ${receivedFrom || 'Party'}`
         }
       });
-
-      return { transaction, updatedAccount: updatedTarget };
-    });
+    } catch (e) {
+      // quiet fail
+    }
 
     return res.status(201).json({
       message: `Successfully received Rs. ${numAmount.toLocaleString()} in ${targetAccount.name}`,
@@ -785,6 +859,7 @@ const payAmountFromLedger = async (req, res) => {
       amount,
       paidTo,
       paymentMethod = 'CASH',
+      bankAccountId,
       targetAccountId,
       date,
       referenceNumber,
@@ -812,66 +887,139 @@ const payAmountFromLedger = async (req, res) => {
       targetAccount = await prisma.account.findUnique({ where: { id: targetAccountId } });
     }
 
+    const isSourceCashOrBank = sourceAccount.subType === 'CASH' || sourceAccount.subType === 'BANK';
+    const isBankMethod = paymentMethod === 'BANK' || paymentMethod === 'BANK_TRANSFER' || (paymentMethod === 'CHEQUE' && !!bankAccountId);
+
     const txnDate = date ? new Date(date) : new Date();
     const txnNumber = await generateTxnNumber('PV');
     const fullDesc = description || `Payment Voucher from [${sourceAccount.name}] to ${paidTo || 'Party'}${notes ? ` - ${notes}` : ''}`;
 
-    const isSourceNormalDebit = ['ASSET', 'EXPENSE'].includes(sourceAccount.type);
-
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Primary Entry (Outflow Credit from Cash Safe / Bank)
-      const entriesToCreate = [
-        {
-          accountId: sourceAccount.id,
-          type: isSourceNormalDebit ? 'CREDIT' : 'DEBIT',
+      let disbursingAccount = null;
+      let entriesToCreate = [];
+
+      if (isSourceCashOrBank) {
+        // Disbursing directly from Cash or Bank
+        disbursingAccount = sourceAccount;
+
+        // 1. Primary Entry (CREDIT outflow from Cash / Bank)
+        entriesToCreate.push({
+          accountId: disbursingAccount.id,
+          type: 'CREDIT',
           amount: numAmount,
           description: `Payment Voucher to ${paidTo || 'Party'}: ${fullDesc}`
-        }
-      ];
-
-      // 2. Offsetting Double-Entry (Expense / Liability / Target Account)
-      if (targetAccount) {
-        const isTargetNormalDebit = ['ASSET', 'EXPENSE'].includes(targetAccount.type);
-        entriesToCreate.push({
-          accountId: targetAccount.id,
-          type: isTargetNormalDebit ? 'DEBIT' : 'CREDIT',
-          amount: numAmount,
-          description: `Paid from [${sourceAccount.name}] to ${paidTo || 'Party'}`
         });
 
-        const targetDelta = isTargetNormalDebit ? numAmount : -numAmount;
+        // 2. Offsetting Double-Entry (DEBIT Expense / Target Account)
+        if (targetAccount) {
+          const isTargetNormalDebit = ['ASSET', 'EXPENSE'].includes(targetAccount.type);
+          entriesToCreate.push({
+            accountId: targetAccount.id,
+            type: isTargetNormalDebit ? 'DEBIT' : 'CREDIT',
+            amount: numAmount,
+            description: `Paid from [${disbursingAccount.name}] to ${paidTo || 'Party'}`
+          });
+
+          const targetDelta = isTargetNormalDebit ? numAmount : -numAmount;
+          await tx.account.update({
+            where: { id: targetAccount.id },
+            data: { currentBalance: { increment: targetDelta } }
+          });
+        } else {
+          // Fallback default expense ledger if no expense was explicitly selected
+          let defaultExpense = await tx.account.findFirst({ where: { code: '5001' } })
+            || await tx.account.findFirst({ where: { type: 'EXPENSE' } });
+          if (!defaultExpense) {
+            defaultExpense = await tx.account.create({
+              data: {
+                code: '5001',
+                name: 'General Showroom Expenses & Payouts',
+                type: 'EXPENSE',
+                subType: 'EXPENSE',
+                currentBalance: 0,
+                description: 'General operational and showroom expense payouts'
+              }
+            });
+          }
+          if (defaultExpense.id !== disbursingAccount.id) {
+            entriesToCreate.push({
+              accountId: defaultExpense.id,
+              type: 'DEBIT',
+              amount: numAmount,
+              description: `Expense payout to ${paidTo || 'Party'}`
+            });
+            await tx.account.update({
+              where: { id: defaultExpense.id },
+              data: { currentBalance: { increment: numAmount } }
+            });
+          }
+        }
+
         await tx.account.update({
-          where: { id: targetAccount.id },
-          data: { currentBalance: { increment: targetDelta } }
+          where: { id: disbursingAccount.id },
+          data: { currentBalance: { increment: -numAmount } }
         });
       } else {
-        // Fallback default expense ledger if no expense was explicitly selected
-        let defaultExpense = await tx.account.findFirst({ where: { code: '5001' } })
-          || await tx.account.findFirst({ where: { type: 'EXPENSE' } });
-        if (!defaultExpense) {
-          defaultExpense = await tx.account.create({
-            data: {
-              code: '5001',
-              name: 'General Showroom Expenses & Payouts',
-              type: 'EXPENSE',
-              subType: 'EXPENSE',
-              currentBalance: 0,
-              description: 'General operational and showroom expense payouts'
-            }
-          });
+        // Source is an Expense, Supplier Payable, Customer, or other Ledger
+        // Resolve Disbursing (Outflow) Account: Cash in Hand Safe (1001) or designated Bank Account
+        if (isBankMethod) {
+          if (bankAccountId) {
+            disbursingAccount = await tx.account.findUnique({ where: { id: bankAccountId } });
+          }
+          if (!disbursingAccount) {
+            disbursingAccount = await tx.account.findFirst({ where: { subType: 'BANK', isActive: true } })
+              || await tx.account.findFirst({ where: { subType: 'BANK' } });
+          }
+        } else {
+          disbursingAccount = await tx.account.findFirst({ where: { subType: 'CASH', isActive: true } })
+            || await tx.account.findFirst({ where: { subType: 'CASH' } });
+          if (!disbursingAccount) {
+            disbursingAccount = await tx.account.create({
+              data: {
+                code: '1001',
+                name: 'Cash in Hand Safe',
+                type: 'ASSET',
+                subType: 'CASH',
+                currentBalance: 0,
+                description: 'Physical showroom safe cash'
+              }
+            });
+          }
         }
-        if (defaultExpense.id !== sourceAccount.id) {
+
+        const methodLabel = isBankMethod ? `Bank Account [${disbursingAccount?.name || 'Bank'}]` : 'Cash in Hand Safe';
+
+        // 1. CREDIT Disbursing Account (Cash / Bank Outflow)
+        if (disbursingAccount) {
           entriesToCreate.push({
-            accountId: defaultExpense.id,
-            type: 'DEBIT',
+            accountId: disbursingAccount.id,
+            type: 'CREDIT',
             amount: numAmount,
-            description: `Expense payout to ${paidTo || 'Party'}`
+            description: `Payment Voucher disbursed via ${methodLabel} to ${paidTo || 'Party'}: ${fullDesc}`
           });
+
           await tx.account.update({
-            where: { id: defaultExpense.id },
-            data: { currentBalance: { increment: numAmount } }
+            where: { id: disbursingAccount.id },
+            data: { currentBalance: { increment: -numAmount } }
           });
         }
+
+        // 2. DEBIT Source Ledger Account (records expense, reduces payable liability)
+        entriesToCreate.push({
+          accountId: sourceAccount.id,
+          type: 'DEBIT',
+          amount: numAmount,
+          description: `Disbursed via ${methodLabel} to ${paidTo || 'Party'}`
+        });
+
+        const sourceDelta = sourceAccount.type === 'EXPENSE' || sourceAccount.type === 'ASSET'
+          ? numAmount
+          : -numAmount;
+
+        await tx.account.update({
+          where: { id: sourceAccount.id },
+          data: { currentBalance: { increment: sourceDelta } }
+        });
       }
 
       const transaction = await tx.transaction.create({
@@ -891,22 +1039,22 @@ const payAmountFromLedger = async (req, res) => {
         }
       });
 
-      const sourceDelta = isSourceNormalDebit ? -numAmount : -numAmount;
-      const updatedSource = await tx.account.update({
-        where: { id: sourceAccount.id },
-        data: { currentBalance: { increment: sourceDelta } }
-      });
+      const updatedSource = await tx.account.findUnique({ where: { id: sourceAccount.id } });
 
-      await tx.activityLog.create({
+      return { transaction, updatedAccount: updatedSource, disbursingAccount };
+    }, { timeout: 25000, maxWait: 15000 });
+
+    try {
+      await prisma.activityLog.create({
         data: {
           userId: req.user.id,
           action: 'PAY_AMOUNT_LEDGER',
-          details: `Generated Payment Voucher ${txnNumber} for Rs. ${numAmount.toLocaleString()} from ${sourceAccount.name} (${sourceAccount.code}) to ${paidTo || 'Party'}`
+          details: `Generated Payment Voucher ${result.transaction.transactionNumber} for Rs. ${numAmount.toLocaleString()} from ${sourceAccount.name} (${sourceAccount.code}) via ${result.disbursingAccount ? result.disbursingAccount.name : paymentMethod} to ${paidTo || 'Party'}`
         }
       });
-
-      return { transaction, updatedAccount: updatedSource };
-    });
+    } catch (e) {
+      // quiet fail
+    }
 
     return res.status(201).json({
       message: `Successfully generated Payment Voucher (${result.transaction.transactionNumber}) for Rs. ${numAmount.toLocaleString()} from ${sourceAccount.name}`,
