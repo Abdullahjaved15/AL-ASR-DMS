@@ -630,16 +630,16 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
         effectiveTotalReceived = numericRemaining;
       } else if (isTradeIn) {
         // Direct Sales Receipt with Trade-In:
-        // Liquid inflow into Cash/Bank is total price minus trade-in car value
+        // Liquid inflow into Cash/Bank is cash advance (or total minus trade-in car valuation)
         const explicitCashAdv = parsePakistaniPrice(inv.tradeInCashAdvance || 0);
-        const computedMonetaryAdv = Math.max(0, numericTotalPrice - numericTradeInValuation);
+        const computedMonetaryAdv = Math.max(0, numericAdvance - numericTradeInValuation);
         effectiveTotalReceived = explicitCashAdv > 0 ? explicitCashAdv : computedMonetaryAdv;
       } else {
-        effectiveTotalReceived = numericAdvance > 0 ? numericRemaining : numericTotalPrice;
+        effectiveTotalReceived = numericAdvance > 0 ? numericAdvance : numericTotalPrice;
       }
     } else {
       // DELIVERY_LETTER or fallback
-      effectiveTotalReceived = numericAdvance > 0 ? numericRemaining : numericTotalPrice;
+      effectiveTotalReceived = numericAdvance > 0 ? numericAdvance : numericTotalPrice;
     }
 
     let cashReceived = 0;
@@ -692,7 +692,14 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
 
     const totalReceived = cashReceived + bankReceived;
 
-    if (totalReceived > 0 || hasTradeInInventory) {
+    // Buyer / Customer Ledger Account for Unpaid Recovery Balance
+    const hasPendingRecoveryLedger = !isConsignment && !inv.linkedBookingId && numericRemaining > 0;
+    let customerAccount = null;
+    if (hasPendingRecoveryLedger) {
+      customerAccount = await findOrCreateCustomerAccount(inv.buyerName || inv.customerName, inv.buyerPhone || inv.customerPhone);
+    }
+
+    if (totalReceived > 0 || hasTradeInInventory || (customerAccount && numericRemaining > 0)) {
       let inventoryAccount = null;
       if (hasTradeInInventory) {
         inventoryAccount = await prisma.account.findFirst({ where: { code: '1100' } })
@@ -791,7 +798,7 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
           amount: cashReceived,
           description: isConsignment
             ? `Consignment Commission Cash (Vehicle: ${inv.vehicleMaker || ''} ${inv.vehicleModel || ''}, Seller: ${inv.sellerName || 'Customer'})`
-            : `Cash received from ${inv.buyerName || 'Customer'} for ${inv.vehicleMaker || ''} ${inv.vehicleModel || ''}`
+            : `Cash advance received from ${inv.buyerName || 'Customer'} for ${inv.vehicleMaker || ''} ${inv.vehicleModel || ''}`
         });
       }
 
@@ -802,11 +809,20 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
           amount: bankReceived,
           description: isConsignment
             ? `Consignment Commission Bank (Vehicle: ${inv.vehicleMaker || ''} ${inv.vehicleModel || ''}, Seller: ${inv.sellerName || 'Customer'})`
-            : `Bank transfer from ${inv.buyerName || 'Customer'} into ${bankAccount.name}`
+            : `Bank transfer advance from ${inv.buyerName || 'Customer'} into ${bankAccount.name}`
         });
       }
 
-      const totalCredited = totalReceived + (hasTradeInInventory ? numericTradeInValuation : 0);
+      if (hasPendingRecoveryLedger && customerAccount && numericRemaining > 0) {
+        entriesToCreate.push({
+          accountId: customerAccount.id,
+          type: 'DEBIT',
+          amount: numericRemaining,
+          description: `Recovery balance receivable from [${inv.buyerName || 'Customer'}] for [${inv.vehicleMaker || ''} ${inv.vehicleModel || ''} - Chassis: ${inv.chassisNumber || 'N/A'}]`
+        });
+      }
+
+      const totalCredited = totalReceived + (hasTradeInInventory ? numericTradeInValuation : 0) + (hasPendingRecoveryLedger && customerAccount ? numericRemaining : 0);
 
       if (revenueAccount && totalCredited > 0) {
         entriesToCreate.push({
@@ -816,7 +832,7 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
           description: isConsignment
             ? `Commission earned on customer vehicle sale (${inv.vehicleMaker || ''} ${inv.vehicleModel || ''} - Reg: ${inv.registrationNo || 'N/A'}, Seller: ${inv.sellerName || 'Customer'}, Buyer: ${inv.buyerName || 'Customer'})`
             : isTradeIn
-            ? `Sales revenue/advance from ${inv.buyerName || 'Customer'} (${hasTradeInInventory ? `Trade-in Car Rs. ${numericTradeInValuation.toLocaleString()}` : ''}${cashReceived > 0 ? ` + Cash Rs. ${cashReceived.toLocaleString()}` : ''}${bankReceived > 0 ? ` + Bank Rs. ${bankReceived.toLocaleString()}` : ''})`
+            ? `Sales revenue from ${inv.buyerName || 'Customer'} (${hasTradeInInventory ? `Trade-in Car Rs. ${numericTradeInValuation.toLocaleString()}` : ''}${cashReceived > 0 ? ` + Cash Rs. ${cashReceived.toLocaleString()}` : ''}${bankReceived > 0 ? ` + Bank Rs. ${bankReceived.toLocaleString()}` : ''}${numericRemaining > 0 ? ` + Recovery Balance Rs. ${numericRemaining.toLocaleString()}` : ''})`
             : `Sales revenue from ${inv.buyerName || 'Customer'}`
         });
       }
@@ -825,8 +841,8 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
         const txnDesc = isConsignment
           ? `Consignment Sale Commission ${inv.invoiceNumber} for [${inv.vehicleMaker || ''} ${inv.vehicleModel || ''}] (Seller: ${inv.sellerName || 'Customer'} -> Buyer: ${inv.buyerName || 'Customer'}) - Comm: Rs. ${totalReceived} (Car Sale Price Rs. ${numericTotalPrice} directly given to seller)`
           : isTradeIn
-          ? `Trade-In Exchange & Booking ${inv.invoiceNumber} for [${inv.buyerName || 'Customer'}] - Trade-In Stock: Rs. ${numericTradeInValuation.toLocaleString()}${totalReceived > 0 ? `, Cash/Bank: Rs. ${totalReceived.toLocaleString()}` : ''}`
-          : `Receipt ${inv.invoiceNumber} for [${inv.buyerName || 'Customer'}] (${inv.vehicleMaker || ''} ${inv.vehicleModel || ''} - Chassis: ${inv.chassisNumber || 'N/A'}) - Cash: Rs. ${cashReceived}, Bank: Rs. ${bankReceived}`;
+          ? `Trade-In Exchange & Sale ${inv.invoiceNumber} for [${inv.buyerName || 'Customer'}] - Trade-In Stock: Rs. ${numericTradeInValuation.toLocaleString()}${totalReceived > 0 ? `, Advance Inflow: Rs. ${totalReceived.toLocaleString()}` : ''}${numericRemaining > 0 ? `, Recovery Balance: Rs. ${numericRemaining.toLocaleString()}` : ''}`
+          : `Receipt ${inv.invoiceNumber} for [${inv.buyerName || 'Customer'}] (${inv.vehicleMaker || ''} ${inv.vehicleModel || ''} - Chassis: ${inv.chassisNumber || 'N/A'}) - Inflow: Rs. ${totalReceived}${numericRemaining > 0 ? `, Recovery Balance: Rs. ${numericRemaining}` : ''}`;
 
         await prisma.transaction.create({
           data: {
@@ -860,6 +876,12 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
           await prisma.account.update({
             where: { id: bankAccount.id },
             data: { currentBalance: { increment: bankReceived } }
+          });
+        }
+        if (hasPendingRecoveryLedger && customerAccount && numericRemaining > 0) {
+          await prisma.account.update({
+            where: { id: customerAccount.id },
+            data: { currentBalance: { increment: numericRemaining } }
           });
         }
         if (revenueAccount && totalCredited > 0) {
@@ -1292,11 +1314,13 @@ const createInvoice = async (req, res) => {
         processingFeeBankAccountId: isBankCase && processingFeePaymentMethod === 'BANK' ? (processingFeeBankAccountId || null) : null,
 
         // Recovery Case & Pending Balance Fields
-        isRecoveryCase: Boolean(isRecoveryCase),
-        recoveryStatus: Boolean(isRecoveryCase) ? (numericRemaining > 0 ? 'PENDING' : 'FULLY_RECOVERED') : 'NONE',
-        recoveryPromiseDate: Boolean(isRecoveryCase) && recoveryPromiseDate ? String(recoveryPromiseDate) : null,
+        isRecoveryCase: Boolean(isRecoveryCase || (numericRemaining > 0 && (category === 'SALES_RECEIPT' || !category))),
+        recoveryStatus: Boolean(isRecoveryCase || (numericRemaining > 0 && (category === 'SALES_RECEIPT' || !category))) 
+          ? (numericRemaining > 0 ? 'PENDING' : 'FULLY_RECOVERED') 
+          : 'NONE',
+        recoveryPromiseDate: (Boolean(isRecoveryCase) || numericRemaining > 0) && recoveryPromiseDate ? String(recoveryPromiseDate) : null,
         recoveredAmount: '0',
-        recoveryNotes: Boolean(isRecoveryCase) && recoveryNotes ? String(recoveryNotes) : null,
+        recoveryNotes: (Boolean(isRecoveryCase) || numericRemaining > 0) && recoveryNotes ? String(recoveryNotes) : null,
 
         // Accounts Head & Admins Approval Workflow:
         // Receipts created by Super Admin, Admin, Salesmen remain PENDING until Accounts Head reviews and approves.
@@ -1352,7 +1376,7 @@ const createInvoice = async (req, res) => {
         const isBooking = category === 'BOOKING_RECEIPT';
         const totalReceived = isBooking 
           ? (numericAdvance > 0 ? numericAdvance : numericTotalPrice)
-          : (numericAdvance > 0 ? numericRemaining : numericTotalPrice);
+          : (finalLinkedBookingId ? numericRemaining : (numericAdvance > 0 ? numericAdvance : numericTotalPrice));
         const typeLabel = isBooking ? 'Booking Receipt' : (category === 'PAYMENT_VOUCHER' ? 'Payment Voucher' : 'Sales Receipt');
 
         await prisma.notification.create({
@@ -1384,7 +1408,7 @@ const createInvoice = async (req, res) => {
           const isBooking = category === 'BOOKING_RECEIPT';
           const totalReceived = isBooking 
             ? (numericAdvance > 0 ? numericAdvance : numericTotalPrice)
-            : (numericAdvance > 0 ? numericRemaining : numericTotalPrice);
+            : (finalLinkedBookingId ? numericRemaining : (numericAdvance > 0 ? numericAdvance : numericTotalPrice));
 
           if (totalReceived > 0) {
             const typeLabel = isBooking ? 'Booking Receipt' : 'Sales Receipt';
@@ -1809,8 +1833,14 @@ const updateInvoice = async (req, res) => {
         processingFeeBankAccountId: processingFeeBankAccountId !== undefined ? processingFeeBankAccountId : existing.processingFeeBankAccountId,
 
         // Recovery Case & Pending Balance Fields
-        isRecoveryCase: isRecoveryCase !== undefined ? Boolean(isRecoveryCase) : existing.isRecoveryCase,
-        recoveryStatus: recoveryStatus !== undefined ? recoveryStatus : (isRecoveryCase !== undefined ? (Boolean(isRecoveryCase) ? (numericRemaining > 0 ? (existing.recoveryStatus === 'PARTIALLY_RECOVERED' ? 'PARTIALLY_RECOVERED' : 'PENDING') : 'FULLY_RECOVERED') : 'NONE') : existing.recoveryStatus),
+        isRecoveryCase: isRecoveryCase !== undefined 
+          ? Boolean(isRecoveryCase || (numericRemaining > 0 && (category === 'SALES_RECEIPT' || existing.category === 'SALES_RECEIPT')))
+          : Boolean(existing.isRecoveryCase || (numericRemaining > 0 && (category === 'SALES_RECEIPT' || existing.category === 'SALES_RECEIPT'))),
+        recoveryStatus: recoveryStatus !== undefined ? recoveryStatus : (
+          (isRecoveryCase !== undefined ? Boolean(isRecoveryCase) : existing.isRecoveryCase) || numericRemaining > 0
+            ? (numericRemaining > 0 ? (existing.recoveryStatus === 'PARTIALLY_RECOVERED' ? 'PARTIALLY_RECOVERED' : 'PENDING') : 'FULLY_RECOVERED')
+            : 'NONE'
+        ),
         recoveryPromiseDate: recoveryPromiseDate !== undefined ? (recoveryPromiseDate ? String(recoveryPromiseDate) : null) : existing.recoveryPromiseDate,
         recoveredAmount: recoveredAmount !== undefined ? (recoveredAmount ? String(parsePakistaniPrice(recoveredAmount)) : '0') : existing.recoveredAmount,
         recoveryNotes: recoveryNotes !== undefined ? (recoveryNotes ? String(recoveryNotes) : null) : existing.recoveryNotes,
@@ -2996,7 +3026,14 @@ const getRecoveryCases = async (req, res) => {
       isDeleted: false,
       OR: [
         { isRecoveryCase: true },
-        { recoveryStatus: { not: 'NONE' } }
+        { recoveryStatus: { not: 'NONE' } },
+        {
+          AND: [
+            { remainingAmount: { not: null } },
+            { remainingAmount: { not: '' } },
+            { remainingAmount: { not: '0' } }
+          ]
+        }
       ]
     };
 
@@ -3044,7 +3081,7 @@ const getRecoveryCases = async (req, res) => {
     let completedCount = 0;
 
     const enrichedCases = allMatching.map(inv => {
-      const total = parsePakistaniPrice(inv.totalPrice || inv.agreedAmount || 0);
+      const total = parsePakistaniPrice(inv.totalPrice || inv.agreedAmount || inv.saleAmount || 0);
       const adv = parsePakistaniPrice(inv.advanceAmount || 0);
       const rem = parsePakistaniPrice(inv.remainingAmount || 0);
       const rec = parsePakistaniPrice(inv.recoveredAmount || 0);
@@ -3067,39 +3104,58 @@ const getRecoveryCases = async (req, res) => {
         numericAdvanceAmount: adv,
         numericRemainingAmount: rem,
         numericRecoveredAmount: rec,
+        // Frontend compatibility fields
+        customerName: inv.buyerName || inv.customerName || 'N/A',
+        customerPhone: inv.buyerPhone || inv.customerPhone || '',
+        customerCity: inv.buyerAddress || inv.customerCity || '',
+        carMake: inv.vehicleMaker || inv.carVehicle || '',
+        carModel: inv.vehicleModel || inv.carModel || '',
+        carYear: inv.carYear || '',
+        registrationNumber: inv.registrationNo || inv.carRegNumber || 'Applied For',
+        totalAmount: total,
+        advancePaid: adv,
+        remainingBalance: rem,
+        recoveredAmount: rec,
         isOverdue,
         isCompleted
       };
     });
 
     let filteredCases = enrichedCases;
-    if (status === 'PENDING' || status === 'ACTIVE') {
+    if (status === 'PENDING' || status === 'PENDING_RECOVERY' || status === 'ACTIVE') {
       filteredCases = enrichedCases.filter(c => c.numericRemainingAmount > 0);
     } else if (status === 'PARTIALLY_RECOVERED') {
-      filteredCases = enrichedCases.filter(c => c.recoveryStatus === 'PARTIALLY_RECOVERED' && c.numericRemainingAmount > 0);
+      filteredCases = enrichedCases.filter(c => c.numericRecoveredAmount > 0 && c.numericRemainingAmount > 0);
     } else if (status === 'FULLY_RECOVERED' || status === 'COMPLETED') {
       filteredCases = enrichedCases.filter(c => c.numericRemainingAmount <= 0);
     } else if (status === 'OVERDUE') {
       filteredCases = enrichedCases.filter(c => c.isOverdue);
     }
 
-    const summary = {
+    const stats = {
       totalPendingRecovery,
+      totalRecoveredAmount: totalRecovered,
       totalRecovered,
+      activeRecoveryCount: activeCount,
       activeCount,
+      overdueRecoveryCount: overdueCount,
       overdueCount,
       completedCount,
+      totalRecoveryCases: allMatching.length,
       totalDealsCount: allMatching.length
     };
 
     return res.json({
+      success: true,
+      data: filteredCases,
       cases: filteredCases,
-      summary,
+      stats,
+      summary: stats,
       total: filteredCases.length
     });
   } catch (error) {
     console.error('getRecoveryCases error:', error);
-    return res.status(500).json({ message: 'Failed to fetch recovery cases', error: error.message });
+    return res.status(500).json({ success: false, message: 'Failed to fetch recovery cases', error: error.message });
   }
 };
 
@@ -3331,9 +3387,13 @@ const recordRecoveryPayment = async (req, res) => {
     }
 
     return res.status(201).json({
+      success: true,
       message: `Successfully recorded recovery payment of PKR ${numAmount.toLocaleString()} into ${result.depositAccount.name}.${isFullyPaid ? ' This recovery case is now 100% completed!' : ` Remaining balance: PKR ${newRemaining.toLocaleString()}`}`,
       recoveryPayment: result.recoveryPayment,
-      invoice: result.updatedInvoice,
+      invoice: {
+        ...result.updatedInvoice,
+        remainingBalance: parsePakistaniPrice(result.updatedInvoice.remainingAmount || 0)
+      },
       transaction: result.transaction
     });
   } catch (error) {

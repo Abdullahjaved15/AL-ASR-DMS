@@ -100,10 +100,18 @@ export default function RecoveryCases({ onNavigate }) {
         params.search = search.trim();
       }
       const res = await api.getRecoveryCases(params);
-      if (res.success) {
-        setCases(res.data || []);
-        if (res.stats) {
-          setStats(res.stats);
+      if (res && (res.success || res.cases || res.data)) {
+        const rawCases = res.data || res.cases || [];
+        setCases(rawCases);
+        const rawStats = res.stats || res.summary;
+        if (rawStats) {
+          setStats({
+            totalPendingRecovery: rawStats.totalPendingRecovery || 0,
+            totalRecoveredAmount: rawStats.totalRecoveredAmount || rawStats.totalRecovered || 0,
+            activeRecoveryCount: rawStats.activeRecoveryCount || rawStats.activeCount || 0,
+            overdueRecoveryCount: rawStats.overdueRecoveryCount || rawStats.overdueCount || 0,
+            totalRecoveryCases: rawStats.totalRecoveryCases || rawStats.totalDealsCount || rawCases.length || 0
+          });
         }
       }
     } catch (err) {
