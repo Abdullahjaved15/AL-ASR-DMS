@@ -608,6 +608,18 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
     const numericTradeInCash = isTradeIn ? parsePakistaniPrice(inv.tradeInCashAdvance || 0) : 0;
     const hasTradeInInventory = isTradeIn && numericTradeInValuation > 0 && !(inv.category === 'SALES_RECEIPT' && inv.linkedBookingId);
 
+    let priorBookingAdvance = 0;
+    if (inv.linkedBookingId) {
+      try {
+        const originalBooking = await prisma.invoice.findUnique({ where: { id: inv.linkedBookingId } });
+        if (originalBooking) {
+          priorBookingAdvance = parsePakistaniPrice(originalBooking.advanceAmount || originalBooking.totalPrice || originalBooking.agreedAmount || 0);
+        }
+      } catch (bkErr) {
+        console.warn('Could not read linked booking receipt:', bkErr.message);
+      }
+    }
+
     if (isConsignment) {
       // Customer-owned vehicle: Dealership does NOT receive total car price into Safe/Bank.
       // The car sale price is paid directly to the customer/seller who brought the vehicle.
@@ -625,9 +637,12 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
       }
     } else if (inv.category === 'SALES_RECEIPT') {
       if (inv.linkedBookingId) {
-        // Converted from booking receipt: advance was already collected in booking.
-        // ONLY collect remaining balance into cash safe / bank now!
-        effectiveTotalReceived = numericRemaining;
+        // Converted from booking receipt:
+        // Total collected to date across booking + sales receipt = numericAdvance (or totalPrice - remaining)
+        // Liquid cash/bank inflow received TODAY at delivery = (Total Collected) - (Already in safe from Booking)
+        const totalCollectedToDate = numericAdvance > 0 ? numericAdvance : Math.max(0, numericTotalPrice - numericRemaining);
+        const deliveryInflowToday = Math.max(0, totalCollectedToDate - priorBookingAdvance);
+        effectiveTotalReceived = deliveryInflowToday;
       } else if (isTradeIn) {
         // Direct Sales Receipt with Trade-In:
         // Liquid inflow into Cash/Bank is cash advance (or total minus trade-in car valuation)
@@ -693,7 +708,7 @@ const syncInvoiceLedgerTransactions = async (invoiceId, userId) => {
     const totalReceived = cashReceived + bankReceived;
 
     // Buyer / Customer Ledger Account for Unpaid Recovery Balance
-    const hasPendingRecoveryLedger = !isConsignment && !inv.linkedBookingId && numericRemaining > 0;
+    const hasPendingRecoveryLedger = !isConsignment && numericRemaining > 0;
     let customerAccount = null;
     if (hasPendingRecoveryLedger) {
       customerAccount = await findOrCreateCustomerAccount(inv.buyerName || inv.customerName, inv.buyerPhone || inv.customerPhone);

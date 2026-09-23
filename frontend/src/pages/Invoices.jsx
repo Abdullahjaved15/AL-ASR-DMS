@@ -20,7 +20,9 @@ import {
   Camera,
   Upload,
   X,
-  Building2
+  Building2,
+  Link2,
+  ArrowRightCircle
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -379,48 +381,78 @@ export default function Invoices({ onNavigate }) {
   const importAndLinkBooking = (bk) => {
     setActiveLinkedBooking(bk);
     setMatchingBookings([]);
-    setFormData(prev => {
-      const totalNum = parsePakistaniPrice(bk.totalPrice || bk.agreedAmount || 0);
-      const advNum = parsePakistaniPrice(bk.advanceAmount || bk.cashAmount || 0);
-      const remNum = parsePakistaniPrice(bk.remainingAmount) || Math.max(0, totalNum - advNum);
+    const totalNum = parsePakistaniPrice(bk.totalPrice || bk.agreedAmount || 0);
+    const advNum = parsePakistaniPrice(bk.advanceAmount || bk.cashAmount || 0);
+    const remNum = Math.max(0, totalNum - advNum);
 
-      return {
-        ...prev,
-        linkedBookingId: bk.id,
-        linkedBookingNumber: bk.invoiceNumber,
-        buyerName: bk.buyerName || bk.customerName || prev.buyerName,
-        buyerFatherName: bk.buyerFatherName || prev.buyerFatherName,
-        buyerCnic: bk.buyerCnic || prev.buyerCnic,
-        buyerAddress: bk.buyerAddress || bk.customerCity || prev.buyerAddress,
-        buyerPhone: bk.buyerPhone || bk.customerPhone || prev.buyerPhone,
-        vehicleMaker: bk.vehicleMaker || bk.carVehicle || prev.vehicleMaker,
-        vehicleModel: bk.vehicleModel || bk.carModel || prev.vehicleModel,
-        carYear: bk.carYear || prev.carYear,
-        registrationNo: bk.registrationNo || bk.carRegNumber || prev.registrationNo,
-        engineNumber: bk.engineNumber || prev.engineNumber,
-        chassisNumber: bk.chassisNumber || prev.chassisNumber,
-        powerCapacity: bk.powerCapacity || prev.powerCapacity,
-        color: bk.color || prev.color,
-        totalPrice: String(totalNum),
-        advanceAmount: String(advNum),
-        remainingAmount: String(remNum),
-        agreedAmount: String(totalNum),
-        agreedAmountHalf: String(Math.round(totalNum / 2)),
-        agreedAmountWords: bk.agreedAmountWords || bk.inWords || prev.agreedAmountWords,
-        inWords: bk.inWords || bk.agreedAmountWords || prev.inWords,
-        isTradeIn: Boolean(bk.isTradeIn),
-        tradeInVehicle: bk.tradeInVehicle || prev.tradeInVehicle,
-        tradeInModel: bk.tradeInModel || prev.tradeInModel,
-        tradeInYear: bk.tradeInYear || prev.tradeInYear,
-        tradeInColor: bk.tradeInColor || prev.tradeInColor,
-        tradeInRegNumber: bk.tradeInRegNumber || prev.tradeInRegNumber,
-        tradeInChassisNumber: bk.tradeInChassisNumber || prev.tradeInChassisNumber,
-        tradeInEngineNumber: bk.tradeInEngineNumber || prev.tradeInEngineNumber,
-        tradeInValuation: bk.tradeInValuation || prev.tradeInValuation,
-        tradeInCashAdvance: bk.tradeInCashAdvance || prev.tradeInCashAdvance,
-        tradeInStockId: bk.tradeInStockId || prev.tradeInStockId
-      };
-    });
+    // Default upon conversion: Full settlement (customer pays the remaining amount today, clearing remaining to 0)
+    setFormData(prev => ({
+      ...prev,
+      category: 'SALES_RECEIPT',
+      linkedBookingId: bk.id,
+      linkedBookingNumber: bk.invoiceNumber,
+      buyerName: bk.buyerName || bk.customerName || prev.buyerName,
+      buyerFatherName: bk.buyerFatherName || prev.buyerFatherName,
+      buyerCnic: bk.buyerCnic || prev.buyerCnic,
+      buyerAddress: bk.buyerAddress || bk.customerCity || prev.buyerAddress,
+      buyerPhone: bk.buyerPhone || bk.customerPhone || prev.buyerPhone,
+      vehicleMaker: bk.vehicleMaker || bk.carVehicle || prev.vehicleMaker,
+      vehicleModel: bk.vehicleModel || bk.carModel || prev.vehicleModel,
+      carYear: bk.carYear || prev.carYear,
+      registrationNo: bk.registrationNo || bk.carRegNumber || prev.registrationNo,
+      engineNumber: bk.engineNumber || prev.engineNumber,
+      chassisNumber: bk.chassisNumber || prev.chassisNumber,
+      powerCapacity: bk.powerCapacity || prev.powerCapacity,
+      color: bk.color || prev.color,
+      totalPrice: String(totalNum),
+      advanceAmount: String(totalNum), // Full settlement default
+      remainingAmount: '0',           // Cleared default
+      isRecoveryCase: false,
+      recoveryStatus: 'NONE',
+      agreedAmount: String(totalNum),
+      agreedAmountHalf: String(Math.round(totalNum / 2)),
+      agreedAmountWords: bk.agreedAmountWords || bk.inWords || prev.agreedAmountWords,
+      inWords: bk.inWords || bk.agreedAmountWords || prev.inWords,
+      isTradeIn: Boolean(bk.isTradeIn),
+      tradeInVehicle: bk.tradeInVehicle || prev.tradeInVehicle,
+      tradeInModel: bk.tradeInModel || prev.tradeInModel,
+      tradeInYear: bk.tradeInYear || prev.tradeInYear,
+      tradeInColor: bk.tradeInColor || prev.tradeInColor,
+      tradeInRegNumber: bk.tradeInRegNumber || prev.tradeInRegNumber,
+      tradeInChassisNumber: bk.tradeInChassisNumber || prev.tradeInChassisNumber,
+      tradeInEngineNumber: bk.tradeInEngineNumber || prev.tradeInEngineNumber,
+      tradeInValuation: bk.tradeInValuation || prev.tradeInValuation,
+      tradeInCashAdvance: bk.tradeInCashAdvance || prev.tradeInCashAdvance,
+      tradeInStockId: bk.tradeInStockId || prev.tradeInStockId
+    }));
+  };
+
+  const handleBookingDeliverySettlement = (amountPaidNow) => {
+    const totalNum = parsePakistaniPrice(formData.totalPrice || activeLinkedBooking?.totalPrice || 0);
+    const initialAdv = activeLinkedBooking 
+      ? parsePakistaniPrice(activeLinkedBooking.advanceAmount || activeLinkedBooking.cashAmount || 0) 
+      : 0;
+    const maxDue = Math.max(0, totalNum - initialAdv);
+    const numPaidNow = Math.min(maxDue, Math.max(0, parsePakistaniPrice(amountPaidNow || 0)));
+    const newFinalRemaining = Math.max(0, maxDue - numPaidNow);
+    const newTotalAdvance = initialAdv + numPaidNow;
+
+    setFormData(prev => ({
+      ...prev,
+      advanceAmount: String(newTotalAdvance),
+      remainingAmount: String(newFinalRemaining),
+      isRecoveryCase: newFinalRemaining > 0,
+      recoveryStatus: newFinalRemaining > 0 ? 'PENDING' : 'NONE'
+    }));
+  };
+
+  const handleConvertToSale = (bk) => {
+    resetForm();
+    setSelectedInvoice(null);
+    setIsAddModalOpen(true);
+    setTimeout(() => {
+      importAndLinkBooking(bk);
+    }, 50);
   };
 
   const unlinkBooking = () => {
@@ -2399,6 +2431,18 @@ export default function Invoices({ onNavigate }) {
                             </button>
                           )}
 
+                          {/* Convert & Settle Booking to Final Sales Receipt Button */}
+                          {cat === 'BOOKING_RECEIPT' && inv.bookingStatus === 'ACTIVE' && (
+                            <button
+                              onClick={() => handleConvertToSale(inv)}
+                              className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40 font-bold text-[11px] flex items-center space-x-1 cursor-pointer transition-all shadow-sm"
+                              title="Convert Booking Receipt to Final Sales Receipt & Settle Balance"
+                            >
+                              <Link2 className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>Convert to Sale</span>
+                            </button>
+                          )}
+
                           {/* Cancel & Refund Booking Button */}
                           {cat === 'BOOKING_RECEIPT' && inv.bookingStatus === 'ACTIVE' && (
                             <button
@@ -3823,26 +3867,32 @@ export default function Invoices({ onNavigate }) {
 
                   {/* ACTIVE LINKED BOOKING RECEIPT NOTIFICATION BANNER */}
                   {formData.linkedBookingNumber ? (
-                    <div className="p-3.5 bg-emerald-500/10 border-2 border-emerald-500/40 rounded-xl flex items-center justify-between shadow-lg">
-                      <div className="flex items-center space-x-3">
-                        <span className="p-2 bg-emerald-500/20 text-emerald-300 rounded-lg text-base font-bold">🔗</span>
-                        <div>
-                          <div className="text-xs font-bold text-emerald-300 flex items-center gap-2">
-                            <span>Connected to Booking Receipt #{formData.linkedBookingNumber}</span>
-                            <span className="text-[10px] bg-emerald-500/20 text-emerald-200 px-2 py-0.5 rounded border border-emerald-500/40 font-mono font-bold">Advance Deducted</span>
+                    <div className="p-4 bg-gradient-to-r from-emerald-950/60 via-slate-950 to-emerald-950/60 border-2 border-emerald-500/50 rounded-2xl shadow-xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <span className="p-2 bg-emerald-500/20 text-emerald-300 rounded-xl text-base font-bold">🔗</span>
+                          <div>
+                            <div className="text-xs font-bold text-emerald-300 flex items-center gap-2">
+                              <span>Connected to Booking Receipt #{formData.linkedBookingNumber}</span>
+                              <span className="text-[10px] bg-emerald-500/20 text-emerald-200 px-2 py-0.5 rounded-full border border-emerald-500/40 font-mono font-bold">Booking Linked</span>
+                            </div>
+                            <p className="text-[11px] text-slate-300 mt-0.5">
+                              {activeLinkedBooking ? (
+                                <>Initial Booking Advance of <strong className="text-emerald-400 font-mono">PKR {parsePakistaniPrice(activeLinkedBooking.advanceAmount || activeLinkedBooking.cashAmount || 0).toLocaleString()}</strong> was already collected. Choose delivery settlement amount below.</>
+                              ) : (
+                                <>Booking receipt #{formData.linkedBookingNumber} connected. Choose delivery settlement amount below.</>
+                              )}
+                            </p>
                           </div>
-                          <p className="text-[11px] text-slate-300 mt-0.5">
-                            Advance of <strong className="text-emerald-400 font-mono">PKR {parsePakistaniPrice(formData.advanceAmount).toLocaleString()}</strong> was collected at booking. Only the remaining <strong className="text-cyan-400 font-mono">PKR {parsePakistaniPrice(formData.remainingAmount).toLocaleString()}</strong> will enter Cash Safe / Bank.
-                          </p>
                         </div>
+                        <button
+                          type="button"
+                          onClick={unlinkBooking}
+                          className="text-xs px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 rounded-xl cursor-pointer font-bold transition-all"
+                        >
+                          ✕ Unlink Booking
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={unlinkBooking}
-                        className="text-xs px-2.5 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 rounded-lg cursor-pointer font-bold"
-                      >
-                        ✕ Unlink Booking
-                      </button>
                     </div>
                   ) : matchingBookings.length > 0 ? (
                     <div className="p-3.5 bg-gradient-to-r from-cyan-950/90 via-slate-900 to-cyan-950/90 border-2 border-cyan-500/60 rounded-xl space-y-2.5 shadow-xl">
@@ -4727,6 +4777,126 @@ export default function Invoices({ onNavigate }) {
                             <div className="text-[9px] text-emerald-300/80 mt-0.5">Showroom Commission Revenue</div>
                           </div>
                         </div>
+                      ) : formData.linkedBookingNumber ? (
+                        /* BOOKING CONVERSION SETTLEMENT INTERFACE */
+                        <div className="space-y-4">
+                          {(() => {
+                            const bTotal = parsePakistaniPrice(formData.totalPrice || activeLinkedBooking?.totalPrice || 0);
+                            const bAdv = activeLinkedBooking 
+                              ? parsePakistaniPrice(activeLinkedBooking.advanceAmount || activeLinkedBooking.cashAmount || 0) 
+                              : 0;
+                            const bDue = Math.max(0, bTotal - bAdv);
+                            const curAdv = parsePakistaniPrice(formData.advanceAmount || 0);
+                            const paidToday = Math.max(0, curAdv - bAdv);
+                            const finalRem = parsePakistaniPrice(formData.remainingAmount !== undefined && formData.remainingAmount !== null && formData.remainingAmount !== '' ? formData.remainingAmount : Math.max(0, bDue - paidToday));
+
+                            return (
+                              <div className="p-4 bg-gradient-to-br from-cyan-950/40 via-slate-950 to-indigo-950/30 rounded-xl border-2 border-cyan-500/50 space-y-4 shadow-xl">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-cyan-500/20 pb-3">
+                                  <div>
+                                    <h5 className="text-xs font-bold text-cyan-300 flex items-center gap-2">
+                                      <span>⚡ Booking Conversion & Delivery Settlement (بکنگ کی حتمی وصولی و بقایا)</span>
+                                    </h5>
+                                    <p className="text-[11px] text-slate-300 mt-0.5">
+                                      Specify how much the customer is paying today upon delivery. Remaining balance (if any) will auto-track in Recovery Cases.
+                                    </p>
+                                  </div>
+                                  <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 self-start sm:self-center">
+                                    BK #{formData.linkedBookingNumber}
+                                  </span>
+                                </div>
+
+                                {/* Financial Summary Cards */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                                  <div className="p-2.5 bg-slate-900/80 rounded-lg border border-white/10">
+                                    <div className="text-[10px] text-slate-400 font-medium">Total Vehicle Deal (کل قیمت)</div>
+                                    <div className="font-mono font-bold text-white text-sm mt-0.5">
+                                      PKR {bTotal.toLocaleString()}
+                                    </div>
+                                  </div>
+                                  <div className="p-2.5 bg-slate-900/80 rounded-lg border border-emerald-500/30">
+                                    <div className="text-[10px] text-emerald-400 font-medium">
+                                      Booking Advance (Already In Hand/Bank)
+                                    </div>
+                                    <div className="font-mono font-bold text-emerald-400 text-sm mt-0.5">
+                                      PKR {bAdv.toLocaleString()}
+                                    </div>
+                                  </div>
+                                  <div className="p-2.5 bg-slate-900/80 rounded-lg border border-amber-500/30">
+                                    <div className="text-[10px] text-amber-400 font-medium">Outstanding Balance from Booking</div>
+                                    <div className="font-mono font-bold text-amber-300 text-sm mt-0.5">
+                                      PKR {bDue.toLocaleString()}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Today's Payment Input & Presets */}
+                                <div className="p-3 bg-slate-950/80 rounded-xl border border-cyan-500/30 space-y-3">
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                                      <span>💵 Amount Customer is Paying Today at Delivery (آج وصول ہونے والی رقم):</span>
+                                    </label>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleBookingDeliverySettlement(bDue)}
+                                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
+                                          finalRem === 0 
+                                            ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/30 font-black' 
+                                            : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40'
+                                        }`}
+                                      >
+                                        ✓ Full Settle (PKR {bDue.toLocaleString()})
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleBookingDeliverySettlement(0)}
+                                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
+                                          paidToday === 0 
+                                            ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30 font-black' 
+                                            : 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/40'
+                                        }`}
+                                      >
+                                        ✕ Pay Later / Recovery (PKR 0 Today)
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                      <input
+                                        type="text"
+                                        placeholder={`e.g. ${bDue}`}
+                                        value={paidToday > 0 ? String(paidToday) : ''}
+                                        onChange={(e) => handleBookingDeliverySettlement(e.target.value)}
+                                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-cyan-500/50 text-emerald-300 text-sm font-mono font-bold focus:border-cyan-400"
+                                      />
+                                      <div className="text-[10px] text-slate-400 mt-1">
+                                        Type amount or click "Full Settle" above
+                                      </div>
+                                    </div>
+
+                                    <div className="p-2.5 rounded-lg bg-slate-900/90 border border-white/10 flex items-center justify-between">
+                                      <div>
+                                        <div className="text-[10px] text-slate-400">Final Remaining on Sales Receipt</div>
+                                        <div className={`text-sm font-mono font-bold mt-0.5 ${finalRem === 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                          PKR {finalRem.toLocaleString()}
+                                        </div>
+                                      </div>
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                        finalRem === 0 
+                                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
+                                          : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                      }`}>
+                                        {finalRem === 0 ? '✓ 100% Cleared' : '⚡ Recovery Case'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
                       ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                           <div className="p-2.5 bg-slate-950/60 rounded-lg border border-white/5">
@@ -4737,7 +4907,7 @@ export default function Invoices({ onNavigate }) {
                           </div>
                           <div className="p-2.5 bg-slate-950/60 rounded-lg border border-white/5">
                             <div className="text-[10px] text-slate-400 font-medium">
-                              Less Advance (Already In Hand/Bank) {formData.linkedBookingNumber ? `(#${formData.linkedBookingNumber})` : ''}
+                              Less Advance (Already In Hand/Bank)
                             </div>
                             <div className="font-mono font-bold text-rose-400 text-sm mt-0.5">
                               - PKR {parsePakistaniPrice(formData.advanceAmount || 0).toLocaleString()}
