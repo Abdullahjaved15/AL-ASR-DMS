@@ -26,6 +26,14 @@ const handleCloudinaryUpload = async (photoStr, folderName) => {
   return photoStr;
 };
 
+// Helper to generate unique transaction number
+const generateTxnNumber = async (prefix = 'TXN') => {
+  const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+  const count = await prisma.transaction.count();
+  const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+  return `${prefix}-${dateStr}-${String(count + 1).padStart(4, '0')}-${randomSuffix}`;
+};
+
 const getInvoices = async (req, res) => {
   try {
     const { page = 1, limit = 20, search = '', category = '', approvalStatus = '' } = req.query;
