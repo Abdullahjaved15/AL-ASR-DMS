@@ -61,11 +61,13 @@ export default function RecoveryCases({ onNavigate }) {
     amount: '',
     paymentMethod: 'CASH', // CASH, BANK_TRANSFER
     bankAccountId: '',
+    cashAccountId: '',
     referenceNo: '',
     paymentDate: new Date().toISOString().split('T')[0],
     notes: ''
   });
   const [bankAccounts, setBankAccounts] = useState([]);
+  const [cashAccounts, setCashAccounts] = useState([]);
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState('');
   const [paymentSuccess, setPaymentSuccess] = useState('');
@@ -124,10 +126,11 @@ export default function RecoveryCases({ onNavigate }) {
   const fetchBankAccounts = async () => {
     try {
       const res = await api.getBankAndCashAccounts();
-      if (res.success && res.data) {
-        const banks = res.data.filter(acc => acc.subType === 'BANK' || acc.accountType === 'BANK');
-        setBankAccounts(banks);
-      }
+      const rawAccounts = Array.isArray(res) ? res : (res?.data || []);
+      const banks = rawAccounts.filter(acc => acc.subType === 'BANK' || acc.type === 'BANK' || acc.accountType === 'BANK');
+      const cashAccs = rawAccounts.filter(acc => acc.subType === 'CASH' || acc.type === 'CASH' || acc.accountType === 'CASH');
+      setBankAccounts(banks);
+      setCashAccounts(cashAccs);
     } catch (err) {
       console.error('Failed to fetch bank accounts:', err);
     }
@@ -135,10 +138,13 @@ export default function RecoveryCases({ onNavigate }) {
 
   const handleOpenPaymentModal = (recoveryCase) => {
     setSelectedCaseForPayment(recoveryCase);
+    const defaultBank = bankAccounts.length > 0 ? bankAccounts[0].id : '';
+    const defaultCash = cashAccounts.length > 0 ? cashAccounts[0].id : '';
     setPaymentForm({
       amount: '',
       paymentMethod: 'CASH',
-      bankAccountId: bankAccounts.length > 0 ? bankAccounts[0].id : '',
+      bankAccountId: defaultBank,
+      cashAccountId: defaultCash,
       referenceNo: '',
       paymentDate: new Date().toISOString().split('T')[0],
       notes: ''
@@ -200,26 +206,33 @@ export default function RecoveryCases({ onNavigate }) {
     setPaymentSuccess('');
 
     try {
+      const selectedDepositId = paymentForm.paymentMethod === 'BANK_TRANSFER'
+        ? paymentForm.bankAccountId
+        : (paymentForm.cashAccountId || undefined);
+
       const payload = {
         amount: rawAmount,
-        paymentMethod: paymentForm.paymentMethod,
-        bankAccountId: paymentForm.paymentMethod === 'BANK_TRANSFER' ? paymentForm.bankAccountId : undefined,
+        paymentMethod: paymentForm.paymentMethod === 'BANK_TRANSFER' ? 'BANK' : 'CASH',
+        bankAccountId: selectedDepositId,
         referenceNo: paymentForm.referenceNo,
+        referenceNumber: paymentForm.referenceNo,
         paymentDate: paymentForm.paymentDate,
+        date: paymentForm.paymentDate,
         notes: paymentForm.notes
       };
 
       const res = await api.recordRecoveryPayment(selectedCaseForPayment.id, payload);
       if (res.success) {
-        const remaining = res.invoice?.remainingBalance || 0;
-        const msg = remaining <= 0 
+        const remaining = res.invoice?.remainingBalance || res.invoice?.remainingAmount || 0;
+        const msg = Number(remaining) <= 0 
           ? `✓ Full recovery completed! Invoice #${res.invoice?.invoiceNumber} is now fully paid.`
-          : `✓ Tranche of ${formatPKR(rawAmount)} recorded! Remaining balance: ${formatPKR(remaining)} (Case remains active).`;
+          : `✓ Tranche of ${formatPKR(rawAmount)} recorded! Remaining balance: ${formatPKR(Number(remaining))} (Case remains active).`;
         setPaymentSuccess(msg);
         
         setTimeout(() => {
           handleClosePaymentModal();
           fetchRecoveryCases();
+          fetchBankAccounts();
         }, 1500);
       } else {
         setPaymentError(res.message || 'Failed to record recovery payment.');
@@ -850,8 +863,11 @@ export default function RecoveryCases({ onNavigate }) {
                 {/* Bank Account Selector (If Bank Transfer) */}
                 {paymentForm.paymentMethod === 'BANK_TRANSFER' && (
                   <div className="animate-in fade-in duration-200">
-                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                      Select Bank Account <span className="text-rose-400">*</span>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                      <span>Select Destination Bank Account <span className="text-rose-400">*</span></span>
+                      {bankAccounts.length === 0 && (
+                        <span className="text-rose-400 text-[10px] font-normal">No bank accounts configured</span>
+                      )}
                     </label>
                     <select
                       value={paymentForm.bankAccountId}
@@ -859,13 +875,59 @@ export default function RecoveryCases({ onNavigate }) {
                       required
                       className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
                     >
-                      <option value="">-- Choose Bank Account --</option>
+                      <option value="">-- Choose Destination Bank Account --</option>
                       {bankAccounts.map(b => (
                         <option key={b.id} value={b.id}>
-                          {b.accountCode} - {b.accountName} {b.accountNumber ? `(${b.accountNumber})` : ''}
+                          {b.code || b.accountCode || ''} - {b.name || b.accountName || b.bankName || 'Bank Account'} {b.accountNumber ? `(A/C: ${b.accountNumber})` : ''} {b.bankName && b.bankName !== b.name ? `[${b.bankName}]` : ''}
                         </option>
                       ))}
                     </select>
+                    {paymentForm.bankAccountId && (() => {
+                      const selectedBank = bankAccounts.find(b => b.id === paymentForm.bankAccountId);
+                      if (!selectedBank) return null;
+                      return (
+                        <p className="mt-1.5 text-[11px] text-indigo-400 flex items-center gap-1">
+                          <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
+                          <span>Posting Inflow: <strong>{selectedBank.name || selectedBank.bankName}</strong> ({selectedBank.code || selectedBank.accountCode}) | Current Balance: Rs. {Number(selectedBank.currentBalance || 0).toLocaleString()}</span>
+                        </p>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* Cash Account Selector / Details (If Cash Safe) */}
+                {paymentForm.paymentMethod === 'CASH' && (
+                  <div className="animate-in fade-in duration-200">
+                    {cashAccounts.length > 1 ? (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                          Select Cash Register / Safe <span className="text-rose-400">*</span>
+                        </label>
+                        <select
+                          value={paymentForm.cashAccountId}
+                          onChange={(e) => setPaymentForm({ ...paymentForm, cashAccountId: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                        >
+                          {cashAccounts.map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.code || c.accountCode || '1001'} - {c.name || c.accountName || 'Cash Safe'} (Balance: Rs. {Number(c.currentBalance || 0).toLocaleString()})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-slate-800/80 border border-emerald-500/30 rounded-xl flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-xs text-slate-300">
+                          <Wallet className="w-4 h-4 text-emerald-400" />
+                          <span>Posting Inflow to: <strong>{cashAccounts[0]?.name || 'Cash Safe (1001)'}</strong></span>
+                        </div>
+                        {cashAccounts[0] && (
+                          <span className="text-[11px] font-mono text-emerald-400">
+                            Balance: Rs. {Number(cashAccounts[0].currentBalance || 0).toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 

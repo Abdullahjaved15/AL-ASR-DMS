@@ -3239,8 +3239,13 @@ const recordRecoveryPayment = async (req, res) => {
             || await tx.account.findFirst({ where: { subType: 'BANK' } });
         }
       } else {
-        depositAccount = await tx.account.findFirst({ where: { subType: 'CASH', isActive: true } })
-          || await tx.account.findFirst({ where: { subType: 'CASH' } });
+        if (bankAccountId) {
+          depositAccount = await tx.account.findUnique({ where: { id: bankAccountId } });
+        }
+        if (!depositAccount) {
+          depositAccount = await tx.account.findFirst({ where: { subType: 'CASH', isActive: true } })
+            || await tx.account.findFirst({ where: { subType: 'CASH' } });
+        }
         if (!depositAccount) {
           depositAccount = await tx.account.create({
             data: {
@@ -3354,20 +3359,63 @@ const recordRecoveryPayment = async (req, res) => {
         ? String(parsePakistaniPrice(invoice.bankAmountReceived || 0) + numAmount)
         : (invoice.bankAmountReceived || '');
 
+      const updatedAdvanceAmount = String(parsePakistaniPrice(invoice.advanceAmount || 0) + numAmount);
+
       const updatedInvoice = await tx.invoice.update({
         where: { id: invoice.id },
         data: {
+          advanceAmount: updatedAdvanceAmount,
           recoveredAmount: String(newRecovered),
           remainingAmount: String(newRemaining),
+          isRecoveryCase: newRemaining > 0,
           recoveryStatus: newRecoveryStatus,
           paymentStatus: newPaymentStatus,
           cashAmountReceived: updatedCashAmount,
-          bankAmountReceived: updatedBankAmount
+          bankAmountReceived: updatedBankAmount,
+          ...(isBankMethod && depositAccount ? { bankAccountId: depositAccount.id } : {})
         },
         include: {
           recoveryPayments: { orderBy: { paymentDate: 'desc' } }
         }
       });
+
+      // Synchronize linked booking receipt (if any)
+      if (invoice.linkedBookingId) {
+        try {
+          await tx.invoice.update({
+            where: { id: invoice.linkedBookingId },
+            data: {
+              advanceAmount: updatedAdvanceAmount,
+              remainingAmount: String(newRemaining),
+              isRecoveryCase: newRemaining > 0,
+              recoveryStatus: newRecoveryStatus,
+              paymentStatus: newPaymentStatus,
+              recoveredAmount: String(newRecovered)
+            }
+          });
+        } catch (linkErr) {
+          console.warn('Failed to sync linked booking receipt on recovery payment:', linkErr.message);
+        }
+      }
+
+      // Synchronize linked sales receipt (if this was a booking receipt)
+      if (invoice.linkedSaleId) {
+        try {
+          await tx.invoice.update({
+            where: { id: invoice.linkedSaleId },
+            data: {
+              advanceAmount: updatedAdvanceAmount,
+              remainingAmount: String(newRemaining),
+              isRecoveryCase: newRemaining > 0,
+              recoveryStatus: newRecoveryStatus,
+              paymentStatus: newPaymentStatus,
+              recoveredAmount: String(newRecovered)
+            }
+          });
+        } catch (linkSaleErr) {
+          console.warn('Failed to sync linked sales receipt on recovery payment:', linkSaleErr.message);
+        }
+      }
 
       return { transaction, recoveryPayment, updatedInvoice, depositAccount };
     }, { timeout: 25000, maxWait: 15000 });
