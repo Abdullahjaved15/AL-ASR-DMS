@@ -2644,16 +2644,30 @@ const getCustomerTradeHistory = async (req, res) => {
   try {
     const { search = '', type = 'ALL' } = req.query;
 
-    const [salesInvoices, bookingInvoices] = await Promise.all([
+    const [salesInvoices, bookingInvoices, allAccounts] = await Promise.all([
       prisma.invoice.findMany({
         where: { category: 'SALES_RECEIPT' },
+        include: {
+          recoveryPayments: {
+            orderBy: { paymentDate: 'asc' }
+          }
+        },
         orderBy: { date: 'desc' }
       }),
       prisma.invoice.findMany({
         where: { category: 'BOOKING_RECEIPT' },
         orderBy: { date: 'desc' }
+      }),
+      prisma.account.findMany({
+        select: { id: true, code: true, name: true, bankName: true, accountNumber: true, subType: true }
       })
     ]);
+
+    // Fast lookup for account names (Cash safe, bank names, etc.)
+    const accountMap = new Map();
+    allAccounts.forEach(acc => {
+      accountMap.set(acc.id, acc.name || (acc.bankName ? `${acc.bankName} (${acc.accountNumber || ''})` : acc.code));
+    });
 
     const buyerMap = new Map();
     const sellerMap = new Map();
@@ -2661,6 +2675,13 @@ const getCustomerTradeHistory = async (req, res) => {
     salesInvoices.forEach(inv => {
       const price = parsePakistaniPrice(inv.totalPrice || inv.agreedAmount || inv.saleAmount || 0);
       const commAmt = parsePakistaniPrice(inv.commissionAmount || 0);
+      const initialAdvance = parsePakistaniPrice(inv.advanceAmount || 0);
+      const cashReceived = parsePakistaniPrice(inv.cashAmountReceived || 0);
+      const bankReceived = parsePakistaniPrice(inv.bankAmountReceived || 0);
+      const remainingBal = parsePakistaniPrice(inv.remainingAmount || 0);
+      const totalRecovered = parsePakistaniPrice(inv.recoveredAmount || 0);
+      const isTradeIn = Boolean(inv.isTradeIn);
+      const tradeInVal = parsePakistaniPrice(inv.tradeInValuation || 0);
 
       // 1. BUYER MAPPING
       const bName = inv.buyerName ? inv.buyerName.trim() : null;
@@ -2686,19 +2707,51 @@ const getCustomerTradeHistory = async (req, res) => {
             address: bAddress,
             totalVehiclesBought: 0,
             totalSpent: 0,
+            totalPaidToDate: 0,
+            totalPendingBalance: 0,
+            totalRecoveredPaid: 0,
+            activeRecoveryCasesCount: 0,
             totalBookingsCount: 0,
             purchasedVehicles: [],
-            bookingHistory: []
+            bookingHistory: [],
+            moneyTrail: []
           });
         }
 
         const bData = buyerMap.get(bKey);
         bData.totalVehiclesBought += 1;
         bData.totalSpent += price;
+        bData.totalPendingBalance += remainingBal;
+        bData.totalRecoveredPaid += totalRecovered;
+        if (remainingBal > 0) {
+          bData.activeRecoveryCasesCount += 1;
+        }
+
         if (!bData.phone && bPhone) bData.phone = bPhone;
         if (!bData.cnic && bCnic) bData.cnic = bCnic;
         if (!bData.address && bAddress) bData.address = bAddress;
 
+        // Map recovery payments with enriched bank account labels
+        const enrichedRecoveryPayments = (inv.recoveryPayments || []).map(rp => {
+          const accLabel = rp.bankAccountId 
+            ? (accountMap.get(rp.bankAccountId) || (rp.paymentMethod === 'BANK' ? 'Bank Account' : 'Showroom Safe Cash'))
+            : (rp.paymentMethod === 'BANK' ? 'Bank Account' : 'Showroom Safe Cash');
+          return {
+            id: rp.id,
+            amount: rp.amount,
+            paymentMethod: rp.paymentMethod,
+            bankAccountId: rp.bankAccountId,
+            accountName: accLabel,
+            receiptNumber: rp.receiptNumber,
+            paymentDate: rp.paymentDate,
+            receivedFrom: rp.receivedFrom || inv.buyerName,
+            notes: rp.notes,
+            transactionId: rp.transactionId,
+            createdAt: rp.createdAt
+          };
+        });
+
+        // Add to customer's purchased vehicles
         bData.purchasedVehicles.push({
           id: inv.id,
           invoiceNumber: inv.invoiceNumber,
@@ -2710,15 +2763,100 @@ const getCustomerTradeHistory = async (req, res) => {
           chassisNumber: inv.chassisNumber || '',
           color: inv.color || '',
           price,
-          advanceAmount: parsePakistaniPrice(inv.advanceAmount || 0),
-          remainingAmount: parsePakistaniPrice(inv.remainingAmount || 0),
+          advanceAmount: initialAdvance,
+          cashAmountReceived: cashReceived,
+          bankAmountReceived: bankReceived,
+          remainingAmount: remainingBal,
+          recoveredAmount: totalRecovered,
+          isRecoveryCase: Boolean(inv.isRecoveryCase || remainingBal > 0),
+          recoveryStatus: inv.recoveryStatus || (remainingBal > 0 ? 'PENDING' : 'FULLY_RECOVERED'),
+          recoveryPromiseDate: inv.recoveryPromiseDate || null,
+          recoveryNotes: inv.recoveryNotes || null,
+          recoveryPayments: enrichedRecoveryPayments,
           linkedBookingNumber: inv.linkedBookingNumber || null,
           sellerName: inv.sellerName || 'AL-ASR Showroom Stock',
           sellerPhone: inv.sellerPhone || '',
           salesmanName: inv.salesmanName || 'Showroom Staff',
           paymentMethod: inv.paymentMethod || 'CASH',
+          bankAccountId: inv.bankAccountId || null,
+          bankAccountName: inv.bankAccountId ? (accountMap.get(inv.bankAccountId) || 'Bank Account') : null,
           deliveryStatus: inv.deliveryStatus || 'DELIVERED',
-          isCustomerVehicle: Boolean(inv.isCustomerVehicle)
+          isCustomerVehicle: Boolean(inv.isCustomerVehicle),
+          isTradeIn,
+          tradeInValuation: tradeInVal,
+          tradeInVehicle: inv.tradeInVehicle ? `${inv.tradeInVehicle} ${inv.tradeInModel || ''} (${inv.tradeInRegNumber || ''})` : null
+        });
+
+        // Add Initial Sales Receipt Downpayment to Customer Money Trail
+        const saleDepositAmount = (cashReceived + bankReceived > 0)
+          ? (cashReceived + bankReceived)
+          : (initialAdvance > 0 ? initialAdvance : (price - remainingBal));
+
+        if (saleDepositAmount > 0) {
+          bData.totalPaidToDate += saleDepositAmount;
+          bData.moneyTrail.push({
+            id: `SALE_INFLOW_${inv.id}`,
+            invoiceId: inv.id,
+            date: inv.date,
+            type: 'SALES_DOWNPAYMENT',
+            typeLabel: 'Sales Advance / Inflow (ڈاؤن پیمنٹ)',
+            receiptNumber: inv.invoiceNumber,
+            amount: saleDepositAmount,
+            cashAmount: cashReceived,
+            bankAmount: bankReceived,
+            paymentMethod: inv.paymentMethod || 'CASH',
+            accountName: inv.bankAccountId ? (accountMap.get(inv.bankAccountId) || 'Bank Account') : (inv.paymentMethod === 'BANK' ? 'Bank Account' : 'Showroom Safe Cash'),
+            vehicle: `${inv.vehicleMaker || ''} ${inv.vehicleModel || ''}`.trim(),
+            registrationNo: inv.registrationNo || '',
+            chassisNumber: inv.chassisNumber || '',
+            salesmanName: inv.salesmanName || 'Showroom Staff',
+            remainingBalanceAfter: remainingBal,
+            notes: inv.remarks || (inv.linkedBookingNumber ? `Linked to Booking #${inv.linkedBookingNumber}` : 'Sales receipt initial inflow')
+          });
+        }
+
+        // Add Trade-In Valuation to Money Trail if applicable
+        if (isTradeIn && tradeInVal > 0) {
+          bData.moneyTrail.push({
+            id: `TRADEIN_${inv.id}`,
+            invoiceId: inv.id,
+            date: inv.date,
+            type: 'TRADE_IN_EXCHANGE',
+            typeLabel: 'Car Trade-In Exchange (گاڑی کا تبادلہ)',
+            receiptNumber: inv.invoiceNumber,
+            amount: tradeInVal,
+            paymentMethod: 'VEHICLE_EXCHANGE',
+            accountName: 'Trade-In Car Inventory',
+            vehicle: `${inv.vehicleMaker || ''} ${inv.vehicleModel || ''}`.trim(),
+            registrationNo: inv.registrationNo || '',
+            chassisNumber: inv.chassisNumber || '',
+            salesmanName: inv.salesmanName || 'Showroom Staff',
+            remainingBalanceAfter: remainingBal,
+            notes: `Exchanged: ${inv.tradeInVehicle || ''} ${inv.tradeInModel || ''} (${inv.tradeInRegNumber || 'N/A'})`
+          });
+        }
+
+        // Add all incremental Recovery Payments to Customer Money Trail
+        enrichedRecoveryPayments.forEach(rp => {
+          bData.totalPaidToDate += rp.amount;
+          bData.moneyTrail.push({
+            id: `RECOVERY_${rp.id}`,
+            invoiceId: inv.id,
+            recoveryPaymentId: rp.id,
+            date: rp.paymentDate || rp.createdAt,
+            type: 'RECOVERY_PAYMENT',
+            typeLabel: 'Recovery Inflow (بقایا ریکوری)',
+            receiptNumber: rp.receiptNumber || `RCV-${inv.invoiceNumber.slice(-4)}`,
+            amount: rp.amount,
+            paymentMethod: rp.paymentMethod,
+            accountName: rp.accountName,
+            vehicle: `${inv.vehicleMaker || ''} ${inv.vehicleModel || ''}`.trim(),
+            registrationNo: inv.registrationNo || '',
+            chassisNumber: inv.chassisNumber || '',
+            salesmanName: rp.receivedFrom || inv.salesmanName || 'Showroom Staff',
+            remainingBalanceAfter: null, // Dynamic in ledger
+            notes: rp.notes || `Recovery installment payment for #${inv.invoiceNumber}`
+          });
         });
       }
 
@@ -2785,12 +2923,14 @@ const getCustomerTradeHistory = async (req, res) => {
       }
     });
 
-    // Populate Booking History for Buyers
+    // Populate Booking History & Booking Advances for Buyers
     bookingInvoices.forEach(bk => {
       const bkName = bk.buyerName || bk.customerName ? (bk.buyerName || bk.customerName).trim() : null;
       const bkPhone = bk.buyerPhone || bk.customerPhone ? (bk.buyerPhone || bk.customerPhone).trim() : '';
       const bkCnic = bk.buyerCnic ? bk.buyerCnic.trim() : '';
       const bkAddress = bk.buyerAddress ? bk.buyerAddress.trim() : '';
+      const bkAdvance = parsePakistaniPrice(bk.advanceAmount || 0);
+      const bkTotalPrice = parsePakistaniPrice(bk.totalPrice || 0);
 
       if (bkName && bkName.toLowerCase() !== 'n/a') {
         const bKey = (bkPhone.replace(/\D/g, '').length >= 7)
@@ -2810,9 +2950,14 @@ const getCustomerTradeHistory = async (req, res) => {
             address: bkAddress,
             totalVehiclesBought: 0,
             totalSpent: 0,
+            totalPaidToDate: 0,
+            totalPendingBalance: 0,
+            totalRecoveredPaid: 0,
+            activeRecoveryCasesCount: 0,
             totalBookingsCount: 0,
             purchasedVehicles: [],
-            bookingHistory: []
+            bookingHistory: [],
+            moneyTrail: []
           });
         }
 
@@ -2831,8 +2976,9 @@ const getCustomerTradeHistory = async (req, res) => {
           carYear: bk.carYear || '',
           registrationNo: bk.registrationNo || '',
           chassisNumber: bk.chassisNumber || '',
-          advanceAmount: parsePakistaniPrice(bk.advanceAmount || 0),
-          totalPrice: parsePakistaniPrice(bk.totalPrice || 0),
+          advanceAmount: bkAdvance,
+          totalPrice: bkTotalPrice,
+          paymentMethod: bk.paymentMethod || 'CASH',
           isDeleted: Boolean(bk.isDeleted),
           bookingStatus: bk.bookingStatus || (bk.isDeleted ? 'CONVERTED_TO_SALE' : 'ACTIVE'),
           linkedSaleId: bk.linkedSaleId || null,
@@ -2843,7 +2989,57 @@ const getCustomerTradeHistory = async (req, res) => {
           cancelledAt: bk.cancelledAt || null,
           salesmanName: bk.salesmanName || 'Showroom Staff'
         });
+
+        // Add Active Booking Advance to Customer Money Trail
+        if (bkAdvance > 0) {
+          if (bk.bookingStatus === 'CANCELLED') {
+            bData.moneyTrail.push({
+              id: `BOOKING_CANCELLED_${bk.id}`,
+              invoiceId: bk.id,
+              date: bk.cancelledAt || bk.date,
+              type: 'REFUND_VOUCHER',
+              typeLabel: 'Booking Cancelled & Refunded (منسوخ شدہ)',
+              receiptNumber: bk.invoiceNumber,
+              amount: -bkAdvance,
+              paymentMethod: bk.paymentMethod || 'CASH',
+              accountName: 'Refund Outflow',
+              vehicle: `${bk.vehicleMaker || ''} ${bk.vehicleModel || ''}`.trim(),
+              registrationNo: bk.registrationNo || '',
+              chassisNumber: bk.chassisNumber || '',
+              salesmanName: bk.salesmanName || 'Showroom Staff',
+              remainingBalanceAfter: 0,
+              notes: `Refunded via Voucher #${bk.linkedVoucherNumber || 'PV-N/A'}${bk.cancellationReason ? ` (${bk.cancellationReason})` : ''}`
+            });
+          } else {
+            // Only add if not already converted to a sale that accounted for this advance
+            if (!bk.linkedSaleNumber) {
+              bData.totalPaidToDate += bkAdvance;
+            }
+            bData.moneyTrail.push({
+              id: `BOOKING_ADVANCE_${bk.id}`,
+              invoiceId: bk.id,
+              date: bk.date,
+              type: 'BOOKING_ADVANCE',
+              typeLabel: 'Booking Advance / Bayana (بیعانہ)',
+              receiptNumber: bk.invoiceNumber,
+              amount: bkAdvance,
+              paymentMethod: bk.paymentMethod || 'CASH',
+              accountName: bk.paymentMethod === 'BANK' ? 'Bank Account' : 'Showroom Safe Cash',
+              vehicle: `${bk.vehicleMaker || ''} ${bk.vehicleModel || ''}`.trim(),
+              registrationNo: bk.registrationNo || '',
+              chassisNumber: bk.chassisNumber || '',
+              salesmanName: bk.salesmanName || 'Showroom Staff',
+              remainingBalanceAfter: Math.max(0, bkTotalPrice - bkAdvance),
+              notes: bk.linkedSaleNumber ? `Converted to Sale #${bk.linkedSaleNumber}` : 'Active booking deposit'
+            });
+          }
+        }
       }
+    });
+
+    // Sort moneyTrail chronologically for every buyer (newest first)
+    buyerMap.forEach(buyer => {
+      buyer.moneyTrail.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     });
 
     let buyersList = Array.from(buyerMap.values());
@@ -2851,29 +3047,36 @@ const getCustomerTradeHistory = async (req, res) => {
 
     if (search && search.trim() !== '') {
       const q = search.toLowerCase().trim();
-      buyersList = buyersList.filter(b => 
-        b.name.toLowerCase().includes(q) ||
-        (b.phone && b.phone.includes(q)) ||
-        (b.cnic && b.cnic.includes(q)) ||
-        b.purchasedVehicles.some(v => 
-          v.vehicleMaker.toLowerCase().includes(q) ||
-          v.vehicleModel.toLowerCase().includes(q) ||
-          v.registrationNo.toLowerCase().includes(q) ||
-          v.chassisNumber.toLowerCase().includes(q)
-        )
-      );
+      const cleanQ = q.replace(/\D/g, '');
 
-      sellersList = sellersList.filter(s => 
-        s.name.toLowerCase().includes(q) ||
-        (s.phone && s.phone.includes(q)) ||
-        (s.cnic && s.cnic.includes(q)) ||
-        s.soldVehicles.some(v => 
+      buyersList = buyersList.filter(b => {
+        const nameMatch = b.name.toLowerCase().includes(q);
+        const phoneMatch = b.phone && (b.phone.toLowerCase().includes(q) || (cleanQ && b.phone.replace(/\D/g, '').includes(cleanQ)));
+        const cnicMatch = b.cnic && (b.cnic.toLowerCase().includes(q) || (cleanQ && b.cnic.replace(/\D/g, '').includes(cleanQ)));
+        const carMatch = b.purchasedVehicles.some(v => 
           v.vehicleMaker.toLowerCase().includes(q) ||
           v.vehicleModel.toLowerCase().includes(q) ||
           v.registrationNo.toLowerCase().includes(q) ||
           v.chassisNumber.toLowerCase().includes(q)
-        )
-      );
+        );
+        const receiptMatch = b.moneyTrail.some(m => 
+          m.receiptNumber.toLowerCase().includes(q)
+        );
+        return nameMatch || phoneMatch || cnicMatch || carMatch || receiptMatch;
+      });
+
+      sellersList = sellersList.filter(s => {
+        const nameMatch = s.name.toLowerCase().includes(q);
+        const phoneMatch = s.phone && (s.phone.toLowerCase().includes(q) || (cleanQ && s.phone.replace(/\D/g, '').includes(cleanQ)));
+        const cnicMatch = s.cnic && (s.cnic.toLowerCase().includes(q) || (cleanQ && s.cnic.replace(/\D/g, '').includes(cleanQ)));
+        const carMatch = s.soldVehicles.some(v => 
+          v.vehicleMaker.toLowerCase().includes(q) ||
+          v.vehicleModel.toLowerCase().includes(q) ||
+          v.registrationNo.toLowerCase().includes(q) ||
+          v.chassisNumber.toLowerCase().includes(q)
+        );
+        return nameMatch || phoneMatch || cnicMatch || carMatch;
+      });
     }
 
     buyersList.sort((a, b) => b.totalVehiclesBought - a.totalVehiclesBought || b.totalSpent - a.totalSpent);
